@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { siteUrl } from "@/lib/config";
 import { supabase } from "@/lib/supabase/client";
 
 type SignupErrors = {
@@ -11,6 +12,18 @@ type SignupErrors = {
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function getSignupRedirectUrl() {
+  if (siteUrl && !siteUrl.includes("localhost")) {
+    return `${siteUrl}/account`;
+  }
+
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/account`;
+  }
+
+  return "https://totosite.org/account";
 }
 
 export function SignupForm() {
@@ -47,6 +60,9 @@ export function SignupForm() {
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: {
+        emailRedirectTo: getSignupRedirectUrl(),
+      },
     });
     setIsSubmitting(false);
 
