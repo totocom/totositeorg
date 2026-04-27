@@ -77,6 +77,7 @@ export function SignupForm() {
   const [telegramCode, setTelegramCode] = useState("");
   const [isTelegramVerified, setIsTelegramVerified] = useState(false);
   const [telegramMessage, setTelegramMessage] = useState("");
+  const [telegramCopyMessage, setTelegramCopyMessage] = useState("");
   const [errors, setErrors] = useState<SignupErrors>({});
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,6 +89,7 @@ export function SignupForm() {
 
     setTelegramCode(code);
     setIsTelegramVerified(false);
+    setTelegramCopyMessage("");
     setTelegramMessage(
       "텔레그램 봇에서 시작 버튼을 누른 뒤 이 화면으로 돌아와 인증 확인을 눌러주세요.",
     );
@@ -95,6 +97,21 @@ export function SignupForm() {
 
     if (telegramUrl) {
       window.open(telegramUrl, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  async function copyTelegramStartCommand() {
+    if (!telegramCode) {
+      return;
+    }
+
+    const command = `/start signup_${telegramCode}`;
+
+    try {
+      await navigator.clipboard.writeText(command);
+      setTelegramCopyMessage("인증 명령어를 복사했습니다.");
+    } catch {
+      setTelegramCopyMessage("복사하지 못했습니다. 명령어를 직접 선택해주세요.");
     }
   }
 
@@ -240,6 +257,7 @@ export function SignupForm() {
     setPasswordConfirm("");
     setTelegramCode("");
     setIsTelegramVerified(false);
+    setTelegramCopyMessage("");
     setTelegramMessage("");
     setSuccessMessage(
       "회원가입 요청이 완료되었습니다. 이메일 인증을 위해 받은 편지함을 확인해주세요.",
@@ -347,17 +365,29 @@ export function SignupForm() {
               봇을 시작하면 가입 후 승인 알림을 같은 대화로 받을 수 있습니다.
             </p>
             {telegramCode ? (
-              <div className="mt-2 grid gap-1 text-xs text-muted">
+              <div className="mt-2 grid gap-2 text-xs text-muted">
                 <p>
                   인증 코드 <span className="font-semibold">{telegramCode}</span>
                 </p>
-                <p>
-                  버튼 연결이 안 되면 봇 대화방에{" "}
-                  <code className="rounded bg-surface px-1 py-0.5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <code className="break-all rounded bg-surface px-2 py-1.5">
                     /start signup_{telegramCode}
                   </code>
-                  를 보내주세요.
-                </p>
+                  <button
+                    type="button"
+                    onClick={copyTelegramStartCommand}
+                    className="h-8 rounded-md border border-line px-3 text-xs font-semibold text-foreground"
+                  >
+                    인증키 복사
+                  </button>
+                </div>
+                {telegramCopyMessage ? (
+                  <p className="font-semibold text-accent">
+                    {telegramCopyMessage}
+                  </p>
+                ) : (
+                  <p>버튼 연결이 안 되면 복사한 인증키를 봇 대화방에 보내주세요.</p>
+                )}
               </div>
             ) : null}
             {telegramMessage ? (
