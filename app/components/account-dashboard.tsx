@@ -120,6 +120,8 @@ export function AccountDashboard() {
   const [telegramSubscription, setTelegramSubscription] =
     useState<TelegramSubscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshingTelegram, setIsRefreshingTelegram] = useState(false);
+  const [telegramCopyMessage, setTelegramCopyMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -185,6 +187,40 @@ export function AccountDashboard() {
   }
 
   const telegramStartUrl = getTelegramStartUrl(user.id);
+  const telegramStartCommand = `/start ${user.id}`;
+
+  async function refreshTelegramConnection() {
+    if (!user) return;
+
+    setIsRefreshingTelegram(true);
+    setTelegramCopyMessage("");
+
+    const { data, error } = await supabase
+      .from("telegram_subscriptions")
+      .select("chat_id, username, first_name, is_active, updated_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    setIsRefreshingTelegram(false);
+
+    if (error) {
+      setErrorMessage("텔레그램 연결 상태를 다시 확인하지 못했습니다.");
+      return;
+    }
+
+    setTelegramSubscription((data as TelegramSubscription | null) ?? null);
+  }
+
+  async function copyTelegramStartCommand() {
+    setTelegramCopyMessage("");
+
+    try {
+      await navigator.clipboard.writeText(telegramStartCommand);
+      setTelegramCopyMessage("연결 명령어를 복사했습니다.");
+    } catch {
+      setTelegramCopyMessage("복사하지 못했습니다. 명령어를 직접 선택해서 복사해주세요.");
+    }
+  }
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
@@ -217,21 +253,56 @@ export function AccountDashboard() {
                 아직 텔레그램 알림이 연결되지 않았습니다.
               </p>
             )}
+            {!telegramSubscription?.is_active ? (
+              <div className="mt-4 rounded-md border border-line bg-background p-3 text-sm">
+                <p className="text-muted">
+                  봇을 이미 시작한 상태라 버튼 연결이 안 되면 아래 명령어를
+                  텔레그램 봇 대화방에 보내주세요.
+                </p>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <code className="break-all rounded-md bg-surface px-3 py-2 text-xs">
+                    {telegramStartCommand}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={copyTelegramStartCommand}
+                    className="h-9 rounded-md border border-line px-3 text-xs font-semibold"
+                  >
+                    복사
+                  </button>
+                </div>
+                {telegramCopyMessage ? (
+                  <p className="mt-2 text-xs font-semibold text-accent">
+                    {telegramCopyMessage}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-          {telegramStartUrl ? (
-            <a
-              href={telegramStartUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
+          <div className="flex flex-col gap-2">
+            {telegramStartUrl ? (
+              <a
+                href={telegramStartUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
+              >
+                텔레그램 봇 시작하기
+              </a>
+            ) : (
+              <p className="text-sm font-semibold text-muted">
+                텔레그램 봇 링크 설정이 필요합니다.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={refreshTelegramConnection}
+              disabled={isRefreshingTelegram}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-sm font-semibold disabled:opacity-50"
             >
-              텔레그램 봇 시작하기
-            </a>
-          ) : (
-            <p className="text-sm font-semibold text-muted">
-              텔레그램 봇 링크 설정이 필요합니다.
-            </p>
-          )}
+              {isRefreshingTelegram ? "확인 중..." : "연결 상태 새로고침"}
+            </button>
+          </div>
         </div>
       </section>
 
