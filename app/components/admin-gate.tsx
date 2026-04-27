@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { AdminDashboard } from "@/app/components/admin-dashboard";
+import {
+  AdminDashboard,
+  type AdminSection,
+} from "@/app/components/admin-dashboard";
 import { useAuth } from "@/app/components/auth-provider";
 
-export function AdminGate() {
+export function AdminGate({ section = "home" }: { section?: AdminSection }) {
   const { user, isAdmin, isLoading, errorMessage } = useAuth();
 
   if (isLoading) {
@@ -61,5 +64,5 @@ export function AdminGate() {
     );
   }
 
-  return <AdminDashboard />;
+  return <AdminDashboard section={section} />;
 }

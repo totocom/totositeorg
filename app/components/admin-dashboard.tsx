@@ -7,6 +7,16 @@ import { issueTypeLabels, moderationStatusLabels } from "@/app/data/sites";
 import { supabase } from "@/lib/supabase/client";
 
 type ModerationStatus = "pending" | "approved" | "rejected";
+export type AdminSection =
+  | "home"
+  | "sites"
+  | "rejected-sites"
+  | "site-registration"
+  | "users"
+  | "reviews"
+  | "scam-reports"
+  | "rejected-reviews"
+  | "surveys";
 
 type SiteRow = {
   id: string;
@@ -288,7 +298,7 @@ async function fetchAdminData(): Promise<AdminDataResult> {
   };
 }
 
-export function AdminDashboard() {
+export function AdminDashboard({ section = "home" }: { section?: AdminSection }) {
   const { user } = useAuth();
   const [sites, setSites] = useState<SiteRow[]>([]);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
@@ -1036,6 +1046,20 @@ export function AdminDashboard() {
     updatingItem.status === status;
   const isDeleting = (table: "sites" | "reviews" | "scam_reports", id: string) =>
     deletingItem?.table === table && deletingItem.id === id;
+  const isHome = section === "home";
+  const showSites = section === "sites";
+  const showRejectedSites = section === "rejected-sites";
+  const showSiteRegistration = section === "site-registration";
+  const showUsers = section === "users";
+  const showReviews = section === "reviews" || section === "surveys";
+  const showScamReports = section === "scam-reports";
+  const showRejectedReviews = section === "rejected-reviews";
+  const showModerationTables =
+    showSites ||
+    showRejectedSites ||
+    showReviews ||
+    showScamReports ||
+    showRejectedReviews;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
@@ -1050,32 +1074,14 @@ export function AdminDashboard() {
         </p>
       </div>
 
-      <nav className="mb-6 flex flex-wrap gap-2" aria-label="관리자 메뉴">
-        <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#sites">
-          사이트 관리
+      {isHome ? <AdminSectionCards /> : (
+        <a
+          href="/admin"
+          className="mb-6 inline-flex h-10 items-center rounded-md border border-line px-4 text-sm font-semibold"
+        >
+          관리자 홈으로
         </a>
-        <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#rejected-sites">
-          사이트 거절 목록
-        </a>
-        <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#site-registration">
-          사이트 등록
-        </a>
-        <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#users">
-          회원 관리
-        </a>
-        <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#reviews">
-          리뷰 관리
-        </a>
-        <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#scam-reports">
-          먹튀 제보 관리
-        </a>
-        <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#rejected-reviews">
-          리뷰 거절 목록
-        </a>
-        <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#reviews">
-          설문 관리
-        </a>
-      </nav>
+      )}
 
       {errorMessage ? (
         <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
@@ -1102,15 +1108,18 @@ export function AdminDashboard() {
         <SummaryCard label="전체 회원" value={adminUsers.length} />
       </section>
 
-      <UserTable
-        users={adminUsers}
-        isLoading={isLoadingUsers}
-        errorMessage={usersErrorMessage}
-        deletingUserId={deletingUserId}
-        onDeleteUser={deleteUser}
-        onRefresh={loadAdminUsers}
-      />
+      {showUsers ? (
+        <UserTable
+          users={adminUsers}
+          isLoading={isLoadingUsers}
+          errorMessage={usersErrorMessage}
+          deletingUserId={deletingUserId}
+          onDeleteUser={deleteUser}
+          onRefresh={loadAdminUsers}
+        />
+      ) : null}
 
+      {showSiteRegistration ? (
       <section
         id="site-registration"
         className="mb-6 rounded-lg border border-line bg-surface p-5 shadow-sm"
@@ -1472,13 +1481,15 @@ export function AdminDashboard() {
           </button>
         </form>
       </section>
+      ) : null}
 
-      {isLoading ? (
+      {showModerationTables && isLoading ? (
         <section className="rounded-lg border border-line bg-surface p-5 text-sm text-muted shadow-sm">
           관리자 데이터를 불러오는 중입니다.
         </section>
-      ) : (
+      ) : showModerationTables ? (
         <div className="grid gap-6">
+          {showSites ? (
           <SiteTable
             anchorId="sites"
             title="승인 대기 사이트"
@@ -1491,6 +1502,8 @@ export function AdminDashboard() {
             setEditingSlug={setEditingSlug}
             onUpdateSlug={updateSlug}
           />
+          ) : null}
+          {showReviews ? (
           <ReviewTable
             anchorId="reviews"
             title="승인 대기 리뷰"
@@ -1500,6 +1513,8 @@ export function AdminDashboard() {
             onUpdateStatus={updateStatus}
             onDelete={deleteItem}
           />
+          ) : null}
+          {showScamReports ? (
           <ScamReportTable
             anchorId="scam-reports"
             title="승인 대기 먹튀 제보"
@@ -1509,6 +1524,8 @@ export function AdminDashboard() {
             onUpdateStatus={updateStatus}
             onDelete={deleteItem}
           />
+          ) : null}
+          {showSites ? (
           <SiteTable
             anchorId="approved-sites"
             title="승인된 사이트"
@@ -1521,6 +1538,8 @@ export function AdminDashboard() {
             setEditingSlug={setEditingSlug}
             onUpdateSlug={updateSlug}
           />
+          ) : null}
+          {showReviews ? (
           <ReviewTable
             anchorId="approved-reviews"
             title="승인된 리뷰"
@@ -1530,6 +1549,8 @@ export function AdminDashboard() {
             onUpdateStatus={updateStatus}
             onDelete={deleteItem}
           />
+          ) : null}
+          {showScamReports ? (
           <ScamReportTable
             anchorId="approved-scam-reports"
             title="승인된 먹튀 제보"
@@ -1539,6 +1560,8 @@ export function AdminDashboard() {
             onUpdateStatus={updateStatus}
             onDelete={deleteItem}
           />
+          ) : null}
+          {showRejectedSites ? (
           <SiteTable
             anchorId="rejected-sites"
             title="거절된 사이트"
@@ -1551,6 +1574,8 @@ export function AdminDashboard() {
             setEditingSlug={setEditingSlug}
             onUpdateSlug={updateSlug}
           />
+          ) : null}
+          {showRejectedReviews ? (
           <ReviewTable
             anchorId="rejected-reviews"
             title="거절된 리뷰"
@@ -1560,6 +1585,8 @@ export function AdminDashboard() {
             onUpdateStatus={updateStatus}
             onDelete={deleteItem}
           />
+          ) : null}
+          {showScamReports ? (
           <ScamReportTable
             anchorId="rejected-scam-reports"
             title="거절된 먹튀 제보"
@@ -1569,9 +1596,76 @@ export function AdminDashboard() {
             onUpdateStatus={updateStatus}
             onDelete={deleteItem}
           />
+          ) : null}
         </div>
-      )}
+      ) : null}
     </main>
+  );
+}
+
+const adminSections: Array<{
+  href: string;
+  title: string;
+  description: string;
+}> = [
+  {
+    href: "/admin/sites",
+    title: "사이트 관리",
+    description: "승인 대기 및 승인된 사이트를 검토합니다.",
+  },
+  {
+    href: "/admin/rejected-sites",
+    title: "사이트 거절 목록",
+    description: "거절 처리된 사이트를 다시 확인합니다.",
+  },
+  {
+    href: "/admin/site-registration",
+    title: "사이트 등록",
+    description: "관리자가 사이트 정보를 직접 등록합니다.",
+  },
+  {
+    href: "/admin/users",
+    title: "회원 관리",
+    description: "가입 회원을 확인하고 필요 시 삭제합니다.",
+  },
+  {
+    href: "/admin/reviews",
+    title: "리뷰 관리",
+    description: "승인 대기 및 승인된 리뷰를 검토합니다.",
+  },
+  {
+    href: "/admin/scam-reports",
+    title: "먹튀 제보 관리",
+    description: "먹튀 제보의 검토 상태와 공개 여부를 관리합니다.",
+  },
+  {
+    href: "/admin/rejected-reviews",
+    title: "리뷰 거절 목록",
+    description: "거절 처리된 리뷰를 다시 확인합니다.",
+  },
+  {
+    href: "/admin/surveys",
+    title: "설문 관리",
+    description: "만족도 평가로 접수된 리뷰를 관리합니다.",
+  },
+];
+
+function AdminSectionCards() {
+  return (
+    <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {adminSections.map((adminSection) => (
+        <a
+          key={adminSection.href}
+          href={adminSection.href}
+          className="rounded-lg border border-line bg-surface p-4 shadow-sm transition hover:border-accent"
+        >
+          <h2 className="font-semibold">{adminSection.title}</h2>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            {adminSection.description}
+          </p>
+        </a>
+      ))}
+    </section>
   );
 }
 
