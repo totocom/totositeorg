@@ -34,16 +34,24 @@ type TelegramSubscription = {
   updated_at: string;
 };
 
+type UserProfile = {
+  username: string;
+  nickname: string;
+  telegram_verified_at: string | null;
+};
+
 type AccountDataResult =
   | {
       sites: UserSite[];
       reviews: UserReview[];
+      profile: UserProfile | null;
       telegramSubscription: TelegramSubscription | null;
       errorMessage: "";
     }
   | {
       sites: [];
       reviews: [];
+      profile: null;
       telegramSubscription: null;
       errorMessage: string;
     };
@@ -76,7 +84,7 @@ function getTelegramStartUrl(userId: string) {
 }
 
 async function fetchAccountData(userId: string): Promise<AccountDataResult> {
-  const [sitesResult, reviewsResult, telegramResult] = await Promise.all([
+  const [sitesResult, reviewsResult, profileResult, telegramResult] = await Promise.all([
     supabase
       .from("sites")
       .select("id, name, url, category, status, created_at")
@@ -88,16 +96,27 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     supabase
+      .from("profiles")
+      .select("username, nickname, telegram_verified_at")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
       .from("telegram_subscriptions")
       .select("chat_id, username, first_name, is_active, updated_at")
       .eq("user_id", userId)
       .maybeSingle(),
   ]);
 
-  if (sitesResult.error || reviewsResult.error || telegramResult.error) {
+  if (
+    sitesResult.error ||
+    reviewsResult.error ||
+    profileResult.error ||
+    telegramResult.error
+  ) {
     return {
       sites: [],
       reviews: [],
+      profile: null,
       telegramSubscription: null,
       errorMessage:
         "내 작성 내역을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
@@ -107,6 +126,7 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
   return {
     sites: (sitesResult.data ?? []) as UserSite[],
     reviews: (reviewsResult.data ?? []) as UserReview[],
+    profile: (profileResult.data as UserProfile | null) ?? null,
     telegramSubscription:
       (telegramResult.data as TelegramSubscription | null) ?? null,
     errorMessage: "",
@@ -117,6 +137,7 @@ export function AccountDashboard() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [sites, setSites] = useState<UserSite[]>([]);
   const [reviews, setReviews] = useState<UserReview[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [telegramSubscription, setTelegramSubscription] =
     useState<TelegramSubscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -145,6 +166,7 @@ export function AccountDashboard() {
 
       setSites(result.sites);
       setReviews(result.reviews);
+      setProfile(result.profile);
       setTelegramSubscription(result.telegramSubscription);
       setErrorMessage(result.errorMessage);
       setIsLoading(false);
@@ -230,8 +252,20 @@ export function AccountDashboard() {
       </div>
 
       <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
-        <p className="text-sm text-muted">내 이메일</p>
-        <p className="mt-2 font-semibold">{user.email}</p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-sm text-muted">아이디</p>
+            <p className="mt-2 font-semibold">{profile?.username ?? "-"}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted">닉네임</p>
+            <p className="mt-2 font-semibold">{profile?.nickname ?? "-"}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted">내 이메일</p>
+            <p className="mt-2 break-all font-semibold">{user.email}</p>
+          </div>
+        </div>
       </section>
 
       <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">

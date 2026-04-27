@@ -296,6 +296,25 @@ create table if not exists public.admin_users (
   )
 );
 
+create table if not exists public.profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  username text unique not null,
+  nickname text not null,
+  telegram_verified_at timestamptz null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint profiles_username_format check (
+    username ~ '^[a-z0-9_]{4,20}$'
+  ),
+  constraint profiles_nickname_not_blank check (
+    length(trim(nickname)) > 0
+  ),
+  constraint profiles_nickname_length check (
+    char_length(trim(nickname)) between 2 and 20
+  )
+);
+
 create table if not exists public.telegram_subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -309,6 +328,25 @@ create table if not exists public.telegram_subscriptions (
 
   constraint telegram_subscriptions_user_unique unique (user_id),
   constraint telegram_subscriptions_chat_id_not_blank check (
+    length(trim(chat_id)) > 0
+  )
+);
+
+create table if not exists public.telegram_signup_codes (
+  id uuid primary key default gen_random_uuid(),
+  verification_code text unique not null,
+  chat_id text not null,
+  username text null,
+  first_name text null,
+  last_name text null,
+  expires_at timestamptz not null,
+  consumed_at timestamptz null,
+  created_at timestamptz not null default now(),
+
+  constraint telegram_signup_codes_code_format check (
+    verification_code ~ '^[A-Z0-9]{8}$'
+  ),
+  constraint telegram_signup_codes_chat_id_not_blank check (
     length(trim(chat_id)) > 0
   )
 );
@@ -370,11 +408,17 @@ create index if not exists state_availability_state_code_idx
 create index if not exists admin_users_email_idx
   on public.admin_users (lower(email));
 
+create index if not exists profiles_username_idx
+  on public.profiles (lower(username));
+
 create index if not exists telegram_subscriptions_user_id_idx
   on public.telegram_subscriptions (user_id);
 
 create index if not exists telegram_subscriptions_chat_id_idx
   on public.telegram_subscriptions (chat_id);
+
+create index if not exists telegram_signup_codes_code_idx
+  on public.telegram_signup_codes (verification_code);
 
 update public.sites
 set slug = regexp_replace(
@@ -430,12 +474,135 @@ before update on public.telegram_subscriptions
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists set_profiles_updated_at on public.profiles;
+create trigger set_profiles_updated_at
+before update on public.profiles
+for each row
+execute function public.set_updated_at();
+
+create or replace function public.handle_new_user_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  requested_username text;
+  requested_nickname text;
+  signup_code text;
+  signup_telegram public.telegram_signup_codes%rowtype;
+begin
+  requested_username := lower(coalesce(new.raw_user_meta_data ->> 'username', ''));
+  requested_username := regexp_replace(requested_username, '[^a-z0-9_]+', '', 'g');
+
+  if requested_username is null or length(requested_username) < 4 then
+    requested_username := 'user_' || substr(new.id::text, 1, 8);
+  end if;
+
+  requested_username := left(requested_username, 20);
+
+  requested_nickname := trim(coalesce(new.raw_user_meta_data ->> 'nickname', ''));
+
+  if requested_nickname = '' then
+    requested_nickname := split_part(coalesce(new.email, 'user'), '@', 1);
+  end if;
+
+  if char_length(requested_nickname) < 2 then
+    requested_nickname := 'user';
+  end if;
+
+  requested_nickname := left(requested_nickname, 20);
+
+  insert into public.profiles (
+    user_id,
+    username,
+    nickname
+  )
+  values (
+    new.id,
+    requested_username,
+    requested_nickname
+  )
+  on conflict (user_id) do nothing;
+
+  signup_code := upper(coalesce(new.raw_user_meta_data ->> 'telegram_signup_code', ''));
+
+  if signup_code ~ '^[A-Z0-9]{8}$' then
+    select *
+    into signup_telegram
+    from public.telegram_signup_codes
+    where verification_code = signup_code
+      and consumed_at is null
+      and expires_at > now()
+    limit 1;
+
+    if found then
+      update public.profiles
+      set telegram_verified_at = now()
+      where user_id = new.id;
+
+      delete from public.telegram_subscriptions
+      where user_id = new.id
+        or chat_id = signup_telegram.chat_id;
+
+      insert into public.telegram_subscriptions (
+        user_id,
+        chat_id,
+        username,
+        first_name,
+        last_name,
+        is_active
+      )
+      values (
+        new.id,
+        signup_telegram.chat_id,
+        signup_telegram.username,
+        signup_telegram.first_name,
+        signup_telegram.last_name,
+        true
+      );
+
+      update public.telegram_signup_codes
+      set consumed_at = now()
+      where id = signup_telegram.id;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created_create_profile on auth.users;
+create trigger on_auth_user_created_create_profile
+after insert on auth.users
+for each row
+execute function public.handle_new_user_profile();
+
+insert into public.profiles (user_id, username, nickname)
+select
+  auth_users.id,
+  'user_' || substr(auth_users.id::text, 1, 8),
+  case
+    when char_length(split_part(coalesce(auth_users.email, 'user'), '@', 1)) < 2
+      then 'user'
+    else left(split_part(coalesce(auth_users.email, 'user'), '@', 1), 20)
+  end
+from auth.users as auth_users
+where not exists (
+  select 1
+  from public.profiles
+  where profiles.user_id = auth_users.id
+)
+on conflict do nothing;
+
 alter table public.sites enable row level security;
 alter table public.reviews enable row level security;
 alter table public.scam_reports enable row level security;
 alter table public.state_availability enable row level security;
 alter table public.admin_users enable row level security;
+alter table public.profiles enable row level security;
 alter table public.telegram_subscriptions enable row level security;
+alter table public.telegram_signup_codes enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -569,6 +736,19 @@ on public.admin_users
 for select
 using (lower(email) = lower(auth.jwt() ->> 'email'));
 
+drop policy if exists "Users can read own profile" on public.profiles;
+create policy "Users can read own profile"
+on public.profiles
+for select
+using (user_id = auth.uid());
+
+drop policy if exists "Users can update own profile" on public.profiles;
+create policy "Users can update own profile"
+on public.profiles
+for update
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
 drop policy if exists "Users can read own telegram subscription"
   on public.telegram_subscriptions;
 create policy "Users can read own telegram subscription"
@@ -653,5 +833,11 @@ drop policy if exists "Admins can read telegram subscriptions"
   on public.telegram_subscriptions;
 create policy "Admins can read telegram subscriptions"
 on public.telegram_subscriptions
+for select
+using (public.is_admin());
+
+drop policy if exists "Admins can read profiles" on public.profiles;
+create policy "Admins can read profiles"
+on public.profiles
 for select
 using (public.is_admin());

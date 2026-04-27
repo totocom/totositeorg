@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
@@ -9,18 +10,14 @@ type LoginFormProps = {
 };
 
 type LoginErrors = {
-  email?: string;
+  login?: string;
   password?: string;
   form?: string;
 };
 
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
 export function LoginForm({ redirectTo }: LoginFormProps) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,10 +26,8 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
     event.preventDefault();
     const nextErrors: LoginErrors = {};
 
-    if (!email.trim()) {
-      nextErrors.email = "이메일을 입력해주세요.";
-    } else if (!isValidEmail(email.trim())) {
-      nextErrors.email = "올바른 이메일 형식으로 입력해주세요.";
+    if (!login.trim()) {
+      nextErrors.login = "아이디 또는 이메일을 입력해주세요.";
     }
 
     if (!password) {
@@ -46,15 +41,35 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
     }
 
     setIsSubmitting(true);
+    const resolveResponse = await fetch("/api/auth/resolve-login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ login: login.trim() }),
+    }).catch(() => null);
+    const resolveResult = (await resolveResponse?.json().catch(() => null)) as {
+      email?: string;
+      error?: string;
+    } | null;
+
+    if (!resolveResponse?.ok || !resolveResult?.email) {
+      setIsSubmitting(false);
+      setErrors({
+        form: resolveResult?.error ?? "아이디 또는 비밀번호를 확인해주세요.",
+      });
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: resolveResult.email,
       password,
     });
     setIsSubmitting(false);
 
     if (error) {
       setErrors({
-        form: "로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.",
+        form: "로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.",
       });
       return;
     }
@@ -76,15 +91,16 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
       ) : null}
 
       <label className="grid gap-1 text-sm font-medium">
-        이메일
+        아이디 또는 이메일
         <input
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          value={login}
+          onChange={(event) => setLogin(event.target.value)}
           className="h-11 rounded-md border border-line px-3 text-sm"
-          placeholder="email@example.com"
+          placeholder="아이디 또는 email@example.com"
+          autoComplete="username"
         />
-        {errors.email ? (
-          <span className="text-xs text-red-700">{errors.email}</span>
+        {errors.login ? (
+          <span className="text-xs text-red-700">{errors.login}</span>
         ) : null}
       </label>
 
@@ -96,6 +112,7 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
           onChange={(event) => setPassword(event.target.value)}
           className="h-11 rounded-md border border-line px-3 text-sm"
           placeholder="비밀번호"
+          autoComplete="current-password"
         />
         {errors.password ? (
           <span className="text-xs text-red-700">{errors.password}</span>
@@ -109,6 +126,12 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
       >
         {isSubmitting ? "로그인 중..." : "로그인"}
       </button>
+
+      <div className="flex flex-wrap justify-center gap-3 text-xs font-semibold text-accent">
+        <Link href="/forgot-username">아이디 찾기</Link>
+        <span className="text-muted">/</span>
+        <Link href="/forgot-password">비밀번호 찾기</Link>
+      </div>
     </form>
   );
 }

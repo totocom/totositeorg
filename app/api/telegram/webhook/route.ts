@@ -43,6 +43,11 @@ function isUuid(value: string) {
   );
 }
 
+function getSignupCode(payload: string) {
+  const match = payload.match(/^signup_([A-Z0-9]{8})$/i);
+  return match?.[1]?.toUpperCase() ?? "";
+}
+
 function getStartPayload(text: string) {
   const match = text.trim().match(/^\/start(?:@\w+)?(?:\s+(.+))?$/i);
   return match?.[1]?.trim() ?? "";
@@ -87,6 +92,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  const signupCode = getSignupCode(payload);
+  const { supabaseUrl, serviceRoleKey } = getEnv();
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  if (signupCode) {
+    const { error } = await supabase.from("telegram_signup_codes").upsert(
+      {
+        verification_code: signupCode,
+        chat_id: String(chatId),
+        username: from.username ?? null,
+        first_name: from.first_name ?? null,
+        last_name: from.last_name ?? null,
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        consumed_at: null,
+      },
+      { onConflict: "verification_code" },
+    );
+
+    if (!error) {
+      await sendTelegramMessage(
+        String(chatId),
+        "텔레그램 인증이 확인되었습니다. 회원가입 페이지로 돌아가 인증 확인 버튼을 눌러주세요.",
+      );
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
   if (!isUuid(payload)) {
     await sendTelegramMessage(
       String(chatId),
@@ -95,8 +128,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const { supabaseUrl, serviceRoleKey } = getEnv();
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
   const { error } = await supabase.from("telegram_subscriptions").upsert(
     {
       user_id: payload,

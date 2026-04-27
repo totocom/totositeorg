@@ -16,7 +16,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <p className="text-sm font-semibold uppercase text-accent">로그인</p>
         <h1 className="mt-1 text-3xl font-bold">계정 로그인</h1>
         <p className="mt-2 text-sm leading-6 text-muted">
-          이메일과 비밀번호로 로그인합니다.
+          아이디 또는 이메일과 비밀번호로 로그인합니다.
         </p>
       </div>
 
