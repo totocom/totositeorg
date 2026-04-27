@@ -1,0 +1,239 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/app/components/auth-provider";
+import { moderationStatusLabels } from "@/app/data/sites";
+import { supabase } from "@/lib/supabase/client";
+
+type UserSite = {
+  id: string;
+  name: string;
+  url: string;
+  category: string;
+  status: keyof typeof moderationStatusLabels;
+  created_at: string;
+};
+
+type UserReview = {
+  id: string;
+  title: string;
+  rating: number;
+  status: keyof typeof moderationStatusLabels;
+  created_at: string;
+  sites?: {
+    name: string;
+  }[] | null;
+};
+
+type AccountDataResult =
+  | {
+      sites: UserSite[];
+      reviews: UserReview[];
+      errorMessage: "";
+    }
+  | {
+      sites: [];
+      reviews: [];
+      errorMessage: string;
+    };
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
+function getReviewSiteName(review: UserReview) {
+  return review.sites?.[0]?.name ?? "알 수 없음";
+}
+
+async function fetchAccountData(userId: string): Promise<AccountDataResult> {
+  const [sitesResult, reviewsResult] = await Promise.all([
+    supabase
+      .from("sites")
+      .select("id, name, url, category, status, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("reviews")
+      .select("id, title, rating, status, created_at, sites(name)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (sitesResult.error || reviewsResult.error) {
+    return {
+      sites: [],
+      reviews: [],
+      errorMessage:
+        "내 작성 내역을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+    };
+  }
+
+  return {
+    sites: (sitesResult.data ?? []) as UserSite[],
+    reviews: (reviewsResult.data ?? []) as UserReview[],
+    errorMessage: "",
+  };
+}
+
+export function AccountDashboard() {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const [sites, setSites] = useState<UserSite[]>([]);
+  const [reviews, setReviews] = useState<UserReview[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAccount() {
+      if (isAuthLoading) {
+        return;
+      }
+
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+
+      const result = await fetchAccountData(user.id);
+
+      if (!isMounted) {
+        return;
+      }
+
+      setSites(result.sites);
+      setReviews(result.reviews);
+      setErrorMessage(result.errorMessage);
+      setIsLoading(false);
+    }
+
+    loadAccount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, isAuthLoading]);
+
+  if (isLoading) {
+    return (
+      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+        <section className="rounded-lg border border-line bg-surface p-5 text-sm text-muted shadow-sm">
+          계정 정보를 불러오는 중입니다.
+        </section>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+        <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
+          <h1 className="text-2xl font-bold">로그인이 필요합니다</h1>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            내 계정 정보를 확인하려면 먼저 로그인해주세요.
+          </p>
+          <Link
+            href="/login?redirectTo=/account"
+            className="mt-4 inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
+          >
+            로그인
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mb-5">
+        <p className="text-sm font-semibold uppercase text-accent">내 계정</p>
+        <h1 className="mt-1 text-3xl font-bold">계정 정보</h1>
+      </div>
+
+      <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
+        <p className="text-sm text-muted">내 이메일</p>
+        <p className="mt-2 font-semibold">{user.email}</p>
+      </section>
+
+      {errorMessage ? (
+        <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">
+        <h2 className="text-lg font-semibold">내가 작성한 리뷰</h2>
+        {reviews.length > 0 ? (
+          <div className="mt-4 grid gap-3">
+            {reviews.map((review) => (
+              <article
+                key={review.id}
+                className="rounded-md border border-line p-4"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-accent">
+                      {getReviewSiteName(review)} · 만족도 평가
+                    </p>
+                    <h3 className="mt-1 font-semibold">{review.title}</h3>
+                  </div>
+                  <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold">
+                    {moderationStatusLabels[review.status]}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-muted">
+                  평점 {review.rating}/5 · {formatDate(review.created_at)}
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm leading-6 text-muted">
+            아직 작성한 리뷰가 없습니다.
+          </p>
+        )}
+      </section>
+
+      <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">
+        <h2 className="text-lg font-semibold">내가 제보한 사이트</h2>
+        {sites.length > 0 ? (
+          <div className="mt-4 grid gap-3">
+            {sites.map((site) => (
+              <article
+                key={site.id}
+                className="rounded-md border border-line p-4"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-accent">
+                      {site.category}
+                    </p>
+                    <h3 className="mt-1 font-semibold">{site.name}</h3>
+                    <p className="mt-1 break-all text-sm text-muted">
+                      {site.url}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold">
+                    {moderationStatusLabels[site.status]}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-muted">
+                  제보일 {formatDate(site.created_at)}
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm leading-6 text-muted">
+            아직 제보한 사이트가 없습니다.
+          </p>
+        )}
+      </section>
+    </main>
+  );
+}

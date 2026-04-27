@@ -1,5 +1,68 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Supabase schema
+
+The initial database schema is in `supabase/schema.sql`.
+
+Run order:
+
+1. Open Supabase Dashboard > SQL Editor.
+2. Paste the full contents of `supabase/schema.sql`.
+3. Run the query once before connecting the app to Supabase.
+
+The SQL includes `sites`, `reviews`, and `state_availability` tables, indexes,
+check constraints, `updated_at` triggers, `admin_users`, and RLS policies.
+
+When updating an existing Supabase project, run the latest
+`supabase/schema.sql` again in SQL Editor. The file uses `create table if not
+exists`, `add column if not exists`, and `drop policy if exists` for repeatable
+schema updates, including `sites.user_id`, `reviews.user_id`, and owner read
+policies.
+
+### Register an admin email
+
+Create the user through Supabase Auth first. Then run this in Supabase SQL
+Editor, replacing the email with the admin account email:
+
+```sql
+insert into public.admin_users (email)
+values ('관리자이메일@example.com');
+```
+
+After registration, log in with that email to access `/admin` and perform
+approve/reject actions.
+
+### Backfill site slugs
+
+If you already have rows in `public.sites` before adding `slug`, run this once
+after `supabase/schema.sql`:
+
+```sql
+update public.sites
+set slug = regexp_replace(
+  trim(both '-' from lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'))),
+  '-+',
+  '-',
+  'g'
+) || '-' || substr(id::text, 1, 8)
+where slug is null;
+```
+
+New site submissions generate a name-based slug with a short suffix
+automatically.
+
+### Slug rules
+
+`sites.slug` is required and unique. It is used in public URLs such as
+`/sites/example-slug`.
+
+Rules:
+
+- Use lowercase letters, numbers, and hyphens only.
+- Do not start or end with a hyphen.
+- Keep it stable after publishing because changing it changes the public URL.
+- Admins can edit slugs in `/admin`, but should do so carefully.
+
 ## Getting Started
 
 First, run the development server:

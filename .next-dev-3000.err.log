@@ -1,0 +1,144 @@
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'map')
+    at SubmitReviewForm (app/components/submit-review-form.tsx:298:21)
+    at SubmitReviewPage (about://React/Server/D:%5Cclassified-site%5C.next%5Cdev%5Cserver%5Cchunks%5Cssr%5C%5Broot-of-the-server%5D__0waczi.._.js?170:415:264)
+  296 |             className="h-11 rounded-md border border-line bg-white px-3 text-sm"
+  297 |           >
+> 298 |             {states.map((state) => (
+      |                     ^
+  299 |               <option key={state} value={state}>
+  300 |                 {state}
+  301 |               </option>
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught ReferenceError: adminSiteCategories is not defined
+    at AdminDashboard (app/components/admin-dashboard.tsx:1010:18)
+    at AdminGate (app/components/admin-gate.tsx:62:3)
+    at AdminPage (app\admin\page.tsx:4:10)
+  1008 |                 className="h-11 rounded-md border border-line bg-white px-3 text-sm"
+  1009 |               >
+> 1010 |                 {adminSiteCategories.map((category) => (
+       |                  ^
+  1011 |                   <option key={category} value={category}>
+  1012 |                     {category}
+  1013 |                   </option>
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ TypeError: Cannot read properties of undefined (reading 'includes')
+    at <unknown> (app\components\site-browser.tsx:71:16)
+    at Array.filter (<anonymous>)
+    at SiteBrowser (app\components\site-browser.tsx:70:44)
+  69 |
+  70 |   const visibleCategories = categoryLabels.filter((label) =>
+> 71 |     categories.includes(label),
+     |                ^
+  72 |   );
+  73 |   const filterCategories =
+  74 |     visibleCategories.length > 0 ? visibleCategories : categoryLabels; {
+  digest: '2403736747'
+}
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ReferenceError: DomainHistoryCard is not defined
+    at <unknown> (app\sites\[slug]\page.tsx:413:12)
+    at Array.map (<anonymous>)
+    at SiteDetailPage (app\sites\[slug]\page.tsx:412:22)
+  411 |
+  412 |         {domainInfos.map(({ domainUrl, whoisInfo }) => (
+> 413 |           <DomainHistoryCard key={`whois-${domainUrl}`} whoisInfo={whoisInfo} />
+      |            ^
+  414 |         ))}
+  415 |         {domainInfos.map(({ domainUrl, dnsInfo }) => (
+  416 |           <DnsInfoCard key={`dns-${domainUrl}`} dnsInfo={dnsInfo} /> {
+  digest: '3412565525'
+}
+⨯ ReferenceError: DomainHistoryCard is not defined
+    at <unknown> (app\sites\[slug]\page.tsx:413:12)
+    at Array.map (<anonymous>)
+    at SiteDetailPage (app\sites\[slug]\page.tsx:412:22)
+  411 |
+  412 |         {domainInfos.map(({ domainUrl, whoisInfo }) => (
+> 413 |           <DomainHistoryCard key={`whois-${domainUrl}`} whoisInfo={whoisInfo} />
+      |            ^
+  414 |         ))}
+  415 |         {domainInfos.map(({ domainUrl, dnsInfo }) => (
+  416 |           <DnsInfoCard key={`dns-${domainUrl}`} dnsInfo={dnsInfo} /> {
+  digest: '3412565525'
+}
+[browser] Uncaught ReferenceError: DomainHistoryCard is not defined
+    at <anonymous> (app\sites\[slug]\page.tsx:413:12)
+    at Array.map (<anonymous>:1:18)
+    at SiteDetailPage (app\sites\[slug]\page.tsx:412:22)
+  411 |
+  412 |         {domainInfos.map(({ domainUrl, whoisInfo }) => (
+> 413 |           <DomainHistoryCard key={`whois-${domainUrl}`} whoisInfo={whoisInfo} />
+      |            ^
+  414 |         ))}
+  415 |         {domainInfos.map(({ domainUrl, dnsInfo }) => (
+  416 |           <DnsInfoCard key={`dns-${domainUrl}`} dnsInfo={dnsInfo} />
+⨯ ReferenceError: DomainInfoPanel is not defined
+    at SiteDetailPage (app\sites\[slug]\page.tsx:266:10)
+  264 |         ) : null}
+  265 |
+> 266 |         <DomainInfoPanel domainInfos={domainInfos} />
+      |          ^
+  267 |
+  268 |         {errorMessage ? (
+  269 |           <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm... {
+  digest: '3081027725'
+}
+⨯ ReferenceError: DomainInfoPanel is not defined
+    at SiteDetailPage (app\sites\[slug]\page.tsx:266:10)
+  264 |         ) : null}
+  265 |
+> 266 |         <DomainInfoPanel domainInfos={domainInfos} />
+      |          ^
+  267 |
+  268 |         {errorMessage ? (
+  269 |           <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm... {
+  digest: '3081027725'
+}
+⨯ ReferenceError: DomainInfoPanel is not defined
+    at SiteDetailPage (app\sites\[slug]\page.tsx:266:10)
+  264 |         ) : null}
+  265 |
+> 266 |         <DomainInfoPanel domainInfos={domainInfos} />
+      |          ^
+  267 |
+  268 |         {errorMessage ? (
+  269 |           <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm... {
+  digest: '3081027725'
+}
+[browser] Uncaught ReferenceError: DomainInfoPanel is not defined
+    at SiteDetailPage (app\sites\[slug]\page.tsx:266:10)
+  264 |         ) : null}
+  265 |
+> 266 |         <DomainInfoPanel domainInfos={domainInfos} />
+      |          ^
+  267 |
+  268 |         {errorMessage ? (
+  269 |           <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm...
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: []
+Incoming: [] 
+    at SubmitReviewForm (app/components/submit-review-form.tsx:152:12)
+    at Set.forEach (<anonymous>)
+  150 |   }, [siteOptions, siteSearch]);
+  151 |
+> 152 |   useEffect(() => {
+      |            ^
+  153 |     let isMounted = true;
+  154 |
+  155 |     async function loadApprovedSites() { (app/components/submit-review-form.tsx:152:12)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'includes')
+    at eval (app/components/scam-report-form.tsx:360:50)
+    at Array.map (<anonymous>)
+    at ScamReportForm (app/components/scam-report-form.tsx:356:31)
+    at SiteDetailPage (app\sites\[slug]\page.tsx:308:9)
+  358 |                   key={item}
+  359 |                   label={item}
+> 360 |                   checked={values.mainCategories.includes(item)}
+      |                                                  ^
+  361 |                   onClick={() => toggleArray("mainCategories", item)}
+  362 |                 />
+  363 |               ))}
+[browser] A component is changing a controlled input to be uncontrolled. This is likely caused by the value changing from a defined to undefined, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components 
