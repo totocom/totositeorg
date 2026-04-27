@@ -117,14 +117,24 @@ export function SignupForm() {
 
     const result = (await response?.json().catch(() => null)) as {
       verified?: boolean;
+      reason?: string;
+      details?: string;
     } | null;
 
     if (!response?.ok || !result?.verified) {
+      const reasonMessage =
+        result?.reason === "db_error"
+          ? "인증 정보를 확인하는 중 DB 오류가 발생했습니다. 관리자에게 문의해주세요."
+          : result?.reason === "expired"
+            ? "텔레그램 인증 코드가 만료되었습니다. 인증을 다시 시작해주세요."
+            : result?.reason === "consumed"
+              ? "이미 사용된 텔레그램 인증 코드입니다. 인증을 다시 시작해주세요."
+              : "아직 텔레그램 인증이 확인되지 않았습니다. 봇 대화방에서 시작 버튼을 누른 뒤 다시 확인해주세요.";
+
       setIsTelegramVerified(false);
       setErrors((currentErrors) => ({
         ...currentErrors,
-        telegram:
-          "아직 텔레그램 인증이 확인되지 않았습니다. 봇 대화방에서 시작 버튼을 누른 뒤 다시 확인해주세요.",
+        telegram: reasonMessage,
       }));
       return;
     }

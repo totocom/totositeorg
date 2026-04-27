@@ -30,11 +30,27 @@ export async function GET(request: Request) {
     .eq("verification_code", code)
     .maybeSingle();
 
-  if (error || !data || data.consumed_at) {
-    return NextResponse.json({ verified: false });
+  if (error) {
+    return NextResponse.json({
+      verified: false,
+      reason: "db_error",
+      details: error.message,
+    });
+  }
+
+  if (!data) {
+    return NextResponse.json({ verified: false, reason: "not_found" });
+  }
+
+  if (data.consumed_at) {
+    return NextResponse.json({ verified: false, reason: "consumed" });
   }
 
   const expiresAt = new Date(String(data.expires_at)).getTime();
 
-  return NextResponse.json({ verified: expiresAt > Date.now() });
+  if (expiresAt <= Date.now()) {
+    return NextResponse.json({ verified: false, reason: "expired" });
+  }
+
+  return NextResponse.json({ verified: true });
 }

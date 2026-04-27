@@ -110,12 +110,26 @@ export async function POST(request: Request) {
       { onConflict: "verification_code" },
     );
 
-    if (!error) {
+    if (error) {
       await sendTelegramMessage(
         String(chatId),
-        "텔레그램 인증이 확인되었습니다. 회원가입 페이지로 돌아가 인증 확인 버튼을 눌러주세요.",
+        "텔레그램 인증 정보를 저장하지 못했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해주세요.",
+      );
+
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "telegram_signup_save_failed",
+          details: error.message,
+        },
+        { status: 500 },
       );
     }
+
+    await sendTelegramMessage(
+      String(chatId),
+      "텔레그램 인증이 확인되었습니다. 회원가입 페이지로 돌아가 인증 확인 버튼을 눌러주세요.",
+    );
 
     return NextResponse.json({ ok: true });
   }
@@ -140,12 +154,26 @@ export async function POST(request: Request) {
     { onConflict: "user_id" },
   );
 
-  if (!error) {
+  if (error) {
     await sendTelegramMessage(
       String(chatId),
-      "텔레그램 알림 연결이 완료되었습니다. 사이트 제보가 승인되면 이 대화로 알림을 보내드립니다.",
+      "텔레그램 알림 연결 정보를 저장하지 못했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해주세요.",
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "telegram_subscription_save_failed",
+        details: error.message,
+      },
+      { status: 500 },
     );
   }
+
+  await sendTelegramMessage(
+    String(chatId),
+    "텔레그램 알림 연결이 완료되었습니다. 사이트 제보가 승인되면 이 대화로 알림을 보내드립니다.",
+  );
 
   return NextResponse.json({ ok: true });
 }
