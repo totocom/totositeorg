@@ -62,6 +62,21 @@ type ScamReportRow = {
   }[] | null;
 };
 
+type AdminUserRow = {
+  id: string;
+  email: string;
+  username: string;
+  nickname: string;
+  created_at: string;
+  last_sign_in_at: string | null;
+  email_confirmed_at: string | null;
+  telegram_verified_at: string | null;
+  telegram_username: string | null;
+  telegram_is_active: boolean;
+  is_admin: boolean;
+  is_current_user: boolean;
+};
+
 type UpdatingItem = {
   table: "sites" | "reviews" | "scam_reports";
   id: string;
@@ -278,10 +293,14 @@ export function AdminDashboard() {
   const [sites, setSites] = useState<SiteRow[]>([]);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [scamReports, setScamReports] = useState<ScamReportRow[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUserRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [usersErrorMessage, setUsersErrorMessage] = useState("");
   const [updatingItem, setUpdatingItem] = useState<UpdatingItem>(null);
   const [deletingItem, setDeletingItem] = useState<DeletingItem>(null);
+  const [deletingUserId, setDeletingUserId] = useState("");
   const [editingSlug, setEditingSlug] = useState<EditingSlug>(null);
   const [slugErrorMessage, setSlugErrorMessage] = useState("");
   const [siteFormValues, setSiteFormValues] = useState<AdminSiteFormValues>(
@@ -357,6 +376,43 @@ export function AdminDashboard() {
     setIsLoading(false);
   }
 
+  async function loadAdminUsers() {
+    setIsLoadingUsers(true);
+    setUsersErrorMessage("");
+
+    const { data: sessionResult } = await supabase.auth.getSession();
+    const accessToken = sessionResult.session?.access_token;
+
+    if (!accessToken) {
+      setAdminUsers([]);
+      setUsersErrorMessage("관리자 로그인 세션을 확인하지 못했습니다.");
+      setIsLoadingUsers(false);
+      return;
+    }
+
+    const response = await fetch("/api/admin/users", {
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+      },
+    });
+    const result = (await response.json().catch(() => null)) as {
+      users?: AdminUserRow[];
+      error?: string;
+    } | null;
+
+    setIsLoadingUsers(false);
+
+    if (!response.ok || !result?.users) {
+      setAdminUsers([]);
+      setUsersErrorMessage(
+        result?.error ?? "회원 목록을 불러오지 못했습니다.",
+      );
+      return;
+    }
+
+    setAdminUsers(result.users);
+  }
+
   useEffect(() => {
     let isMounted = true;
 
@@ -371,6 +427,7 @@ export function AdminDashboard() {
       setScamReports(result.scamReports);
       setIsLoading(false);
     });
+    Promise.resolve().then(() => loadAdminUsers());
 
     return () => {
       isMounted = false;
@@ -489,6 +546,57 @@ export function AdminDashboard() {
       return;
     }
 
+    await loadAdminData();
+  }
+
+  async function deleteUser(targetUser: AdminUserRow) {
+    if (targetUser.is_current_user) {
+      setUsersErrorMessage("현재 로그인한 관리자 계정은 직접 삭제할 수 없습니다.");
+      return;
+    }
+
+    const label =
+      targetUser.email || targetUser.username || targetUser.nickname || targetUser.id;
+    const confirmed = window.confirm(
+      `${label} 회원을 삭제할까요? Auth 계정, 프로필, 텔레그램 연결이 삭제되며 작성 콘텐츠의 작성자 연결은 비워집니다.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingUserId(targetUser.id);
+    setUsersErrorMessage("");
+
+    const { data: sessionResult } = await supabase.auth.getSession();
+    const accessToken = sessionResult.session?.access_token;
+
+    if (!accessToken) {
+      setDeletingUserId("");
+      setUsersErrorMessage("관리자 로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    const response = await fetch("/api/admin/users", {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ userId: targetUser.id }),
+    });
+    const result = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+
+    setDeletingUserId("");
+
+    if (!response.ok) {
+      setUsersErrorMessage(result?.error ?? "회원 삭제에 실패했습니다.");
+      return;
+    }
+
+    await loadAdminUsers();
     await loadAdminData();
   }
 
@@ -952,6 +1060,9 @@ export function AdminDashboard() {
         <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#site-registration">
           사이트 등록
         </a>
+        <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#users">
+          회원 관리
+        </a>
         <a className="rounded-md border border-line px-3 py-2 text-sm font-semibold" href="#reviews">
           리뷰 관리
         </a>
@@ -988,7 +1099,17 @@ export function AdminDashboard() {
         <SummaryCard label="거절된 사이트" value={rejectedSites.length} />
         <SummaryCard label="거절된 리뷰" value={rejectedReviews.length} />
         <SummaryCard label="거절된 먹튀 제보" value={rejectedScamReports.length} />
+        <SummaryCard label="전체 회원" value={adminUsers.length} />
       </section>
+
+      <UserTable
+        users={adminUsers}
+        isLoading={isLoadingUsers}
+        errorMessage={usersErrorMessage}
+        deletingUserId={deletingUserId}
+        onDeleteUser={deleteUser}
+        onRefresh={loadAdminUsers}
+      />
 
       <section
         id="site-registration"
@@ -1451,6 +1572,148 @@ export function AdminDashboard() {
         </div>
       )}
     </main>
+  );
+}
+
+function UserTable({
+  users,
+  isLoading,
+  errorMessage,
+  deletingUserId,
+  onDeleteUser,
+  onRefresh,
+}: {
+  users: AdminUserRow[];
+  isLoading: boolean;
+  errorMessage: string;
+  deletingUserId: string;
+  onDeleteUser: (user: AdminUserRow) => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <section
+      id="users"
+      className="mb-6 overflow-hidden rounded-lg border border-line bg-surface shadow-sm"
+    >
+      <div className="flex flex-col gap-3 border-b border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold">회원 관리</h2>
+          <p className="mt-1 text-xs text-muted">
+            회원 삭제는 Supabase Auth 계정과 프로필, 텔레그램 연결을 삭제합니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={isLoading}
+          className="h-9 w-fit rounded-md border border-line px-3 text-xs font-semibold disabled:opacity-50"
+        >
+          {isLoading ? "새로고침 중..." : "회원 새로고침"}
+        </button>
+      </div>
+
+      {errorMessage ? (
+        <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+          <thead className="bg-background text-xs uppercase text-muted">
+            <tr>
+              <th className="px-4 py-3 font-semibold">회원</th>
+              <th className="px-4 py-3 font-semibold">아이디</th>
+              <th className="px-4 py-3 font-semibold">닉네임</th>
+              <th className="px-4 py-3 font-semibold">이메일 인증</th>
+              <th className="px-4 py-3 font-semibold">텔레그램</th>
+              <th className="px-4 py-3 font-semibold">가입일</th>
+              <th className="px-4 py-3 font-semibold">최근 로그인</th>
+              <th className="px-4 py-3 font-semibold">작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr className="border-t border-line">
+                <td colSpan={8} className="px-4 py-6 text-center text-sm text-muted">
+                  회원 목록을 불러오는 중입니다.
+                </td>
+              </tr>
+            ) : users.length > 0 ? (
+              users.map((adminUser) => {
+                const deleting = deletingUserId === adminUser.id;
+                const canDelete = !adminUser.is_current_user;
+
+                return (
+                  <tr key={adminUser.id} className="border-t border-line">
+                    <td className="px-4 py-4">
+                      <p className="break-all font-semibold">
+                        {adminUser.email || "이메일 없음"}
+                      </p>
+                      <p className="mt-1 font-mono text-xs text-muted">
+                        {adminUser.id}
+                      </p>
+                      {adminUser.is_admin ? (
+                        <p className="mt-1 text-xs font-semibold text-accent">
+                          관리자
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-4">
+                      {adminUser.username || "-"}
+                    </td>
+                    <td className="px-4 py-4">
+                      {adminUser.nickname || "-"}
+                    </td>
+                    <td className="px-4 py-4">
+                      {adminUser.email_confirmed_at ? "완료" : "미완료"}
+                    </td>
+                    <td className="px-4 py-4">
+                      {adminUser.telegram_is_active ? (
+                        <span>
+                          연결됨
+                          {adminUser.telegram_username
+                            ? ` · @${adminUser.telegram_username}`
+                            : ""}
+                        </span>
+                      ) : adminUser.telegram_verified_at ? (
+                        "인증됨"
+                      ) : (
+                        "미연결"
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      {formatDate(adminUser.created_at)}
+                    </td>
+                    <td className="px-4 py-4">
+                      {adminUser.last_sign_in_at
+                        ? formatDate(adminUser.last_sign_in_at)
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-4">
+                      <button
+                        type="button"
+                        disabled={!canDelete || deleting}
+                        onClick={() => onDeleteUser(adminUser)}
+                        className="rounded-md border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50"
+                      >
+                        {adminUser.is_current_user
+                          ? "현재 계정"
+                          : deleting
+                            ? "삭제 중..."
+                            : "회원 삭제"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <EmptyRow colSpan={8} />
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
