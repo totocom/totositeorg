@@ -90,7 +90,7 @@ export async function POST(request: Request) {
   if (!isUuid(payload)) {
     await sendTelegramMessage(
       String(chatId),
-      "사이트에 로그인한 뒤 등록 페이지의 텔레그램 봇 시작하기 버튼으로 다시 연결해주세요.",
+      "사이트에 로그인한 뒤 내 계정 페이지의 텔레그램 봇 시작하기 버튼으로 다시 연결해주세요.",
     );
     return NextResponse.json({ ok: true });
   }

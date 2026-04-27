@@ -17,7 +17,6 @@ type FormStatus = "idle" | "submitting";
 
 const defaultSiteCategory = "기타 베팅";
 const defaultLicenseInfo = "관리자 등록 사이트";
-const telegramBotUrl = process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? "";
 
 const initialValues = (): SiteFormValues => ({
   siteNameKo: "",
@@ -80,19 +79,6 @@ function createSlug(name: string) {
   return `${baseSlug}-${suffix}`;
 }
 
-function getTelegramStartUrl(userId: string) {
-  if (!telegramBotUrl) return "";
-
-  try {
-    const url = new URL(telegramBotUrl);
-    url.searchParams.set("start", userId);
-    return url.toString();
-  } catch {
-    const separator = telegramBotUrl.includes("?") ? "&" : "?";
-    return `${telegramBotUrl}${separator}start=${encodeURIComponent(userId)}`;
-  }
-}
-
 export function SubmitSiteForm() {
   const { user } = useAuth();
   const [values, setValues] = useState(() => initialValues());
@@ -100,7 +86,6 @@ export function SubmitSiteForm() {
   const [successMessage, setSuccessMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [formStatus, setFormStatus] = useState<FormStatus>("idle");
-  const telegramStartUrl = user ? getTelegramStartUrl(user.id) : "";
 
   function updateField<K extends keyof SiteFormValues>(
     field: K,
@@ -357,25 +342,17 @@ export function SubmitSiteForm() {
       </label>
 
       <div className="rounded-md border border-line bg-background p-4 text-sm">
-        <p className="font-semibold text-foreground">텔레그램 알림 받기</p>
+        <p className="font-semibold text-foreground">승인 알림 안내</p>
         <p className="mt-1 leading-6 text-muted">
-          승인 알림을 받으려면 사이트 등록 전후로 텔레그램 봇을 먼저
-          시작해주세요.
+          등록 요청 승인 알림은 내 계정의 텔레그램 연결 상태에 따라
+          전송됩니다.
         </p>
-        {telegramStartUrl ? (
-          <a
-            href={telegramStartUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
-          >
-            텔레그램 봇 시작하기
-          </a>
-        ) : (
-          <p className="mt-2 text-xs font-semibold text-muted">
-            봇 링크는 NEXT_PUBLIC_TELEGRAM_BOT_URL 환경변수 설정 후 표시됩니다.
-          </p>
-        )}
+        <a
+          href="/account"
+          className="mt-3 inline-flex h-10 items-center rounded-md border border-line px-4 text-sm font-semibold text-foreground"
+        >
+          계정에서 알림 연결하기
+        </a>
       </div>
 
       <button

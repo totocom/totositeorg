@@ -26,17 +26,29 @@ type UserReview = {
   }[] | null;
 };
 
+type TelegramSubscription = {
+  chat_id: string;
+  username: string | null;
+  first_name: string | null;
+  is_active: boolean;
+  updated_at: string;
+};
+
 type AccountDataResult =
   | {
       sites: UserSite[];
       reviews: UserReview[];
+      telegramSubscription: TelegramSubscription | null;
       errorMessage: "";
     }
   | {
       sites: [];
       reviews: [];
+      telegramSubscription: null;
       errorMessage: string;
     };
+
+const telegramBotUrl = process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? "";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("ko-KR", {
@@ -50,8 +62,21 @@ function getReviewSiteName(review: UserReview) {
   return review.sites?.[0]?.name ?? "알 수 없음";
 }
 
+function getTelegramStartUrl(userId: string) {
+  if (!telegramBotUrl) return "";
+
+  try {
+    const url = new URL(telegramBotUrl);
+    url.searchParams.set("start", userId);
+    return url.toString();
+  } catch {
+    const separator = telegramBotUrl.includes("?") ? "&" : "?";
+    return `${telegramBotUrl}${separator}start=${encodeURIComponent(userId)}`;
+  }
+}
+
 async function fetchAccountData(userId: string): Promise<AccountDataResult> {
-  const [sitesResult, reviewsResult] = await Promise.all([
+  const [sitesResult, reviewsResult, telegramResult] = await Promise.all([
     supabase
       .from("sites")
       .select("id, name, url, category, status, created_at")
@@ -62,12 +87,18 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
       .select("id, title, rating, status, created_at, sites(name)")
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("telegram_subscriptions")
+      .select("chat_id, username, first_name, is_active, updated_at")
+      .eq("user_id", userId)
+      .maybeSingle(),
   ]);
 
-  if (sitesResult.error || reviewsResult.error) {
+  if (sitesResult.error || reviewsResult.error || telegramResult.error) {
     return {
       sites: [],
       reviews: [],
+      telegramSubscription: null,
       errorMessage:
         "내 작성 내역을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
     };
@@ -76,6 +107,8 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
   return {
     sites: (sitesResult.data ?? []) as UserSite[],
     reviews: (reviewsResult.data ?? []) as UserReview[],
+    telegramSubscription:
+      (telegramResult.data as TelegramSubscription | null) ?? null,
     errorMessage: "",
   };
 }
@@ -84,6 +117,8 @@ export function AccountDashboard() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [sites, setSites] = useState<UserSite[]>([]);
   const [reviews, setReviews] = useState<UserReview[]>([]);
+  const [telegramSubscription, setTelegramSubscription] =
+    useState<TelegramSubscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -108,6 +143,7 @@ export function AccountDashboard() {
 
       setSites(result.sites);
       setReviews(result.reviews);
+      setTelegramSubscription(result.telegramSubscription);
       setErrorMessage(result.errorMessage);
       setIsLoading(false);
     }
@@ -148,6 +184,8 @@ export function AccountDashboard() {
     );
   }
 
+  const telegramStartUrl = getTelegramStartUrl(user.id);
+
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
       <div className="mb-5">
@@ -158,6 +196,43 @@ export function AccountDashboard() {
       <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
         <p className="text-sm text-muted">내 이메일</p>
         <p className="mt-2 font-semibold">{user.email}</p>
+      </section>
+
+      <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">텔레그램 알림 연결</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              사이트 제보가 승인되면 연결된 텔레그램 대화로 알림을 보내드립니다.
+            </p>
+            {telegramSubscription?.is_active ? (
+              <p className="mt-3 text-sm font-semibold text-accent">
+                연결됨
+                {telegramSubscription.username
+                  ? ` · @${telegramSubscription.username}`
+                  : ""}
+              </p>
+            ) : (
+              <p className="mt-3 text-sm font-semibold text-muted">
+                아직 텔레그램 알림이 연결되지 않았습니다.
+              </p>
+            )}
+          </div>
+          {telegramStartUrl ? (
+            <a
+              href={telegramStartUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
+            >
+              텔레그램 봇 시작하기
+            </a>
+          ) : (
+            <p className="text-sm font-semibold text-muted">
+              텔레그램 봇 링크 설정이 필요합니다.
+            </p>
+          )}
+        </div>
       </section>
 
       {errorMessage ? (
