@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { domainToUnicode } from "node:url";
 import { SiteBrowser } from "@/app/components/site-browser";
-import { getPublicDnsInfo } from "@/app/data/domain-dns";
-import { getPublicWhoisInfo } from "@/app/data/domain-whois";
 import { getPublicSites } from "@/app/data/public-sites";
 import type { ReviewTarget } from "@/app/data/sites";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
@@ -33,45 +31,15 @@ function formatSearchDomain(value: string) {
   }
 }
 
-async function buildDomainSearchText(site: ReviewTarget) {
+function buildDomainSearchText(site: ReviewTarget) {
   const domains = Array.from(new Set(site.domains.length > 0 ? site.domains : [site.siteUrl]))
     .filter(Boolean)
     .slice(0, 6);
 
-  const domainInfos = await Promise.all(
-    domains.map(async (domain) => {
-      const [whoisInfo, dnsInfo] = await Promise.all([
-        getPublicWhoisInfo(domain),
-        getPublicDnsInfo(domain),
-      ]);
-
-      return { domain, whoisInfo, dnsInfo };
-    }),
-  );
-
-  const creationDates = domainInfos
-    .map(({ whoisInfo }) => whoisInfo?.creationDate ?? "")
-    .filter(Boolean)
-    .sort();
-
-  const searchText = domainInfos
-    .flatMap(({ domain, whoisInfo, dnsInfo }) => [
+  const searchText = domains
+    .flatMap((domain) => [
       domain,
       formatSearchDomain(domain),
-      whoisInfo?.domain,
-      whoisInfo?.domain ? formatSearchDomain(whoisInfo.domain) : "",
-      whoisInfo?.registrar,
-      whoisInfo?.whoisServer,
-      whoisInfo?.registrantName,
-      whoisInfo?.registrantEmail,
-      whoisInfo?.registrantOrganization,
-      ...(whoisInfo?.nameServers ?? []),
-      ...(dnsInfo?.a ?? []),
-      ...(dnsInfo?.aaaa ?? []),
-      ...(dnsInfo?.ns ?? []),
-      ...(dnsInfo?.mx ?? []),
-      ...(dnsInfo?.txt ?? []),
-      dnsInfo?.soa,
     ])
     .filter(Boolean)
     .join(" ");
@@ -79,13 +47,12 @@ async function buildDomainSearchText(site: ReviewTarget) {
   return {
     ...site,
     domainSearchText: searchText,
-    oldestDomainCreationDate: creationDates[0] ?? "",
   };
 }
 
 export default async function SitesPage() {
   const { sites, errorMessage, source } = await getPublicSites();
-  const searchableSites = await Promise.all(sites.map(buildDomainSearchText));
+  const searchableSites = sites.map(buildDomainSearchText);
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
