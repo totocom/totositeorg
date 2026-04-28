@@ -9,10 +9,30 @@ type ScamReportSortOption =
   | "incident_latest"
   | "damage_high"
   | "site_name";
+type DamageTypeFilter =
+  | "all"
+  | "출금 거부"
+  | "출금 지연"
+  | "계정 차단"
+  | "고객센터 차단"
+  | "보너스 규정 악용"
+  | "입금 후 미반영"
+  | "기타";
 
 type PublicScamReportListProps = {
   items: PublicScamReportListItem[];
 };
+
+const damageTypeFilters: { value: DamageTypeFilter; label: string }[] = [
+  { value: "all", label: "전체" },
+  { value: "출금 거부", label: "출금 거부" },
+  { value: "출금 지연", label: "출금 지연" },
+  { value: "계정 차단", label: "계정 차단" },
+  { value: "고객센터 차단", label: "고객센터 차단" },
+  { value: "보너스 규정 악용", label: "보너스 규정 악용" },
+  { value: "입금 후 미반영", label: "입금 후 미반영" },
+  { value: "기타", label: "기타" },
+];
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -37,6 +57,8 @@ function getDamageAmount(report: PublicScamReportListItem) {
 
 export function PublicScamReportList({ items }: PublicScamReportListProps) {
   const [query, setQuery] = useState("");
+  const [damageTypeFilter, setDamageTypeFilter] =
+    useState<DamageTypeFilter>("all");
   const [sortOption, setSortOption] =
     useState<ScamReportSortOption>("latest");
 
@@ -45,23 +67,23 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
 
     return items
       .filter((report) => {
-        if (!normalizedQuery) return true;
+        const matchesQuery =
+          !normalizedQuery ||
+          [
+            report.site.siteName,
+            report.site.siteNameKo ?? "",
+            report.site.siteNameEn ?? "",
+            report.site.siteUrl,
+            ...report.site.domains,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedQuery);
 
-        return [
-          report.site.siteName,
-          report.site.siteNameKo ?? "",
-          report.site.siteNameEn ?? "",
-          report.site.siteUrl,
-          ...report.site.domains,
-          report.mainCategory,
-          ...report.categoryItems,
-          ...report.damageTypes,
-          report.situationDescription,
-          report.usagePeriod,
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedQuery);
+        if (!matchesQuery) return false;
+        if (damageTypeFilter === "all") return true;
+
+        return report.damageTypes.includes(damageTypeFilter);
       })
       .sort((first, second) => {
         if (sortOption === "incident_latest") {
@@ -78,12 +100,16 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
 
         return getTime(second.createdAt) - getTime(first.createdAt);
       });
-  }, [items, query, sortOption]);
+  }, [damageTypeFilter, items, query, sortOption]);
 
-  const hasActiveFilters = query.trim() !== "" || sortOption !== "latest";
+  const hasActiveFilters =
+    query.trim() !== "" ||
+    damageTypeFilter !== "all" ||
+    sortOption !== "latest";
 
   function resetFilters() {
     setQuery("");
+    setDamageTypeFilter("all");
     setSortOption("latest");
   }
 
@@ -96,7 +122,7 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             className="h-11 rounded-md border border-line bg-white px-3 text-sm text-foreground"
-            placeholder="사이트명, 도메인, 피해 유형으로 검색"
+            placeholder="사이트명 또는 도메인으로 검색"
           />
         </label>
         <label className="grid gap-1 text-sm font-medium text-foreground">
@@ -122,6 +148,23 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
         >
           초기화
         </button>
+      </section>
+
+      <section className="flex flex-wrap gap-2">
+        {damageTypeFilters.map((filter) => (
+          <button
+            key={filter.value}
+            type="button"
+            onClick={() => setDamageTypeFilter(filter.value)}
+            className={
+              damageTypeFilter === filter.value
+                ? "rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white"
+                : "rounded-md border border-line bg-surface px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-background"
+            }
+          >
+            {filter.label}
+          </button>
+        ))}
       </section>
 
       <p className="text-sm text-muted">

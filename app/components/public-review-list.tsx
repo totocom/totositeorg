@@ -7,10 +7,20 @@ import type { PublicReviewListItem } from "@/app/data/public-sites";
 import { issueTypeLabels } from "@/app/data/sites";
 
 type ReviewSortOption = "latest" | "rating_high" | "rating_low" | "site_name";
+type RatingFilter = "all" | "5" | "4" | "3" | "2" | "1";
 
 type PublicReviewListProps = {
   items: PublicReviewListItem[];
 };
+
+const ratingFilters: { value: RatingFilter; label: string }[] = [
+  { value: "all", label: "전체" },
+  { value: "5", label: "매우 만족" },
+  { value: "4", label: "만족" },
+  { value: "3", label: "보통" },
+  { value: "2", label: "불만족" },
+  { value: "1", label: "매우 불만족" },
+];
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -26,6 +36,7 @@ function getTime(value: string) {
 
 export function PublicReviewList({ items }: PublicReviewListProps) {
   const [query, setQuery] = useState("");
+  const [ratingFilter, setRatingFilter] = useState<RatingFilter>("all");
   const [sortOption, setSortOption] = useState<ReviewSortOption>("latest");
 
   const filteredItems = useMemo(() => {
@@ -33,22 +44,23 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
 
     return items
       .filter((review) => {
-        if (!normalizedQuery) return true;
+        const matchesQuery =
+          !normalizedQuery ||
+          [
+            review.site.siteName,
+            review.site.siteNameKo ?? "",
+            review.site.siteNameEn ?? "",
+            review.site.siteUrl,
+            ...review.site.domains,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedQuery);
 
-        return [
-          review.site.siteName,
-          review.site.siteNameKo ?? "",
-          review.site.siteNameEn ?? "",
-          review.site.siteUrl,
-          ...review.site.domains,
-          review.title,
-          review.experience,
-          issueTypeLabels[review.issueType],
-          review.stateUsed,
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedQuery);
+        if (!matchesQuery) return false;
+        if (ratingFilter === "all") return true;
+
+        return review.rating === Number(ratingFilter);
       })
       .sort((first, second) => {
         if (sortOption === "rating_high") return second.rating - first.rating;
@@ -59,12 +71,14 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
 
         return getTime(second.createdAt) - getTime(first.createdAt);
       });
-  }, [items, query, sortOption]);
+  }, [items, query, ratingFilter, sortOption]);
 
-  const hasActiveFilters = query.trim() !== "" || sortOption !== "latest";
+  const hasActiveFilters =
+    query.trim() !== "" || ratingFilter !== "all" || sortOption !== "latest";
 
   function resetFilters() {
     setQuery("");
+    setRatingFilter("all");
     setSortOption("latest");
   }
 
@@ -77,7 +91,7 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             className="h-11 rounded-md border border-line bg-white px-3 text-sm text-foreground"
-            placeholder="사이트명, 도메인, 평가 제목으로 검색"
+            placeholder="사이트명 또는 도메인으로 검색"
           />
         </label>
         <label className="grid gap-1 text-sm font-medium text-foreground">
@@ -103,6 +117,23 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
         >
           초기화
         </button>
+      </section>
+
+      <section className="flex flex-wrap gap-2">
+        {ratingFilters.map((filter) => (
+          <button
+            key={filter.value}
+            type="button"
+            onClick={() => setRatingFilter(filter.value)}
+            className={
+              ratingFilter === filter.value
+                ? "rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white"
+                : "rounded-md border border-line bg-surface px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-background"
+            }
+          >
+            {filter.label}
+          </button>
+        ))}
       </section>
 
       <p className="text-sm text-muted">
