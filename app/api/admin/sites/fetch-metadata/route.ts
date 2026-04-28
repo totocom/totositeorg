@@ -1,7 +1,9 @@
 import { lookup } from "node:dns/promises";
 import net from "node:net";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 
 export const runtime = "nodejs";
 
@@ -56,6 +58,18 @@ function getEnv() {
   }
 
   return { supabaseUrl, supabaseAnonKey };
+}
+
+function getStorageEnv() {
+  const { supabaseUrl } = getEnv();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET || "site-screenshots";
+
+  if (!serviceRoleKey) {
+    return null;
+  }
+
+  return { supabaseUrl, serviceRoleKey, bucket };
 }
 
 function firstString(...values: unknown[]) {
@@ -282,6 +296,75 @@ async function fetchWithTimeout(
   }
 }
 
+async function storeFaviconUrl(faviconUrl: string) {
+  const storageEnv = getStorageEnv();
+  const parsedUrl = normalizeUrl(faviconUrl);
+
+  if (!storageEnv || !parsedUrl) return "";
+
+  try {
+    await assertPublicHost(parsedUrl);
+
+    const response = await fetchWithTimeout(
+      parsedUrl.toString(),
+      {
+        headers: {
+          accept: "image/avif,image/webp,image/png,image/jpeg,image/svg+xml,image/x-icon,image/*,*/*;q=0.8",
+          "user-agent": "Mozilla/5.0 favicon-fetcher",
+        },
+      },
+      10_000,
+    );
+
+    if (!response.ok) return "";
+
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+
+    if (!contentType.includes("image") && !contentType.includes("octet-stream")) {
+      return "";
+    }
+
+    const imageBytes = new Uint8Array(await response.arrayBuffer());
+
+    if (imageBytes.byteLength === 0 || imageBytes.byteLength > 2 * 1024 * 1024) {
+      return "";
+    }
+
+    const webpBytes = await sharp(imageBytes)
+      .resize(96, 96, {
+        fit: "contain",
+        background: { r: 255, g: 255, b: 255, alpha: 0 },
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 82 })
+      .toBuffer();
+    const supabase = createClient(storageEnv.supabaseUrl, storageEnv.serviceRoleKey);
+    const filePath = `favicons/${randomUUID()}.webp`;
+    const { error } = await supabase.storage
+      .from(storageEnv.bucket)
+      .upload(filePath, webpBytes, {
+        contentType: "image/webp",
+        upsert: false,
+      });
+
+    if (error) return "";
+
+    const { data } = supabase.storage.from(storageEnv.bucket).getPublicUrl(filePath);
+    return data.publicUrl;
+  } catch {
+    return "";
+  }
+}
+
+async function localizeMetadataFavicon(metadata: MetadataResponse) {
+  const storedFaviconUrl = await storeFaviconUrl(metadata.faviconUrl);
+
+  return {
+    ...metadata,
+    faviconUrl: storedFaviconUrl,
+  };
+}
+
 async function fetchMetadataWithProxy(targetUrl: string) {
   const metadataApiUrl = process.env.METADATA_API_URL;
   const metadataApiKey =
@@ -364,7 +447,7 @@ export async function POST(request: Request) {
     const proxyMetadata = await fetchMetadataWithProxy(targetUrl.toString());
 
     if (proxyMetadata) {
-      return NextResponse.json(proxyMetadata, { status: 200 });
+      return NextResponse.json(await localizeMetadataFavicon(proxyMetadata), { status: 200 });
     }
 
     const response = await fetchWithTimeout(
@@ -404,7 +487,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      metadata,
+      await localizeMetadataFavicon(metadata),
       { status: 200 },
     );
   } catch (error) {

@@ -259,18 +259,6 @@ function normalizeUrl(value: string) {
   }
 }
 
-function getDefaultFaviconUrl(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-
-  try {
-    const url = new URL(trimmed);
-    return new URL("/favicon.ico", url.origin).toString();
-  } catch {
-    return "";
-  }
-}
-
 function getDomainList(values: AdminSiteFormValues) {
   return Array.from(
     new Set(
@@ -846,14 +834,6 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setSiteFormValues((current) => {
       const next = { ...current, [key]: value };
 
-      if (
-        key === "url" &&
-        typeof value === "string" &&
-        !current.faviconUrl.trim()
-      ) {
-        next.faviconUrl = getDefaultFaviconUrl(value);
-      }
-
       return next;
     });
     setSiteFormErrors((current) => ({ ...current, [key]: undefined }));
@@ -1194,10 +1174,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
         url: siteFormValues.url.trim(),
         domains: getDomainList(siteFormValues),
         screenshot_url: pageCaptureUrl.trim() || null,
-        favicon_url:
-          siteFormValues.faviconUrl.trim() ||
-          getDefaultFaviconUrl(siteFormValues.url) ||
-          null,
+        favicon_url: siteFormValues.faviconUrl.trim() || null,
         category: defaultSiteCategory,
         available_states: ["전체"],
         license_info: defaultLicenseInfo,

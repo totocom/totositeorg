@@ -113,18 +113,6 @@ function normalizeUrl(value: string) {
   }
 }
 
-function getDefaultFaviconUrl(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-
-  try {
-    const url = new URL(trimmed);
-    return new URL("/favicon.ico", url.origin).toString();
-  } catch {
-    return "";
-  }
-}
-
 function getDomainList(values: EditValues) {
   return Array.from(
     new Set(
@@ -160,7 +148,7 @@ function valuesFromSite(site: SiteRow): EditValues {
     url: site.url,
     domainsText: extraDomains.join("\n"),
     screenshotUrl: site.screenshot_url ?? "",
-    faviconUrl: site.favicon_url ?? getDefaultFaviconUrl(site.url),
+    faviconUrl: site.favicon_url ?? "",
     description: site.description,
   };
 }
@@ -322,14 +310,6 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   function updateField<K extends keyof EditValues>(key: K, value: EditValues[K]) {
     setValues((current) => {
       const next = { ...current, [key]: value };
-
-      if (
-        key === "url" &&
-        typeof value === "string" &&
-        !current.faviconUrl.trim()
-      ) {
-        next.faviconUrl = getDefaultFaviconUrl(value);
-      }
 
       return next;
     });
@@ -619,8 +599,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         url: values.url.trim(),
         domains: getDomainList(values),
         screenshot_url: values.screenshotUrl.trim() || null,
-        favicon_url:
-          values.faviconUrl.trim() || getDefaultFaviconUrl(values.url) || null,
+        favicon_url: values.faviconUrl.trim() || null,
         description: values.description.trim(),
       })
       .eq("id", siteId);
