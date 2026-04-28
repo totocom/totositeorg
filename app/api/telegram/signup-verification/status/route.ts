@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const { data, error } = await supabase
     .from("telegram_signup_codes")
-    .select("id, consumed_at, expires_at")
+    .select("id, chat_id, consumed_at, expires_at")
     .eq("verification_code", code)
     .maybeSingle();
 
@@ -50,6 +50,28 @@ export async function GET(request: Request) {
 
   if (expiresAt <= Date.now()) {
     return NextResponse.json({ verified: false, reason: "expired" });
+  }
+
+  const { data: existingSubscription, error: subscriptionError } = await supabase
+    .from("telegram_subscriptions")
+    .select("id")
+    .eq("chat_id", data.chat_id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (subscriptionError) {
+    return NextResponse.json({
+      verified: false,
+      reason: "db_error",
+      details: subscriptionError.message,
+    });
+  }
+
+  if (existingSubscription) {
+    return NextResponse.json({
+      verified: false,
+      reason: "telegram_in_use",
+    });
   }
 
   return NextResponse.json({ verified: true });

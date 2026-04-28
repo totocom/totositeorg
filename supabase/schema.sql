@@ -465,6 +465,12 @@ create index if not exists admin_users_email_idx
 create index if not exists profiles_username_idx
   on public.profiles (lower(username));
 
+create unique index if not exists profiles_username_unique_lower_idx
+  on public.profiles (lower(username));
+
+create unique index if not exists profiles_nickname_unique_lower_idx
+  on public.profiles (lower(nickname));
+
 create index if not exists telegram_subscriptions_user_id_idx
   on public.telegram_subscriptions (user_id);
 
@@ -574,6 +580,7 @@ declare
   requested_nickname text;
   signup_code text;
   signup_telegram public.telegram_signup_codes%rowtype;
+  existing_telegram_user_id uuid;
 begin
   requested_username := lower(coalesce(new.raw_user_meta_data ->> 'username', ''));
   requested_username := regexp_replace(requested_username, '[^a-z0-9_]+', '', 'g');
@@ -620,13 +627,23 @@ begin
     limit 1;
 
     if found then
+      select user_id
+      into existing_telegram_user_id
+      from public.telegram_subscriptions
+      where chat_id = signup_telegram.chat_id
+        and user_id <> new.id
+      limit 1;
+
+      if found then
+        return new;
+      end if;
+
       update public.profiles
       set telegram_verified_at = now()
       where user_id = new.id;
 
       delete from public.telegram_subscriptions
-      where user_id = new.id
-        or chat_id = signup_telegram.chat_id;
+      where user_id = new.id;
 
       insert into public.telegram_subscriptions (
         user_id,

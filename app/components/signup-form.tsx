@@ -90,8 +90,53 @@ export function SignupForm() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingTelegram, setIsCheckingTelegram] = useState(false);
+  const [usernameStatus, setUsernameStatus] =
+    useState<AvailabilityStatus>("idle");
   const [nicknameStatus, setNicknameStatus] =
     useState<AvailabilityStatus>("idle");
+  const [emailStatus, setEmailStatus] = useState<AvailabilityStatus>("idle");
+
+  useEffect(() => {
+    const normalizedUsername = normalizeUsername(username);
+
+    if (!isValidUsername(normalizedUsername)) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      setUsernameStatus("checking");
+
+      const response = await fetch(
+        `/api/auth/check-username?username=${encodeURIComponent(
+          normalizedUsername,
+        )}`,
+        { signal: controller.signal },
+      ).catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return null;
+        }
+
+        return null;
+      });
+      const result = (await response?.json().catch(() => null)) as {
+        available?: boolean;
+      } | null;
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setUsernameStatus(
+        response?.ok && result?.available ? "available" : "unavailable",
+      );
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [username]);
 
   useEffect(() => {
     const normalizedNickname = nickname.trim();
@@ -134,6 +179,46 @@ export function SignupForm() {
       controller.abort();
     };
   }, [nickname]);
+
+  useEffect(() => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!isValidEmail(normalizedEmail)) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      setEmailStatus("checking");
+
+      const response = await fetch(
+        `/api/auth/check-email?email=${encodeURIComponent(normalizedEmail)}`,
+        { signal: controller.signal },
+      ).catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return null;
+        }
+
+        return null;
+      });
+      const result = (await response?.json().catch(() => null)) as {
+        available?: boolean;
+      } | null;
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setEmailStatus(
+        response?.ok && result?.available ? "available" : "unavailable",
+      );
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [email]);
 
   function startTelegramVerification() {
     const code = createVerificationCode();
@@ -198,6 +283,8 @@ export function SignupForm() {
             ? "텔레그램 인증 코드가 만료되었습니다. 인증을 다시 시작해주세요."
             : result?.reason === "consumed"
               ? "이미 사용된 텔레그램 인증 코드입니다. 인증을 다시 시작해주세요."
+              : result?.reason === "telegram_in_use"
+                ? "이미 다른 계정에 연결된 텔레그램입니다. 다른 텔레그램 계정으로 인증해주세요."
               : "아직 텔레그램 인증이 확인되지 않았습니다. 봇 대화방에서 시작 버튼을 누른 뒤 다시 확인해주세요.";
 
       setIsTelegramVerified(false);
@@ -275,6 +362,7 @@ export function SignupForm() {
 
     if (!usernameResponse?.ok || !usernameResult?.available) {
       setIsSubmitting(false);
+      setUsernameStatus("unavailable");
       setErrors({
         username: "이미 사용 중인 아이디이거나 확인할 수 없습니다.",
       });
@@ -295,6 +383,24 @@ export function SignupForm() {
       setNicknameStatus("unavailable");
       setErrors({
         nickname: "이미 사용 중인 닉네임이거나 확인할 수 없습니다.",
+      });
+      return;
+    }
+
+    const emailResponse = await fetch(
+      `/api/auth/check-email?email=${encodeURIComponent(
+        email.trim().toLowerCase(),
+      )}`,
+    ).catch(() => null);
+    const emailResult = (await emailResponse?.json().catch(() => null)) as {
+      available?: boolean;
+    } | null;
+
+    if (!emailResponse?.ok || !emailResult?.available) {
+      setIsSubmitting(false);
+      setEmailStatus("unavailable");
+      setErrors({
+        email: "이미 사용 중인 이메일이거나 확인할 수 없습니다.",
       });
       return;
     }
@@ -327,7 +433,9 @@ export function SignupForm() {
     setPasswordConfirm("");
     setTelegramCode("");
     setIsTelegramVerified(false);
+    setUsernameStatus("idle");
     setNicknameStatus("idle");
+    setEmailStatus("idle");
     setTelegramCopyMessage("");
     setTelegramMessage("");
     setSuccessMessage(
@@ -357,13 +465,33 @@ export function SignupForm() {
         아이디
         <input
           value={username}
-          onChange={(event) => setUsername(normalizeUsername(event.target.value))}
+          onChange={(event) => {
+            setUsername(normalizeUsername(event.target.value));
+            setUsernameStatus("idle");
+            setErrors((currentErrors) => ({
+              ...currentErrors,
+              username: undefined,
+            }));
+          }}
           className="h-11 rounded-md border border-line px-3 text-sm"
           placeholder="영문 소문자, 숫자, _"
           autoComplete="username"
         />
         {errors.username ? (
           <span className="text-xs text-red-700">{errors.username}</span>
+        ) : null}
+        {!errors.username && usernameStatus === "checking" ? (
+          <span className="text-xs text-muted">아이디 중복 확인 중...</span>
+        ) : null}
+        {!errors.username && usernameStatus === "available" ? (
+          <span className="text-xs font-semibold text-accent">
+            사용 가능한 아이디입니다.
+          </span>
+        ) : null}
+        {!errors.username && usernameStatus === "unavailable" ? (
+          <span className="text-xs text-red-700">
+            이미 사용 중인 아이디입니다.
+          </span>
         ) : null}
       </label>
 
@@ -408,13 +536,33 @@ export function SignupForm() {
         <input
           type="email"
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            setEmailStatus("idle");
+            setErrors((currentErrors) => ({
+              ...currentErrors,
+              email: undefined,
+            }));
+          }}
           className="h-11 rounded-md border border-line px-3 text-sm"
           placeholder="email@example.com"
           autoComplete="email"
         />
         {errors.email ? (
           <span className="text-xs text-red-700">{errors.email}</span>
+        ) : null}
+        {!errors.email && emailStatus === "checking" ? (
+          <span className="text-xs text-muted">이메일 중복 확인 중...</span>
+        ) : null}
+        {!errors.email && emailStatus === "available" ? (
+          <span className="text-xs font-semibold text-accent">
+            사용 가능한 이메일입니다.
+          </span>
+        ) : null}
+        {!errors.email && emailStatus === "unavailable" ? (
+          <span className="text-xs text-red-700">
+            이미 사용 중인 이메일입니다.
+          </span>
         ) : null}
       </label>
 
