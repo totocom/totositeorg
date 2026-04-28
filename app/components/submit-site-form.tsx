@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 
@@ -14,6 +14,18 @@ type SiteFormValues = {
 
 type SiteFormErrors = Partial<Record<keyof SiteFormValues, string>>;
 type FormStatus = "idle" | "submitting";
+type DuplicateSite = {
+  id: string;
+  name: string;
+  url: string;
+  status: "pending" | "approved" | "rejected";
+  publicUrl: string;
+};
+type DuplicateResult = {
+  nameMatches: DuplicateSite[];
+  urlMatches: DuplicateSite[];
+  domainMatches: DuplicateSite[];
+};
 
 const defaultSiteCategory = "기타 베팅";
 const defaultLicenseInfo = "관리자 등록 사이트";
@@ -86,6 +98,73 @@ export function SubmitSiteForm() {
   const [successMessage, setSuccessMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [formStatus, setFormStatus] = useState<FormStatus>("idle");
+  const [duplicateResult, setDuplicateResult] =
+    useState<DuplicateResult | null>(null);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
+  const [allowSameNameDifferentSite, setAllowSameNameDifferentSite] =
+    useState(false);
+
+  const hasNameDuplicate = Boolean(duplicateResult?.nameMatches.length);
+  const hasUrlDuplicate = Boolean(duplicateResult?.urlMatches.length);
+  const hasDomainDuplicate = Boolean(duplicateResult?.domainMatches.length);
+  const hasBlockingDuplicate = hasUrlDuplicate || hasDomainDuplicate;
+
+  useEffect(() => {
+    const hasName = values.siteNameKo.trim() || values.siteNameEn.trim();
+    const hasUrl = values.siteUrl.trim();
+
+    if (!hasName && !hasUrl) {
+      return;
+    }
+
+    const invalidUrls = getDomainList(values).filter(
+      (domain) => !isValidUrl(domain),
+    );
+
+    if (invalidUrls.length > 0) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      setIsCheckingDuplicate(true);
+
+      const response = await fetch("/api/sites/check-duplicate", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          nameKo: values.siteNameKo,
+          nameEn: values.siteNameEn,
+          url: values.siteUrl,
+          domains: getDomainList(values),
+        }),
+        signal: controller.signal,
+      }).catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return null;
+        }
+
+        return null;
+      });
+      const result = (await response?.json().catch(() => null)) as
+        | DuplicateResult
+        | null;
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setDuplicateResult(response?.ok && result ? result : null);
+      setIsCheckingDuplicate(false);
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [values]);
 
   function updateField<K extends keyof SiteFormValues>(
     field: K,
@@ -93,6 +172,9 @@ export function SubmitSiteForm() {
   ) {
     setValues((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
+    setDuplicateResult(null);
+    setAllowSameNameDifferentSite(false);
+    setIsCheckingDuplicate(false);
     setSuccessMessage("");
     setSubmitError("");
   }
@@ -123,6 +205,16 @@ export function SubmitSiteForm() {
         "추가 URL은 http:// 또는 https://로 시작하는 URL만 입력해주세요.";
     }
 
+    if (hasBlockingDuplicate) {
+      nextErrors.siteUrl =
+        "이미 등록되었거나 검토 중인 URL/도메인은 다시 제보할 수 없습니다.";
+    }
+
+    if (hasNameDuplicate && !allowSameNameDifferentSite) {
+      nextErrors.siteNameKo =
+        "같은 이름의 사이트가 있습니다. 동일명 다른 사이트인 경우 확인 체크를 해주세요.";
+    }
+
     if (!values.shortDescription.trim()) {
       nextErrors.shortDescription = "간단 설명을 입력해주세요.";
     } else if (values.shortDescription.trim().length < 10) {
@@ -151,6 +243,31 @@ export function SubmitSiteForm() {
     setFormStatus("submitting");
     setSuccessMessage("");
     setSubmitError("");
+
+    const duplicateCheck = await checkDuplicates();
+
+    if (duplicateCheck) {
+      const blockingDuplicate =
+        duplicateCheck.urlMatches.length > 0 ||
+        duplicateCheck.domainMatches.length > 0;
+      const nameDuplicate =
+        duplicateCheck.nameMatches.length > 0 && !allowSameNameDifferentSite;
+
+      if (blockingDuplicate || nameDuplicate) {
+        setFormStatus("idle");
+        setDuplicateResult(duplicateCheck);
+        setErrors((current) => ({
+          ...current,
+          siteNameKo: nameDuplicate
+            ? "같은 이름의 사이트가 있습니다. 동일명 다른 사이트인 경우 확인 체크를 해주세요."
+            : current.siteNameKo,
+          siteUrl: blockingDuplicate
+            ? "이미 등록되었거나 검토 중인 URL/도메인은 다시 제보할 수 없습니다."
+            : current.siteUrl,
+        }));
+        return;
+      }
+    }
 
     const { data: insertedSite, error } = await supabase
       .from("sites")
@@ -202,6 +319,32 @@ export function SubmitSiteForm() {
         : "사이트 제보가 관리자 검토 대기 상태로 접수되었습니다.",
     );
     setValues(initialValues());
+    setDuplicateResult(null);
+    setAllowSameNameDifferentSite(false);
+  }
+
+  async function checkDuplicates() {
+    const response = await fetch("/api/sites/check-duplicate", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        nameKo: values.siteNameKo,
+        nameEn: values.siteNameEn,
+        url: values.siteUrl,
+        domains: getDomainList(values),
+      }),
+    }).catch(() => null);
+    const result = (await response?.json().catch(() => null)) as
+      | DuplicateResult
+      | null;
+
+    if (!response?.ok || !result) {
+      return null;
+    }
+
+    return result;
   }
 
   async function sendSiteSubmissionNotification(siteId: string) {
@@ -269,6 +412,41 @@ export function SubmitSiteForm() {
         </div>
       ) : null}
 
+      {isCheckingDuplicate ? (
+        <div className="rounded-md border border-line bg-background px-4 py-3 text-sm text-muted">
+          사이트 중복 여부를 확인하는 중입니다.
+        </div>
+      ) : null}
+
+      {duplicateResult ? (
+        <div className="grid gap-3">
+          {duplicateResult.nameMatches.length > 0 ? (
+            <DuplicateNotice
+              title="같은 이름의 사이트가 있습니다"
+              description="한글 이름 또는 영문 이름이 같은 사이트입니다. 동일명 다른 사이트라면 아래 확인 체크 후 제보할 수 있습니다."
+              sites={duplicateResult.nameMatches}
+              tone="warning"
+            />
+          ) : null}
+          {duplicateResult.urlMatches.length > 0 ? (
+            <DuplicateNotice
+              title="이미 등록된 URL입니다"
+              description="대표 URL 또는 추가 URL이 기존 사이트와 중복되어 제보할 수 없습니다."
+              sites={duplicateResult.urlMatches}
+              tone="danger"
+            />
+          ) : null}
+          {duplicateResult.domainMatches.length > 0 ? (
+            <DuplicateNotice
+              title="이미 사용 중인 도메인입니다"
+              description="같은 도메인을 사용하는 사이트가 있어 제보할 수 없습니다."
+              sites={duplicateResult.domainMatches}
+              tone="danger"
+            />
+          ) : null}
+        </div>
+      ) : null}
+
       <label className="grid gap-1 text-sm font-medium">
         사이트 한글 이름
         <input
@@ -294,6 +472,21 @@ export function SubmitSiteForm() {
           <span className="text-xs text-red-700">{errors.siteNameEn}</span>
         ) : null}
       </label>
+
+      {hasNameDuplicate && !hasBlockingDuplicate ? (
+        <label className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+          <input
+            type="checkbox"
+            checked={allowSameNameDifferentSite}
+            onChange={(event) =>
+              setAllowSameNameDifferentSite(event.target.checked)
+            }
+            className="mt-1"
+          />
+          동일명 다른 사이트입니다. 이름은 같지만 대표 URL과 도메인이 다른
+          별도 사이트로 제보합니다.
+        </label>
+      ) : null}
 
       <label className="grid gap-1 text-sm font-medium">
         대표 URL 필수
@@ -349,5 +542,42 @@ export function SubmitSiteForm() {
         {formStatus === "submitting" ? "저장 중..." : "사이트 제보 제출"}
       </button>
     </form>
+  );
+}
+
+function DuplicateNotice({
+  title,
+  description,
+  sites,
+  tone,
+}: {
+  title: string;
+  description: string;
+  sites: DuplicateSite[];
+  tone: "warning" | "danger";
+}) {
+  const wrapperClass =
+    tone === "danger"
+      ? "border-red-200 bg-red-50 text-red-800"
+      : "border-amber-200 bg-amber-50 text-amber-900";
+
+  return (
+    <section className={`rounded-md border px-4 py-3 text-sm ${wrapperClass}`}>
+      <p className="font-semibold">{title}</p>
+      <p className="mt-1 leading-5">{description}</p>
+      <div className="mt-3 grid gap-2">
+        {sites.map((site) => (
+          <a
+            key={site.id}
+            href={site.publicUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md bg-white/70 px-3 py-2 font-semibold underline"
+          >
+            {site.name} · {site.status === "approved" ? "게시물 보기" : "검토 중"}
+          </a>
+        ))}
+      </div>
+    </section>
   );
 }
