@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { siteUrl } from "@/lib/config";
 import { supabase } from "@/lib/supabase/client";
 
@@ -14,6 +14,8 @@ type SignupErrors = {
   form?: string;
 };
 
+type AvailabilityStatus = "idle" | "checking" | "available" | "unavailable";
+
 const telegramBotUrl = process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? "";
 
 function isValidEmail(email: string) {
@@ -26,6 +28,12 @@ function normalizeUsername(value: string) {
 
 function isValidUsername(value: string) {
   return /^[a-z0-9_]{4,20}$/.test(value);
+}
+
+function isValidNickname(value: string) {
+  const normalizedNickname = value.trim();
+
+  return normalizedNickname.length >= 2 && normalizedNickname.length <= 20;
 }
 
 function createVerificationCode() {
@@ -82,6 +90,50 @@ export function SignupForm() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingTelegram, setIsCheckingTelegram] = useState(false);
+  const [nicknameStatus, setNicknameStatus] =
+    useState<AvailabilityStatus>("idle");
+
+  useEffect(() => {
+    const normalizedNickname = nickname.trim();
+
+    if (!isValidNickname(normalizedNickname)) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      setNicknameStatus("checking");
+
+      const response = await fetch(
+        `/api/auth/check-nickname?nickname=${encodeURIComponent(
+          normalizedNickname,
+        )}`,
+        { signal: controller.signal },
+      ).catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return null;
+        }
+
+        return null;
+      });
+      const result = (await response?.json().catch(() => null)) as {
+        available?: boolean;
+      } | null;
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setNicknameStatus(
+        response?.ok && result?.available ? "available" : "unavailable",
+      );
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [nickname]);
 
   function startTelegramVerification() {
     const code = createVerificationCode();
@@ -229,6 +281,24 @@ export function SignupForm() {
       return;
     }
 
+    const nicknameResponse = await fetch(
+      `/api/auth/check-nickname?nickname=${encodeURIComponent(
+        nickname.trim(),
+      )}`,
+    ).catch(() => null);
+    const nicknameResult = (await nicknameResponse?.json().catch(() => null)) as {
+      available?: boolean;
+    } | null;
+
+    if (!nicknameResponse?.ok || !nicknameResult?.available) {
+      setIsSubmitting(false);
+      setNicknameStatus("unavailable");
+      setErrors({
+        nickname: "이미 사용 중인 닉네임이거나 확인할 수 없습니다.",
+      });
+      return;
+    }
+
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
@@ -257,6 +327,7 @@ export function SignupForm() {
     setPasswordConfirm("");
     setTelegramCode("");
     setIsTelegramVerified(false);
+    setNicknameStatus("idle");
     setTelegramCopyMessage("");
     setTelegramMessage("");
     setSuccessMessage(
@@ -300,13 +371,35 @@ export function SignupForm() {
         닉네임
         <input
           value={nickname}
-          onChange={(event) => setNickname(event.target.value)}
+          onChange={(event) => {
+            const nextNickname = event.target.value;
+
+            setNickname(nextNickname);
+            setNicknameStatus("idle");
+            setErrors((currentErrors) => ({
+              ...currentErrors,
+              nickname: undefined,
+            }));
+          }}
           className="h-11 rounded-md border border-line px-3 text-sm"
           placeholder="사이트에서 표시할 이름"
           autoComplete="nickname"
         />
         {errors.nickname ? (
           <span className="text-xs text-red-700">{errors.nickname}</span>
+        ) : null}
+        {!errors.nickname && nicknameStatus === "checking" ? (
+          <span className="text-xs text-muted">닉네임 중복 확인 중...</span>
+        ) : null}
+        {!errors.nickname && nicknameStatus === "available" ? (
+          <span className="text-xs font-semibold text-accent">
+            사용 가능한 닉네임입니다.
+          </span>
+        ) : null}
+        {!errors.nickname && nicknameStatus === "unavailable" ? (
+          <span className="text-xs text-red-700">
+            이미 사용 중인 닉네임입니다.
+          </span>
         ) : null}
       </label>
 
