@@ -4,6 +4,8 @@ import { AuthNav } from "@/app/components/auth-nav";
 const navItems = [
   { href: "/", label: "홈" },
   { href: "/sites", label: "사이트 목록" },
+  { href: "/reviews", label: "만족도 평가" },
+  { href: "/scam-reports", label: "먹튀 제보" },
   { href: "/site-registration", label: "사이트 등록" },
 ];
 

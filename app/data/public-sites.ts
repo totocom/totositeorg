@@ -61,6 +61,20 @@ type PublicSiteDetailResult = {
   source: "supabase" | "fallback" | "none";
 };
 
+export type PublicReviewListItem = SiteReview & {
+  site: ReviewTarget;
+};
+
+export type PublicScamReportListItem = ScamReport & {
+  site: ReviewTarget;
+};
+
+type PublicContentListResult<T> = {
+  items: T[];
+  errorMessage: string;
+  source: "supabase" | "fallback";
+};
+
 type PublicSiteDnsRecordRow = {
   domain_url: string;
   domain: string;
@@ -366,6 +380,133 @@ export async function getPublicSiteDetail(
     reviews: reviewRows.map(mapReviewRow),
     scamReports: scamReportRows.map(mapScamReportRow),
     dnsRecords: dnsRecordRows.map(mapDnsRecordRow),
+    errorMessage: "",
+    source: "supabase",
+  };
+}
+
+export async function getPublicReviewList(): Promise<
+  PublicContentListResult<PublicReviewListItem>
+> {
+  const [sitesResult, reviewsResult, scamReportsResult] = await Promise.all([
+    supabase
+      .from("sites")
+      .select(
+        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, category, available_states, license_info, resolved_ips, dns_checked_at, description",
+      )
+      .eq("status", "approved"),
+    supabase
+      .from("reviews")
+      .select("id, site_id, rating, title, experience, issue_type, state_used, created_at")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("scam_reports")
+      .select(
+        "id, site_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+      )
+      .eq("review_status", "approved")
+      .eq("is_published", true),
+  ]);
+
+  if (sitesResult.error || reviewsResult.error) {
+    const fallbackSites = getApprovedSites();
+    const items = fallbackSites.flatMap((site) =>
+      getApprovedReviewsBySiteId(site.id).map((review) => ({
+        ...review,
+        site,
+      })),
+    );
+
+    return {
+      items,
+      errorMessage:
+        "Supabase 공개 리뷰 목록을 불러오지 못해 개발용 더미 데이터를 표시하고 있습니다.",
+      source: "fallback",
+    };
+  }
+
+  const siteRows = (sitesResult.data ?? []) as PublicSiteRow[];
+  const reviewRows = (reviewsResult.data ?? []) as PublicReviewRow[];
+  const scamReportRows = scamReportsResult.error
+    ? []
+    : ((scamReportsResult.data ?? []) as PublicScamReportRow[]);
+  const siteMap = new Map(
+    siteRows.map((site) => [
+      site.id,
+      mapSiteRow(
+        site,
+        reviewRows.filter((review) => review.site_id === site.id),
+        scamReportRows.filter((report) => report.site_id === site.id),
+      ),
+    ]),
+  );
+
+  return {
+    items: reviewRows.flatMap((review) => {
+      const site = siteMap.get(review.site_id);
+
+      return site ? [{ ...mapReviewRow(review), site }] : [];
+    }),
+    errorMessage: "",
+    source: "supabase",
+  };
+}
+
+export async function getPublicScamReportList(): Promise<
+  PublicContentListResult<PublicScamReportListItem>
+> {
+  const [sitesResult, reviewsResult, scamReportsResult] = await Promise.all([
+    supabase
+      .from("sites")
+      .select(
+        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, category, available_states, license_info, resolved_ips, dns_checked_at, description",
+      )
+      .eq("status", "approved"),
+    supabase
+      .from("reviews")
+      .select("id, site_id, rating, title, experience, issue_type, state_used, created_at")
+      .eq("status", "approved"),
+    supabase
+      .from("scam_reports")
+      .select(
+        "id, site_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+      )
+      .eq("review_status", "approved")
+      .eq("is_published", true)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (sitesResult.error || scamReportsResult.error) {
+    return {
+      items: [],
+      errorMessage: "승인된 먹튀 피해 제보 목록을 불러오지 못했습니다.",
+      source: "fallback",
+    };
+  }
+
+  const siteRows = (sitesResult.data ?? []) as PublicSiteRow[];
+  const reviewRows = reviewsResult.error
+    ? []
+    : ((reviewsResult.data ?? []) as PublicReviewRow[]);
+  const scamReportRows = (scamReportsResult.data ?? []) as PublicScamReportRow[];
+  const siteMap = new Map(
+    siteRows.map((site) => [
+      site.id,
+      mapSiteRow(
+        site,
+        reviewRows.filter((review) => review.site_id === site.id),
+        scamReportRows.filter((report) => report.site_id === site.id),
+      ),
+    ]),
+  );
+
+  return {
+    items: scamReportRows.flatMap((report) => {
+      const site = siteMap.get(report.site_id);
+
+      return site ? [{ ...mapScamReportRow(report), site }] : [];
+    }),
     errorMessage: "",
     source: "supabase",
   };
