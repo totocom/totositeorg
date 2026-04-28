@@ -75,6 +75,7 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
             report.site.siteNameEn ?? "",
             report.site.siteUrl,
             ...report.site.domains,
+            report.authorNickname ?? "",
           ]
             .join(" ")
             .toLowerCase()
@@ -122,7 +123,7 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             className="h-11 rounded-md border border-line bg-white px-3 text-sm text-foreground"
-            placeholder="사이트명 또는 도메인으로 검색"
+            placeholder="사이트명, 도메인, 작성자 닉네임으로 검색"
           />
         </label>
         <label className="grid gap-1 text-sm font-medium text-foreground">
