@@ -398,7 +398,10 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           </section>
         ) : null}
 
-        <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">
+        <section
+          id="scam-reports"
+          className="mt-6 scroll-mt-24 rounded-lg border border-line bg-surface p-5 shadow-sm"
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase text-accent">
@@ -460,7 +463,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           </p>
         ) : null}
 
-        <section className="mt-6 grid gap-4">
+        <section id="reviews" className="mt-6 grid scroll-mt-24 gap-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase text-accent">

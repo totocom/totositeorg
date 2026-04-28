@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { siteUrl } from "@/lib/config";
 
 export const runtime = "nodejs";
 
@@ -14,6 +15,8 @@ type ContentRow = {
 type SiteRow = {
   id: string;
   name: string;
+  slug: string | null;
+  url: string;
 };
 
 type TelegramSubscriptionRow = {
@@ -63,14 +66,28 @@ async function getIsAdmin(token: string) {
   return !adminError && Boolean(adminRow);
 }
 
-function getApprovedMessage(type: ContentType, siteName: string) {
+function getSiteContentUrl(type: ContentType, site: SiteRow) {
+  const baseUrl = siteUrl.replace(/\/$/, "");
+  const hash = type === "scam_report" ? "scam-reports" : "reviews";
+
+  if (site.slug) {
+    return `${baseUrl}/sites/${site.slug}#${hash}`;
+  }
+
+  return site.url;
+}
+
+function getApprovedMessage(type: ContentType, site: SiteRow) {
   const label = type === "scam_report" ? "먹튀 제보" : "만족도 평가";
+  const contentUrl = getSiteContentUrl(type, site);
 
   return [
-    `🎉 ${siteName} ${label} 승인 완료`,
+    `🎉 ${site.name} ${label} 승인 완료`,
     "",
     "게시물이 승인되었습니다.",
     "지금 바로 확인하실 수 있습니다.",
+    "",
+    `바로가기: ${contentUrl}`,
   ].join("\n");
 }
 
@@ -185,7 +202,7 @@ export async function POST(request: Request) {
 
   const { data: site, error: siteError } = await supabase
     .from("sites")
-    .select("id, name")
+    .select("id, name, slug, url")
     .eq("id", content.site_id)
     .maybeSingle<SiteRow>();
 
@@ -199,7 +216,7 @@ export async function POST(request: Request) {
   try {
     await sendTelegramMessage(
       subscription.chat_id,
-      getApprovedMessage(type, site.name),
+      getApprovedMessage(type, site),
     );
 
     return NextResponse.json({ ok: true });
