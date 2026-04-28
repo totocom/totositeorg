@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ReviewSummary } from "@/app/components/review-summary";
+import { PublicReviewList } from "@/app/components/public-review-list";
 import { getPublicReviewList } from "@/app/data/public-sites";
-import { issueTypeLabels } from "@/app/data/sites";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +19,6 @@ export const metadata: Metadata = {
     description: siteDescription,
   },
 };
-
-function formatDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("ko-KR");
-}
 
 export default async function ReviewsPage() {
   const { items, errorMessage, source } = await getPublicReviewList();
@@ -67,47 +59,7 @@ export default async function ReviewsPage() {
       ) : null}
 
       {items.length > 0 ? (
-        <section className="grid gap-4">
-          {items.map((review) => (
-            <article
-              key={review.id}
-              className="rounded-lg border border-line bg-surface p-4 shadow-sm"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <Link
-                    href={`/sites/${review.site.slug}#reviews`}
-                    className="text-sm font-semibold text-accent transition hover:text-foreground"
-                  >
-                    {review.site.siteName}
-                  </Link>
-                  <h2 className="mt-1 text-xl font-bold text-foreground">
-                    {review.title}
-                  </h2>
-                  <p className="mt-1 text-xs text-muted">
-                    {issueTypeLabels[review.issueType]} · {review.stateUsed} ·{" "}
-                    {formatDate(review.createdAt)}
-                  </p>
-                </div>
-                <p className="w-fit rounded-md bg-background px-3 py-1 text-sm font-semibold">
-                  {review.rating}/5
-                </p>
-              </div>
-              <ReviewSummary
-                siteName={review.site.siteName}
-                experience={review.experience}
-              />
-              <div className="mt-4">
-                <Link
-                  href={`/sites/${review.site.slug}#reviews`}
-                  className="text-sm font-semibold text-accent transition hover:text-foreground"
-                >
-                  해당 게시물 보기
-                </Link>
-              </div>
-            </article>
-          ))}
-        </section>
+        <PublicReviewList items={items} />
       ) : (
         <section className="rounded-lg border border-line bg-surface p-8 text-center shadow-sm">
           <h2 className="text-lg font-semibold">

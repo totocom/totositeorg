@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PublicScamReportList } from "@/app/components/public-scam-report-list";
 import { getPublicScamReportList } from "@/app/data/public-sites";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
 
@@ -18,18 +19,6 @@ export const metadata: Metadata = {
     description: siteDescription,
   },
 };
-
-function formatDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("ko-KR");
-}
-
-function formatDamageAmount(amount: number | null, isUnknown: boolean) {
-  if (isUnknown || amount === null) return "피해 금액 미확인";
-  return `${amount.toLocaleString("ko-KR")}원`;
-}
 
 export default async function ScamReportsPage() {
   const { items, errorMessage, source } = await getPublicScamReportList();
@@ -70,65 +59,7 @@ export default async function ScamReportsPage() {
       ) : null}
 
       {items.length > 0 ? (
-        <section className="grid gap-4">
-          {items.map((report) => (
-            <article
-              key={report.id}
-              className="rounded-lg border border-line bg-surface p-4 shadow-sm"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <Link
-                    href={`/sites/${report.site.slug}#scam-reports`}
-                    className="text-sm font-semibold text-accent transition hover:text-foreground"
-                  >
-                    {report.site.siteName}
-                  </Link>
-                  <h2 className="mt-1 text-xl font-bold text-foreground">
-                    {report.damageTypes.join(", ") || report.mainCategory}
-                  </h2>
-                  <p className="mt-1 text-xs text-muted">
-                    발생일 {formatDate(report.incidentDate)} · 접수일{" "}
-                    {formatDate(report.createdAt)}
-                  </p>
-                </div>
-                <p className="w-fit rounded-md bg-red-50 px-3 py-1 text-sm font-semibold text-red-700">
-                  {formatDamageAmount(
-                    report.damageAmount,
-                    report.damageAmountUnknown,
-                  )}
-                </p>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold text-muted">
-                  이용 기간 {report.usagePeriod}
-                </span>
-                <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold text-muted">
-                  {report.mainCategory}
-                </span>
-                {report.categoryItems.slice(0, 4).map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-full bg-background px-3 py-1 text-xs font-semibold text-muted"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-3 line-clamp-4 text-sm leading-6 text-muted">
-                {report.situationDescription}
-              </p>
-              <div className="mt-4">
-                <Link
-                  href={`/sites/${report.site.slug}#scam-reports`}
-                  className="text-sm font-semibold text-accent transition hover:text-foreground"
-                >
-                  해당 게시물 보기
-                </Link>
-              </div>
-            </article>
-          ))}
-        </section>
+        <PublicScamReportList items={items} />
       ) : (
         <section className="rounded-lg border border-line bg-surface p-8 text-center shadow-sm">
           <h2 className="text-lg font-semibold">
