@@ -1,19 +1,29 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { siteUrl } from "@/lib/config";
 
 export const runtime = "nodejs";
 
 type SiteRow = {
   id: string;
+  slug: string | null;
   name: string;
   url: string;
   domains: string[] | null;
-  status: string;
+  status: "pending" | "approved" | "rejected";
 };
 
 type TelegramSubscriptionRow = {
   chat_id: string;
   username: string | null;
+};
+
+type DuplicateSite = {
+  id: string;
+  name: string;
+  url: string;
+  status: SiteRow["status"];
+  publicUrl: string;
 };
 
 function getEnv() {
@@ -56,6 +66,36 @@ function getHostname(value: string) {
   } catch {
     return "";
   }
+}
+
+function getPublicUrl(site: SiteRow) {
+  const baseUrl = siteUrl.replace(/\/$/, "");
+
+  if (site.slug && site.status === "approved") {
+    return `${baseUrl}/sites/${site.slug}`;
+  }
+
+  return site.url;
+}
+
+function mapDuplicateSite(site: SiteRow): DuplicateSite {
+  return {
+    id: site.id,
+    name: site.name,
+    url: site.url,
+    status: site.status,
+    publicUrl: getPublicUrl(site),
+  };
+}
+
+function uniqueSites(sites: SiteRow[]) {
+  const seen = new Set<string>();
+
+  return sites.filter((site) => {
+    if (seen.has(site.id)) return false;
+    seen.add(site.id);
+    return true;
+  });
 }
 
 function getTelegramDisplayName(subscription: TelegramSubscriptionRow | null) {
@@ -119,7 +159,7 @@ export async function POST(request: Request) {
   const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
   const { data: site, error: siteError } = await adminSupabase
     .from("sites")
-    .select("id, name, url, domains, status")
+    .select("id, slug, name, url, domains, status")
     .eq("id", siteId)
     .eq("status", "approved")
     .maybeSingle<SiteRow>();
@@ -132,14 +172,38 @@ export async function POST(request: Request) {
   }
 
   const nextHostname = getHostname(domainUrl);
-  const existingDomains = [site.url, ...(site.domains ?? [])].filter(Boolean);
-  const duplicated = existingDomains.some(
-    (domain) => domain === domainUrl || getHostname(domain) === nextHostname,
-  );
+  const { data: sites, error: duplicateLookupError } = await adminSupabase
+    .from("sites")
+    .select("id, slug, name, url, domains, status")
+    .in("status", ["pending", "approved"])
+    .limit(1000);
 
-  if (duplicated) {
+  if (duplicateLookupError) {
     return NextResponse.json(
-      { error: "이미 등록된 도메인입니다." },
+      { error: "도메인 중복 확인에 실패했습니다." },
+      { status: 500 },
+    );
+  }
+
+  const duplicateSites = uniqueSites(
+    ((sites ?? []) as SiteRow[]).filter((existingSite) => {
+      const existingDomains = [existingSite.url, ...(existingSite.domains ?? [])]
+        .map(normalizeUrl)
+        .filter(Boolean);
+
+      return existingDomains.some(
+        (domain) =>
+          domain === domainUrl || getHostname(domain) === nextHostname,
+      );
+    }),
+  ).map(mapDuplicateSite);
+
+  if (duplicateSites.length > 0) {
+    return NextResponse.json(
+      {
+        error: "이미 등록되어 있는 도메인입니다.",
+        duplicateSites,
+      },
       { status: 409 },
     );
   }
