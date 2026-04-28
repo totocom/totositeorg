@@ -14,6 +14,12 @@ type SiteFormValues = {
 
 type SiteFormErrors = Partial<Record<keyof SiteFormValues, string>>;
 type FormStatus = "idle" | "submitting";
+type SupabaseWriteError = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+};
 type DuplicateSite = {
   id: string;
   name: string;
@@ -89,6 +95,35 @@ function createSlug(name: string) {
     .slice(2, 6)}`;
 
   return `${baseSlug}-${suffix}`;
+}
+
+function getSiteSubmissionErrorMessage(error: SupabaseWriteError) {
+  const message = error.message ?? "";
+  const details = error.details ?? "";
+  const hint = error.hint ?? "";
+  const debugDetail = [error.code, message, details, hint].filter(Boolean).join(" / ");
+
+  if (error.code === "23505") {
+    return "이미 등록되었거나 검토 중인 사이트 URL입니다.";
+  }
+
+  if (error.code === "42501") {
+    return "제보를 저장할 권한이 없습니다. Supabase RLS 정책을 확인해주세요.";
+  }
+
+  if (error.code === "23514") {
+    return `입력값이 데이터베이스 검증 조건을 통과하지 못했습니다. ${debugDetail}`;
+  }
+
+  if (error.code === "PGRST204" || message.includes("schema cache")) {
+    return `Supabase 스키마가 최신 코드와 맞지 않습니다. supabase/schema.sql을 운영 DB에 다시 실행한 뒤 API 캐시를 새로고침해주세요. ${debugDetail}`;
+  }
+
+  if (message.includes("Could not find")) {
+    return `운영 DB에 필요한 컬럼이 아직 없습니다. supabase/schema.sql을 다시 적용해주세요. ${debugDetail}`;
+  }
+
+  return `사이트 제보 저장 중 문제가 발생했습니다. ${debugDetail || "잠시 후 다시 시도해주세요."}`;
 }
 
 export function SubmitSiteForm() {
@@ -291,21 +326,8 @@ export function SubmitSiteForm() {
     setFormStatus("idle");
 
     if (error) {
-      if (error.code === "23505") {
-        setSubmitError("이미 등록되었거나 검토 중인 사이트 URL입니다.");
-        return;
-      }
-
-      if (error.code === "42501") {
-        setSubmitError(
-          "제보를 저장할 권한이 없습니다. Supabase RLS 정책을 확인해주세요.",
-        );
-        return;
-      }
-
-      setSubmitError(
-        "사이트 제보 저장 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
-      );
+      console.error("Site submission failed", error);
+      setSubmitError(getSiteSubmissionErrorMessage(error));
       return;
     }
 
