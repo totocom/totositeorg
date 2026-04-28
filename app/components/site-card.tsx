@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReviewTarget } from "@/app/data/sites";
+import { formatRatingScore, type ReviewTarget } from "@/app/data/sites";
 
 type SiteCardProps = {
   site: ReviewTarget;
@@ -64,7 +64,7 @@ export function SiteCard({ site }: SiteCardProps) {
             <p className="mt-0.5 text-xs text-accent">
               평점{" "}
               <span className="font-bold">
-                {site.averageRating.toFixed(1)}
+                {formatRatingScore(site.averageRating)}
               </span>
             </p>
           </div>

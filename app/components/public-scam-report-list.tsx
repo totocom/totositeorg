@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ScamReportDetails } from "@/app/components/scam-report-details";
 import type { PublicScamReportListItem } from "@/app/data/public-sites";
 
 type ScamReportSortOption =
@@ -219,9 +220,7 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
                   </span>
                 ))}
               </div>
-              <p className="mt-3 line-clamp-4 text-sm leading-6 text-muted">
-                {report.situationDescription}
-              </p>
+              <ScamReportDetails report={report} siteName={report.site.siteName} />
               <div className="mt-4">
                 <Link
                   href={`/sites/${report.site.slug}#scam-reports`}

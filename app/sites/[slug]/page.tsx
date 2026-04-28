@@ -4,9 +4,11 @@ import { domainToUnicode } from "node:url";
 import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actions";
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
+import { ScamReportDetails } from "@/app/components/scam-report-details";
+import { SiteAuthorActions } from "@/app/components/site-author-actions";
 import { getPublicWhoisInfo } from "@/app/data/domain-whois";
 import { getPublicSiteDetail, getPublicSites } from "@/app/data/public-sites";
-import type { ReviewTarget } from "@/app/data/sites";
+import { formatRatingScore, type ReviewTarget } from "@/app/data/sites";
 import { siteUrl } from "@/lib/config";
 
 type SiteDetailPageProps = {
@@ -129,7 +131,7 @@ export async function generateMetadata({
   }
 
   const title = `${site.siteName} 토토사이트 리뷰`;
-  const description = `${site.siteName} 실제 이용 후기 ${site.reviewCount}건. 평균 평점 ${site.averageRating.toFixed(1)}점. ${site.shortDescription}`;
+  const description = `${site.siteName} 실제 이용 후기 ${site.reviewCount}건. 평균 평점 ${formatRatingScore(site.averageRating)}. ${site.shortDescription}`;
   const pageUrl = `${siteUrl}/sites/${slug}`;
 
   return {
@@ -201,10 +203,10 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     },
     reviewRating: {
       "@type": "AggregateRating",
-      ratingValue: site.averageRating.toFixed(1),
+      ratingValue: Math.round(site.averageRating * 20),
       reviewCount: site.reviewCount,
-      bestRating: 5,
-      worstRating: 1,
+      bestRating: 100,
+      worstRating: 20,
     },
     name: `${site.siteName} 토토사이트 리뷰`,
     description:
@@ -294,6 +296,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </div>
             <div className="flex shrink-0 flex-col gap-3 sm:items-end">
               <AdminSiteDetailActions siteId={site.id} />
+              <SiteAuthorActions siteId={site.id} />
               <div className="flex gap-2">
                 <div className="min-w-20 rounded-md bg-accent-soft px-3 py-2 text-center">
                   <p className="text-sm font-bold text-accent">
@@ -302,7 +305,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   <p className="mt-0.5 text-xs text-accent">
                     평점{" "}
                     <span className="font-bold">
-                      {site.averageRating.toFixed(1)}
+                      {formatRatingScore(site.averageRating)}
                     </span>
                   </p>
                 </div>
@@ -410,12 +413,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </p>
               <h2 className="mt-1 text-2xl font-bold">승인된 피해 제보</h2>
             </div>
-            <Link
-              href={`/submit-scam-report?siteId=${site.id}`}
-              className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
-            >
-              먹튀 제보하기
-            </Link>
           </div>
           {scamReports.length > 0 ? (
             <div className="mt-4 grid gap-3">
@@ -441,9 +438,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                         : `${report.damageAmount.toLocaleString("ko-KR")}원`}
                     </p>
                   </div>
-                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted">
-                    {report.situationDescription}
-                  </p>
+                  <ScamReportDetails report={report} siteName={site.siteName} />
                 </article>
               ))}
             </div>
@@ -474,12 +469,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </p>
               <h2 className="mt-1 text-2xl font-bold">최근 이용 경험</h2>
             </div>
-            <Link
-              href={`/submit-review?siteId=${site.id}`}
-              className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
-            >
-              만족도 평가
-            </Link>
           </div>
 
           {reviews.length > 0 ? (
@@ -498,7 +487,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                     </h3>
                   </div>
                   <p className="rounded-md bg-background px-3 py-1 text-sm font-semibold">
-                    {review.rating}/5
+                    {formatRatingScore(review.rating)}
                   </p>
                 </div>
                 <ReviewSummary siteName={site.siteName} experience={review.experience} />

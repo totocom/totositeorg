@@ -63,10 +63,17 @@ export type ScamReport = {
   usagePeriod: string;
   mainCategory: string;
   categoryItems: string[];
+  categoryEtcText: string | null;
   damageTypes: string[];
+  damageTypeEtcText: string | null;
   damageAmount: number | null;
   damageAmountUnknown: boolean;
   situationDescription: string;
+  depositBankName: string | null;
+  depositAccountNumber: string | null;
+  depositAccountHolder: string | null;
+  depositAmount: number | null;
+  depositDate: string | null;
   evidenceImageUrls: string[];
   evidenceNote: string | null;
   reviewStatus: ModerationStatus;
@@ -90,6 +97,11 @@ export const issueTypeLabels: Record<IssueType, string> = {
   account_limit: "계정 제한",
   other: "기타",
 };
+
+export function formatRatingScore(rating: number) {
+  const score = Math.round(rating * 20);
+  return `${score}/100`;
+}
 
 export const responsibleUseNotice = [
   "본 사이트는 이용자의 경험 공유와 정보 제공을 위한 플랫폼입니다.",

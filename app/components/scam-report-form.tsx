@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
+import { moderationStatusLabels } from "@/app/data/sites";
 import { supabase } from "@/lib/supabase/client";
 
 type ScamReportFormProps = {
@@ -45,6 +47,34 @@ type FormValues = {
 };
 
 type FormErrors = Partial<Record<keyof FormValues | "siteId", string>>;
+
+type ExistingScamReport = {
+  id: string;
+  site_id: string;
+  incident_date: string;
+  usage_period: string;
+  main_category: string;
+  category_items: string[] | null;
+  category_etc_text: string | null;
+  damage_types: string[] | null;
+  damage_type_etc_text: string | null;
+  damage_amount: number | null;
+  damage_amount_unknown: boolean;
+  situation_description: string;
+  deposit_bank_name: string | null;
+  deposit_account_number: string | null;
+  deposit_account_holder: string | null;
+  deposit_amount: number | null;
+  evidence_image_urls: string[] | null;
+  privacy_masking_agreement: boolean;
+  false_report_agreement: boolean;
+  review_status: "pending" | "approved" | "rejected";
+};
+
+type ExistingReview = {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+};
 
 const initialValues: FormValues = {
   siteId: "",
@@ -134,6 +164,88 @@ function parseNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function splitStoredList(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function formatStoredAmount(value: number | null) {
+  return value === null ? "" : String(value);
+}
+
+function parseCoinDepositNote(value: string | null) {
+  const note = value ?? "";
+  const parts = Object.fromEntries(
+    note
+      .split("/")
+      .map((part) => part.trim().split(":").map((item) => item.trim()))
+      .filter((part): part is [string, string] => part.length === 2),
+  );
+
+  return {
+    coinName: parts["코인"] ?? "",
+    walletAddress: parts["지갑"] ?? "",
+    txHash: parts.TX ?? "",
+  };
+}
+
+function hasOption(options: readonly string[], item: string) {
+  return options.includes(item);
+}
+
+function valuesFromExistingReport(report: ExistingScamReport): FormValues {
+  const detailItems = report.category_items ?? [];
+  const isCoinDeposit = (report.deposit_bank_name ?? "").includes("코인:");
+  const coinDeposit = isCoinDeposit
+    ? parseCoinDepositNote(report.deposit_bank_name)
+    : null;
+
+  return {
+    siteId: report.site_id,
+    incidentDate: report.incident_date,
+    usagePeriod: report.usage_period,
+    mainCategories: splitStoredList(report.main_category),
+    sportsItems: detailItems.filter((item) =>
+      hasOption(categoryDetailQuestions[0].options, item),
+    ),
+    casinoItems: detailItems.filter((item) =>
+      hasOption(categoryDetailQuestions[1].options, item),
+    ),
+    slotItems: detailItems.filter((item) =>
+      hasOption(categoryDetailQuestions[2].options, item),
+    ),
+    miniGameItems: detailItems.filter((item) =>
+      hasOption(categoryDetailQuestions[3].options, item),
+    ),
+    otherBettingItems: detailItems.filter((item) =>
+      hasOption(categoryDetailQuestions[4].options, item),
+    ),
+    categoryItems: [],
+    categoryEtcText: report.category_etc_text ?? "",
+    damageTypes: report.damage_types ?? [],
+    damageTypeEtcText: report.damage_type_etc_text ?? "",
+    damageAmount: formatStoredAmount(report.damage_amount),
+    damageAmountUnknown: report.damage_amount_unknown,
+    situationDescription: report.situation_description,
+    depositMethod: isCoinDeposit ? "coin" : report.deposit_bank_name ? "bank" : "",
+    depositBankName: isCoinDeposit ? "" : report.deposit_bank_name ?? "",
+    depositAccountNumber: isCoinDeposit ? "" : report.deposit_account_number ?? "",
+    depositAccountHolder: isCoinDeposit ? "" : report.deposit_account_holder ?? "",
+    depositCoinName:
+      coinDeposit?.coinName ?? (isCoinDeposit ? report.deposit_account_holder ?? "" : ""),
+    depositWalletAddress:
+      coinDeposit?.walletAddress ??
+      (isCoinDeposit ? report.deposit_account_number ?? "" : ""),
+    depositTxHash: coinDeposit?.txHash ?? "",
+    depositAmount: formatStoredAmount(report.deposit_amount),
+    evidenceImageUrls: report.evidence_image_urls ?? [],
+    privacyMaskingAgreement: report.privacy_masking_agreement,
+    falseReportAgreement: report.false_report_agreement,
+  };
+}
+
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value.trim(),
@@ -156,6 +268,11 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
   const [siteSearch, setSiteSearch] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [existingReportId, setExistingReportId] = useState<string | null>(null);
+  const [existingReportStatus, setExistingReportStatus] =
+    useState<ExistingScamReport["review_status"] | null>(null);
+  const [existingReviewStatus, setExistingReviewStatus] =
+    useState<ExistingReview["status"] | null>(null);
   const isSiteFixed = Boolean(normalizedSelectedSiteId);
 
   const selectedSite = useMemo(
@@ -252,6 +369,53 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
     };
   }, [normalizedSelectedSiteId]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadExistingContent() {
+      setExistingReportId(null);
+      setExistingReportStatus(null);
+      setExistingReviewStatus(null);
+
+      if (!user || !isUuid(values.siteId)) return;
+
+      const [reportResult, reviewResult] = await Promise.all([
+        supabase
+          .from("scam_reports")
+          .select(
+            "id, site_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, evidence_image_urls, privacy_masking_agreement, false_report_agreement, review_status",
+          )
+          .eq("user_id", user.id)
+          .eq("site_id", values.siteId)
+          .limit(1),
+        supabase
+          .from("reviews")
+          .select("id, status")
+          .eq("user_id", user.id)
+          .eq("site_id", values.siteId)
+          .limit(1),
+      ]);
+
+      if (!isMounted) return;
+
+      const review = reviewResult.data?.[0] as ExistingReview | undefined;
+      setExistingReviewStatus(review?.status ?? null);
+
+      if (reportResult.error || !reportResult.data?.[0]) return;
+
+      const report = reportResult.data[0] as ExistingScamReport;
+      setExistingReportId(report.id);
+      setExistingReportStatus(report.review_status);
+      setValues(valuesFromExistingReport(report));
+    }
+
+    loadExistingContent();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, values.siteId]);
+
   function updateField<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: undefined }));
@@ -262,6 +426,10 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
   function selectSite(site: ScamReportSiteOption) {
     updateField("siteId", site.id);
     setSiteSearch(site.siteName);
+  }
+
+  function scrollToReportForm() {
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function toggleArray(
@@ -362,9 +530,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
             .join(" / ")
         : null;
 
-    const { data: insertedReport, error } = await supabase
-      .from("scam_reports")
-      .insert({
+    const reportPayload = {
         site_id: values.siteId,
         user_id: user?.id ?? null,
         incident_date: values.incidentDate,
@@ -399,26 +565,41 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
         false_report_agreement: values.falseReportAgreement,
         review_status: "pending",
         is_published: false,
-      })
-      .select("id")
-      .single();
+        reviewed_at: null,
+        approved_at: null,
+        published_at: null,
+      };
+    const mutation = existingReportId
+      ? supabase
+          .from("scam_reports")
+          .update(reportPayload)
+          .eq("id", existingReportId)
+          .eq("user_id", user?.id ?? "")
+          .select("id")
+          .single()
+      : supabase.from("scam_reports").insert(reportPayload).select("id").single();
+    const { data: savedReport, error } = await mutation;
 
     setIsSubmitting(false);
 
     if (error) {
-      setErrorMessage("먹튀 피해 제보 저장 중 문제가 발생했습니다. 입력값과 권한을 확인해주세요.");
+      setErrorMessage(
+        error.code === "23505"
+          ? "이미 이 사이트에 작성한 먹튀 피해 제보가 있습니다. 기존 제보를 수정해주세요."
+          : "먹튀 피해 제보 저장 중 문제가 발생했습니다. 입력값과 권한을 확인해주세요.",
+      );
       return;
     }
 
-    const notificationError = insertedReport?.id
-      ? await sendContentSubmittedNotification(insertedReport.id)
+    const notificationError = savedReport?.id
+      ? await sendContentSubmittedNotification(savedReport.id)
       : "";
 
     setValues(initialFormValues(normalizedSelectedSiteId || values.siteId));
     setSuccessMessage(
       notificationError
-        ? `먹튀 피해 제보가 접수되었습니다. 관리자 승인 전까지 공개되지 않습니다. ${notificationError}`
-        : "먹튀 피해 제보가 접수되었습니다. 관리자 승인 전까지 공개되지 않습니다.",
+        ? `먹튀 피해 제보가 관리자 승인 대기 상태로 ${existingReportId ? "수정" : "접수"}되었습니다. ${notificationError}`
+        : `먹튀 피해 제보가 관리자 승인 대기 상태로 ${existingReportId ? "수정" : "접수"}되었습니다.`,
     );
   }
 
@@ -560,6 +741,44 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
       {errorMessage ? (
         <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {errorMessage}
+        </div>
+      ) : null}
+
+      {existingReportId || existingReviewStatus ? (
+        <div className="mt-4 grid gap-3 rounded-md border border-accent bg-accent-soft px-4 py-3 text-sm text-accent">
+          {existingReportId ? (
+            <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+              <p className="font-semibold">
+                이미 작성한 먹튀 피해 제보가 있습니다. 작성한 글을 수정해서 다시
+                제출할 수 있습니다.
+                {existingReportStatus
+                  ? ` 현재 상태: ${moderationStatusLabels[existingReportStatus]}`
+                  : ""}
+              </p>
+              <button
+                type="button"
+                onClick={scrollToReportForm}
+                className="h-10 rounded-md border border-accent px-3 text-sm font-semibold text-accent transition hover:bg-white"
+              >
+                작성한 먹튀 제보 수정하기
+              </button>
+            </div>
+          ) : null}
+          {existingReviewStatus ? (
+            <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+              <p className="font-semibold">
+                이미 작성한 만족도 평가가 있습니다. 작성한 평가를 수정하려면
+                만족도 평가 수정 화면으로 이동해주세요. 현재 상태:{" "}
+                {moderationStatusLabels[existingReviewStatus]}
+              </p>
+              <Link
+                href={`/submit-review?siteId=${encodeURIComponent(values.siteId)}`}
+                className="inline-flex h-10 items-center justify-center rounded-md border border-accent px-3 text-sm font-semibold text-accent transition hover:bg-white"
+              >
+                작성한 만족도 평가 수정하기
+              </Link>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -766,7 +985,11 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
             disabled={isSubmitting || !user}
             className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {isSubmitting ? "제출 중..." : "먹튀 피해 제보 제출"}
+            {isSubmitting
+              ? "제출 중..."
+              : existingReportId
+                ? "먹튀 피해 제보 수정 제출"
+                : "먹튀 피해 제보 제출"}
           </button>
       </form>
     </section>

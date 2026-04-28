@@ -98,10 +98,17 @@ type PublicScamReportRow = {
   usage_period: string;
   main_category: string;
   category_items: string[] | null;
+  category_etc_text: string | null;
   damage_types: string[] | null;
+  damage_type_etc_text: string | null;
   damage_amount: number | null;
   damage_amount_unknown: boolean;
   situation_description: string;
+  deposit_bank_name: string | null;
+  deposit_account_number: string | null;
+  deposit_account_holder: string | null;
+  deposit_amount: number | null;
+  deposit_date: string | null;
   evidence_image_urls: string[] | null;
   evidence_note: string | null;
   review_status: "pending" | "approved" | "rejected";
@@ -260,10 +267,17 @@ function mapScamReportRow(
     usagePeriod: report.usage_period,
     mainCategory: report.main_category,
     categoryItems: report.category_items ?? [],
+    categoryEtcText: report.category_etc_text,
     damageTypes: report.damage_types ?? [],
+    damageTypeEtcText: report.damage_type_etc_text,
     damageAmount: report.damage_amount,
     damageAmountUnknown: report.damage_amount_unknown,
     situationDescription: report.situation_description,
+    depositBankName: report.deposit_bank_name,
+    depositAccountNumber: report.deposit_account_number,
+    depositAccountHolder: report.deposit_account_holder,
+    depositAmount: report.deposit_amount,
+    depositDate: report.deposit_date,
     evidenceImageUrls: report.evidence_image_urls ?? [],
     evidenceNote: report.evidence_note,
     reviewStatus: report.review_status,
@@ -310,7 +324,7 @@ export async function getPublicSites(): Promise<PublicSitesResult> {
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("review_status", "approved")
       .eq("is_published", true)
@@ -387,7 +401,7 @@ export async function getPublicSiteDetail(
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("site_id", siteResult.data.id)
       .eq("review_status", "approved")
@@ -462,7 +476,7 @@ export async function getPublicReviewList(): Promise<
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("review_status", "approved")
       .eq("is_published", true),
@@ -532,7 +546,7 @@ export async function getPublicScamReportList(): Promise<
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("review_status", "approved")
       .eq("is_published", true)

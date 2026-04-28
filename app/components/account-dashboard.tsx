@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
-import { moderationStatusLabels } from "@/app/data/sites";
+import { formatRatingScore, moderationStatusLabels } from "@/app/data/sites";
 import { supabase } from "@/lib/supabase/client";
 
 type UserSite = {
@@ -17,9 +17,22 @@ type UserSite = {
 
 type UserReview = {
   id: string;
+  site_id: string;
   title: string;
   rating: number;
   status: keyof typeof moderationStatusLabels;
+  created_at: string;
+  sites?: {
+    name: string;
+  }[] | null;
+};
+
+type UserScamReport = {
+  id: string;
+  site_id: string;
+  damage_types: string[] | null;
+  review_status: keyof typeof moderationStatusLabels;
+  is_published: boolean;
   created_at: string;
   sites?: {
     name: string;
@@ -36,12 +49,14 @@ type AccountDataResult =
   | {
       sites: UserSite[];
       reviews: UserReview[];
+      scamReports: UserScamReport[];
       profile: UserProfile | null;
       errorMessage: "";
     }
   | {
       sites: [];
       reviews: [];
+      scamReports: [];
       profile: null;
       errorMessage: string;
     };
@@ -58,8 +73,13 @@ function getReviewSiteName(review: UserReview) {
   return review.sites?.[0]?.name ?? "알 수 없음";
 }
 
+function getScamReportSiteName(report: UserScamReport) {
+  return report.sites?.[0]?.name ?? "알 수 없음";
+}
+
 async function fetchAccountData(userId: string): Promise<AccountDataResult> {
-  const [sitesResult, reviewsResult, profileResult] = await Promise.all([
+  const [sitesResult, reviewsResult, scamReportsResult, profileResult] =
+    await Promise.all([
     supabase
       .from("sites")
       .select("id, name, url, category, status, created_at")
@@ -67,7 +87,14 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
       .order("created_at", { ascending: false }),
     supabase
       .from("reviews")
-      .select("id, title, rating, status, created_at, sites(name)")
+      .select("id, site_id, title, rating, status, created_at, sites(name)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("scam_reports")
+      .select(
+        "id, site_id, damage_types, review_status, is_published, created_at, sites(name)",
+      )
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     supabase
@@ -80,11 +107,13 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
   if (
     sitesResult.error ||
     reviewsResult.error ||
+    scamReportsResult.error ||
     profileResult.error
   ) {
     return {
       sites: [],
       reviews: [],
+      scamReports: [],
       profile: null,
       errorMessage:
         "내 작성 내역을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
@@ -94,6 +123,7 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
   return {
     sites: (sitesResult.data ?? []) as UserSite[],
     reviews: (reviewsResult.data ?? []) as UserReview[],
+    scamReports: (scamReportsResult.data ?? []) as UserScamReport[],
     profile: (profileResult.data as UserProfile | null) ?? null,
     errorMessage: "",
   };
@@ -103,6 +133,7 @@ export function AccountDashboard() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [sites, setSites] = useState<UserSite[]>([]);
   const [reviews, setReviews] = useState<UserReview[]>([]);
+  const [scamReports, setScamReports] = useState<UserScamReport[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -128,6 +159,7 @@ export function AccountDashboard() {
 
       setSites(result.sites);
       setReviews(result.reviews);
+      setScamReports(result.scamReports);
       setProfile(result.profile);
       setErrorMessage(result.errorMessage);
       setIsLoading(false);
@@ -220,14 +252,63 @@ export function AccountDashboard() {
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-muted">
-                  평점 {review.rating}/5 · {formatDate(review.created_at)}
+                  평점 {formatRatingScore(review.rating)} ·{" "}
+                  {formatDate(review.created_at)}
                 </p>
+                <Link
+                  href={`/submit-review?siteId=${review.site_id}`}
+                  className="mt-3 inline-flex h-9 items-center rounded-md border border-line px-3 text-xs font-semibold text-foreground transition hover:bg-background"
+                >
+                  만족도 평가 수정
+                </Link>
               </article>
             ))}
           </div>
         ) : (
           <p className="mt-2 text-sm leading-6 text-muted">
             아직 작성한 리뷰가 없습니다.
+          </p>
+        )}
+      </section>
+
+      <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">
+        <h2 className="text-lg font-semibold">내가 작성한 먹튀 피해 제보</h2>
+        {scamReports.length > 0 ? (
+          <div className="mt-4 grid gap-3">
+            {scamReports.map((report) => (
+              <article
+                key={report.id}
+                className="rounded-md border border-line p-4"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-accent">
+                      {getScamReportSiteName(report)} · 먹튀 피해 제보
+                    </p>
+                    <h3 className="mt-1 font-semibold">
+                      {(report.damage_types ?? []).join(", ") || "피해 유형 미입력"}
+                    </h3>
+                  </div>
+                  <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold">
+                    {moderationStatusLabels[report.review_status]}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-muted">
+                  제보일 {formatDate(report.created_at)} ·{" "}
+                  {report.is_published ? "공개" : "비공개"}
+                </p>
+                <Link
+                  href={`/submit-scam-report?siteId=${report.site_id}`}
+                  className="mt-3 inline-flex h-9 items-center rounded-md border border-line px-3 text-xs font-semibold text-foreground transition hover:bg-background"
+                >
+                  먹튀 피해 제보 수정
+                </Link>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm leading-6 text-muted">
+            아직 작성한 먹튀 피해 제보가 없습니다.
           </p>
         )}
       </section>

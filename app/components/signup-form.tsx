@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { siteUrl } from "@/lib/config";
-import { supabase } from "@/lib/supabase/client";
 
 type SignupErrors = {
   username?: string;
@@ -405,23 +404,30 @@ export function SignupForm() {
       return;
     }
 
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        emailRedirectTo: getSignupRedirectUrl(),
-        data: {
-          username: normalizedUsername,
-          nickname: nickname.trim(),
-          telegram_signup_code: telegramCode,
-        },
+    const signupResponse = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
       },
-    });
+      body: JSON.stringify({
+        username: normalizedUsername,
+        nickname: nickname.trim(),
+        email: email.trim(),
+        password,
+        telegramSignupCode: telegramCode,
+        emailRedirectTo: getSignupRedirectUrl(),
+      }),
+    }).catch(() => null);
+    const signupResult = (await signupResponse?.json().catch(() => null)) as
+      | { error?: string }
+      | null;
     setIsSubmitting(false);
 
-    if (error) {
+    if (!signupResponse?.ok) {
       setErrors({
-        form: "회원가입에 실패했습니다. 입력 정보를 확인하거나 잠시 후 다시 시도해주세요.",
+        form:
+          signupResult?.error ??
+          "회원가입에 실패했습니다. 입력 정보를 확인하거나 잠시 후 다시 시도해주세요.",
       });
       return;
     }

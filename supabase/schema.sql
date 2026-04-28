@@ -314,6 +314,8 @@ create table if not exists public.profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   username text unique not null,
   nickname text not null,
+  signup_ip text null,
+  signup_user_agent text null,
   telegram_verified_at timestamptz null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -328,6 +330,23 @@ create table if not exists public.profiles (
     char_length(trim(nickname)) between 2 and 20
   )
 );
+
+create table if not exists public.admin_ip_allowlist (
+  ip_address text primary key,
+  label text null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint admin_ip_allowlist_ip_not_blank check (
+    length(trim(ip_address)) > 0
+  )
+);
+
+alter table public.profiles
+  add column if not exists signup_ip text null;
+
+alter table public.profiles
+  add column if not exists signup_user_agent text null;
 
 create table if not exists public.telegram_subscriptions (
   id uuid primary key default gen_random_uuid(),
@@ -450,6 +469,10 @@ create index if not exists reviews_site_id_idx
 create index if not exists reviews_user_id_idx
   on public.reviews (user_id);
 
+create unique index if not exists reviews_user_site_unique_idx
+  on public.reviews (user_id, site_id)
+  where user_id is not null;
+
 create index if not exists reviews_status_idx
   on public.reviews (status);
 
@@ -464,6 +487,10 @@ create index if not exists scam_reports_site_id_idx
 
 create index if not exists scam_reports_user_id_idx
   on public.scam_reports (user_id);
+
+create unique index if not exists scam_reports_user_site_unique_idx
+  on public.scam_reports (user_id, site_id)
+  where user_id is not null;
 
 create index if not exists scam_reports_review_status_idx
   on public.scam_reports (review_status);
@@ -491,6 +518,12 @@ create unique index if not exists profiles_username_unique_lower_idx
 
 create unique index if not exists profiles_nickname_unique_lower_idx
   on public.profiles (lower(nickname));
+
+create index if not exists profiles_signup_ip_idx
+  on public.profiles (signup_ip);
+
+create index if not exists admin_ip_allowlist_ip_idx
+  on public.admin_ip_allowlist (ip_address);
 
 create index if not exists telegram_subscriptions_user_id_idx
   on public.telegram_subscriptions (user_id);
@@ -593,6 +626,13 @@ before update on public.profiles
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists set_admin_ip_allowlist_updated_at
+  on public.admin_ip_allowlist;
+create trigger set_admin_ip_allowlist_updated_at
+before update on public.admin_ip_allowlist
+for each row
+execute function public.set_updated_at();
+
 drop trigger if exists set_domain_whois_cache_updated_at
   on public.domain_whois_cache;
 create trigger set_domain_whois_cache_updated_at
@@ -626,6 +666,8 @@ declare
   signup_code text;
   signup_telegram public.telegram_signup_codes%rowtype;
   existing_telegram_user_id uuid;
+  signup_ip text;
+  signup_user_agent text;
 begin
   requested_username := lower(coalesce(new.raw_user_meta_data ->> 'username', ''));
   requested_username := regexp_replace(requested_username, '[^a-z0-9_]+', '', 'g');
@@ -647,16 +689,40 @@ begin
   end if;
 
   requested_nickname := left(requested_nickname, 20);
+  signup_ip := nullif(trim(coalesce(new.raw_user_meta_data ->> 'signup_ip', '')), '');
+  signup_user_agent := nullif(
+    left(trim(coalesce(new.raw_user_meta_data ->> 'signup_user_agent', '')), 500),
+    ''
+  );
+
+  if signup_ip is not null
+    and not exists (
+      select 1
+      from public.admin_ip_allowlist
+      where admin_ip_allowlist.ip_address = signup_ip
+    )
+    and exists (
+      select 1
+      from public.profiles
+      where profiles.signup_ip = signup_ip
+      limit 1
+    ) then
+    raise exception 'signup_ip_already_used';
+  end if;
 
   insert into public.profiles (
     user_id,
     username,
-    nickname
+    nickname,
+    signup_ip,
+    signup_user_agent
   )
   values (
     new.id,
     requested_username,
-    requested_nickname
+    requested_nickname,
+    signup_ip,
+    signup_user_agent
   )
   on conflict (user_id) do nothing;
 
@@ -746,6 +812,7 @@ alter table public.scam_reports enable row level security;
 alter table public.state_availability enable row level security;
 alter table public.admin_users enable row level security;
 alter table public.profiles enable row level security;
+alter table public.admin_ip_allowlist enable row level security;
 alter table public.telegram_subscriptions enable row level security;
 alter table public.telegram_signup_codes enable row level security;
 alter table public.domain_whois_cache enable row level security;
@@ -883,11 +950,34 @@ on public.reviews
 for select
 using (user_id = auth.uid());
 
+drop policy if exists "Users can update own reviews for reapproval"
+  on public.reviews;
+create policy "Users can update own reviews for reapproval"
+on public.reviews
+for update
+using (user_id = auth.uid())
+with check (
+  user_id = auth.uid()
+  and status = 'pending'
+);
+
 drop policy if exists "Users can read own scam reports" on public.scam_reports;
 create policy "Users can read own scam reports"
 on public.scam_reports
 for select
 using (user_id = auth.uid());
+
+drop policy if exists "Users can update own scam reports for reapproval"
+  on public.scam_reports;
+create policy "Users can update own scam reports for reapproval"
+on public.scam_reports
+for update
+using (user_id = auth.uid())
+with check (
+  user_id = auth.uid()
+  and review_status = 'pending'
+  and is_published = false
+);
 
 drop policy if exists "Authenticated users can submit site domains"
   on public.site_domain_submissions;
@@ -1020,6 +1110,14 @@ create policy "Admins can read profiles"
 on public.profiles
 for select
 using (public.is_admin());
+
+drop policy if exists "Admins can manage admin IP allowlist"
+  on public.admin_ip_allowlist;
+create policy "Admins can manage admin IP allowlist"
+on public.admin_ip_allowlist
+for all
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "Admins can manage domain whois cache"
   on public.domain_whois_cache;

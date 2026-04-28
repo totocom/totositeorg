@@ -3,7 +3,11 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
 import { reviewSurveySections, type SurveyQuestion } from "@/app/data/review-survey";
-import type { ReviewTarget, SiteReview } from "@/app/data/sites";
+import {
+  moderationStatusLabels,
+  type ReviewTarget,
+  type SiteReview,
+} from "@/app/data/sites";
 import { supabase } from "@/lib/supabase/client";
 
 type SubmitReviewFormProps = {
@@ -24,6 +28,15 @@ type FormStatus = "idle" | "loading-sites" | "submitting";
 type ReviewSiteOption = {
   id: string;
   siteName: string;
+};
+
+type ExistingReview = {
+  id: string;
+  site_id: string;
+  rating: number;
+  title: string;
+  experience: string;
+  status: "pending" | "approved" | "rejected";
 };
 
 const satisfactionToRating: Record<string, number> = {
@@ -80,6 +93,25 @@ function buildExperiencePayload(values: ReviewFormValues) {
   );
 }
 
+function parseExperiencePayload(experience: string) {
+  try {
+    const payload = JSON.parse(experience) as {
+      type?: string;
+      answers?: SurveyAnswers;
+      comment?: string | null;
+    };
+
+    if (payload?.type !== "site_satisfaction_survey") return null;
+
+    return {
+      answers: payload.answers ?? {},
+      comment: payload.comment ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 function getVisibleAnswers(answers: SurveyAnswers) {
   return reviewSurveySections.reduce<SurveyAnswers>((visibleAnswers, section) => {
     for (const question of section.questions) {
@@ -128,6 +160,9 @@ export function SubmitReviewForm({
   const [submitError, setSubmitError] = useState("");
   const [siteLoadError, setSiteLoadError] = useState("");
   const [siteSearch, setSiteSearch] = useState("");
+  const [existingReviewId, setExistingReviewId] = useState<string | null>(null);
+  const [existingReviewStatus, setExistingReviewStatus] =
+    useState<ExistingReview["status"] | null>(null);
   const isSiteFixed = Boolean(normalizedSelectedSiteId);
 
   const selectedSiteName = useMemo(() => {
@@ -211,6 +246,48 @@ export function SubmitReviewForm({
     };
   }, [normalizedSelectedSiteId]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadExistingReview() {
+      setExistingReviewId(null);
+      setExistingReviewStatus(null);
+
+      if (!user || !isUuid(values.siteId)) return;
+
+      const { data, error } = await supabase
+        .from("reviews")
+        .select("id, site_id, rating, title, experience, status")
+        .eq("user_id", user.id)
+        .eq("site_id", values.siteId)
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      if (error || !data) return;
+
+      const review = data as ExistingReview;
+      const parsed = parseExperiencePayload(review.experience);
+      setExistingReviewId(review.id);
+      setExistingReviewStatus(review.status);
+
+      if (parsed) {
+        setValues((current) => ({
+          ...current,
+          siteId: review.site_id,
+          answers: parsed.answers,
+          comment: parsed.comment ?? "",
+        }));
+      }
+    }
+
+    loadExistingReview();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, values.siteId]);
+
   function updateField<K extends keyof Omit<ReviewFormValues, "answers">>(
     field: K,
     value: ReviewFormValues[K],
@@ -265,6 +342,7 @@ export function SubmitReviewForm({
       nextErrors.siteId =
         "승인된 사이트 정보가 아직 Supabase와 연결되지 않았습니다.";
     }
+    if (!user) nextErrors.siteId = "로그인 후 만족도 평가를 작성할 수 있습니다.";
 
     for (const section of reviewSurveySections) {
       for (const question of section.questions) {
@@ -301,9 +379,7 @@ export function SubmitReviewForm({
     });
     const title = getTitle(selectedSiteName, visibleAnswers);
 
-    const { data: insertedReview, error } = await supabase
-      .from("reviews")
-      .insert({
+    const reviewPayload = {
         site_id: values.siteId,
         user_id: user?.id ?? null,
         rating: getRating(visibleAnswers),
@@ -313,9 +389,17 @@ export function SubmitReviewForm({
         reviewer_name: null,
         reviewer_email: null,
         status: "pending",
-      })
-      .select("id")
-      .single();
+    };
+    const mutation = existingReviewId
+      ? supabase
+          .from("reviews")
+          .update(reviewPayload)
+          .eq("id", existingReviewId)
+          .eq("user_id", user?.id ?? "")
+          .select("id")
+          .single()
+      : supabase.from("reviews").insert(reviewPayload).select("id").single();
+    const { data: savedReview, error } = await mutation;
 
     setFormStatus("idle");
 
@@ -335,19 +419,21 @@ export function SubmitReviewForm({
       }
 
       setSubmitError(
-        "만족도 평가 저장 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        error.code === "23505"
+          ? "이미 이 사이트에 작성한 만족도 평가가 있습니다. 기존 평가를 수정해주세요."
+          : "만족도 평가 저장 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
       );
       return;
     }
 
-    const notificationError = insertedReview?.id
-      ? await sendContentSubmittedNotification(insertedReview.id)
+    const notificationError = savedReview?.id
+      ? await sendContentSubmittedNotification(savedReview.id)
       : "";
 
     setSuccessMessage(
       notificationError
-        ? `만족도 평가가 관리자 검토 대기 상태로 접수되었습니다. ${notificationError}`
-        : "만족도 평가가 관리자 검토 대기 상태로 접수되었습니다.",
+        ? `만족도 평가가 관리자 검토 대기 상태로 ${existingReviewId ? "수정" : "접수"}되었습니다. ${notificationError}`
+        : `만족도 평가가 관리자 검토 대기 상태로 ${existingReviewId ? "수정" : "접수"}되었습니다.`,
     );
     setValues(initialValues(siteOptions, normalizedSelectedSiteId));
     const selectedSite = siteOptions.find((site) => site.id === normalizedSelectedSiteId);
@@ -428,6 +514,22 @@ export function SubmitReviewForm({
       {submitError ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {submitError}
+        </div>
+      ) : null}
+
+      {!user ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          만족도 평가는 로그인 사용자만 작성할 수 있습니다.
+        </div>
+      ) : null}
+
+      {existingReviewId ? (
+        <div className="rounded-md border border-accent bg-accent-soft px-4 py-3 text-sm font-semibold text-accent">
+          이 사이트에 이미 작성한 만족도 평가가 있습니다. 수정 후 제출하면
+          관리자 승인 대기 상태로 변경됩니다.
+          {existingReviewStatus
+            ? ` 현재 상태: ${moderationStatusLabels[existingReviewStatus]}`
+            : ""}
         </div>
       ) : null}
 
@@ -585,10 +687,14 @@ export function SubmitReviewForm({
 
       <button
         type="submit"
-        disabled={formStatus === "submitting"}
+        disabled={formStatus === "submitting" || !user}
         className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50"
       >
-        {formStatus === "submitting" ? "저장 중..." : "만족도 평가 제출"}
+        {formStatus === "submitting"
+          ? "저장 중..."
+          : existingReviewId
+            ? "만족도 평가 수정 제출"
+            : "만족도 평가 제출"}
       </button>
     </form>
   );

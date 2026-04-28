@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ReviewSummary } from "@/app/components/review-summary";
 import type { PublicReviewListItem } from "@/app/data/public-sites";
-import { issueTypeLabels } from "@/app/data/sites";
+import { formatRatingScore, issueTypeLabels } from "@/app/data/sites";
 
 type ReviewSortOption = "latest" | "rating_high" | "rating_low" | "site_name";
 type RatingFilter = "all" | "5" | "4" | "3" | "2" | "1";
@@ -166,7 +166,7 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
                   </p>
                 </div>
                 <p className="w-fit rounded-md bg-background px-3 py-1 text-sm font-semibold">
-                  {review.rating}/5
+                  {formatRatingScore(review.rating)}
                 </p>
               </div>
               <ReviewSummary

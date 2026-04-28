@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthNav } from "@/app/components/auth-nav";
+import { ThemeToggle } from "@/app/components/theme-toggle";
 
 const navItems = [
   { href: "/", label: "홈" },
@@ -27,6 +28,7 @@ export function Header() {
             </Link>
           ))}
           <AuthNav />
+          <ThemeToggle />
         </nav>
       </div>
     </header>

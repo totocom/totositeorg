@@ -122,6 +122,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [loadAdminStatus]);
 
+  useEffect(() => {
+    if (!user || !isAdmin) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function registerAdminIp() {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+
+      if (!token || isCancelled) {
+        return;
+      }
+
+      await fetch("/api/admin/signup-ip-allowlist/current", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      }).catch(() => null);
+    }
+
+    registerAdminIp();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, isAdmin]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,

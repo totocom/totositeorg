@@ -68,6 +68,11 @@ type WhoisInfo = {
   provider?: WhoisProvider;
 };
 
+type WhoisLookupResult = WhoisInfo & {
+  lookupUrl: string;
+  lookupLabel: string;
+};
+
 type WhoisProvider = "api-ninjas" | "apilayer" | "auto";
 
 type DnsInfo = {
@@ -130,6 +135,10 @@ function getDomainList(values: EditValues) {
   );
 }
 
+function getValidDomainList(values: EditValues) {
+  return getDomainList(values).filter(isValidUrl);
+}
+
 function getDisplayName(values: EditValues) {
   const ko = values.nameKo.trim();
   const en = values.nameEn.trim();
@@ -177,6 +186,77 @@ function DnsRecord({ label, values }: { label: string; values: string[] }) {
   );
 }
 
+function WhoisInfoCard({ whoisInfo }: { whoisInfo: WhoisLookupResult }) {
+  return (
+    <div className="grid gap-3 rounded-md border border-line bg-background p-4 text-sm">
+      <div>
+        <p className="text-xs font-semibold uppercase text-accent">
+          WHOIS 정보 · {whoisInfo.lookupLabel}
+          {whoisInfo.provider
+            ? ` · ${
+                whoisProviderOptions.find(
+                  (option) => option.value === whoisInfo.provider,
+                )?.label ?? whoisInfo.provider
+              }`
+            : ""}
+        </p>
+        <h3 className="mt-1 break-all text-base font-bold">
+          {whoisInfo.domain}
+        </h3>
+        <p className="mt-1 break-all text-xs text-muted">
+          조회 URL: {whoisInfo.lookupUrl}
+        </p>
+      </div>
+      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">등록기관</dt>
+          <dd className="mt-1 text-foreground">
+            {whoisInfo.registrar || "확인 불가"}
+          </dd>
+        </div>
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">등록일</dt>
+          <dd className="mt-1 text-foreground">
+            {formatOptionalDate(whoisInfo.creationDate)}
+          </dd>
+        </div>
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">만료일</dt>
+          <dd className="mt-1 text-foreground">
+            {formatOptionalDate(whoisInfo.expirationDate)}
+          </dd>
+        </div>
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">최근 갱신일</dt>
+          <dd className="mt-1 text-foreground">
+            {formatOptionalDate(whoisInfo.updatedDate)}
+          </dd>
+        </div>
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">WHOIS 서버</dt>
+          <dd className="mt-1 break-all text-foreground">
+            {whoisInfo.whoisServer || "확인 불가"}
+          </dd>
+        </div>
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">DNSSEC</dt>
+          <dd className="mt-1 text-foreground">
+            {whoisInfo.dnssec || "확인 불가"}
+          </dd>
+        </div>
+      </dl>
+      <div className="rounded-md bg-white p-3">
+        <p className="text-xs font-semibold text-muted">네임서버</p>
+        <p className="mt-1 break-all text-foreground">
+          {whoisInfo.nameServers.length > 0
+            ? whoisInfo.nameServers.join(", ")
+            : "확인 불가"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   const router = useRouter();
   const { user, isAdmin, isLoading } = useAuth();
@@ -188,7 +268,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
   const [metadata, setMetadata] = useState<SiteMetadata | null>(null);
   const [isFetchingWhois, setIsFetchingWhois] = useState(false);
-  const [whoisInfo, setWhoisInfo] = useState<WhoisInfo | null>(null);
+  const [whoisInfos, setWhoisInfos] = useState<WhoisLookupResult[]>([]);
   const [whoisProvider, setWhoisProvider] = useState<WhoisProvider>("auto");
   const [isFetchingDns, setIsFetchingDns] = useState(false);
   const [dnsInfo, setDnsInfo] = useState<DnsInfo | null>(null);
@@ -356,8 +436,10 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   async function fetchWhoisInfo() {
     setMessage("");
     setErrorMessage("");
+    setWhoisInfos([]);
+    const lookupUrls = getValidDomainList(values);
 
-    if (!values.url.trim() || !isValidUrl(values.url.trim())) {
+    if (lookupUrls.length === 0) {
       setErrors((current) => ({
         ...current,
         url: "WHOIS를 조회할 http:// 또는 https:// URL을 입력해주세요.",
@@ -374,27 +456,41 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       return;
     }
 
-    const response = await fetch("/api/admin/sites/whois", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ url: values.url.trim(), provider: whoisProvider }),
-    });
-    const result = (await response.json().catch(() => null)) as
-      | (WhoisInfo & { error?: string })
-      | null;
+    const results: WhoisLookupResult[] = [];
 
-    setIsFetchingWhois(false);
+    for (const [index, lookupUrl] of lookupUrls.entries()) {
+      const response = await fetch("/api/admin/sites/whois", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url: lookupUrl, provider: whoisProvider }),
+      });
+      const result = (await response.json().catch(() => null)) as
+        | (WhoisInfo & { error?: string })
+        | null;
 
-    if (!response.ok || !result) {
-      setErrorMessage(result?.error ?? "WHOIS 정보를 가져오지 못했습니다.");
-      return;
+      if (!response.ok || !result) {
+        setErrorMessage(
+          `${lookupUrl} WHOIS 정보를 가져오지 못했습니다. ${
+            result?.error ?? ""
+          }`.trim(),
+        );
+        setIsFetchingWhois(false);
+        return;
+      }
+
+      results.push({
+        ...result,
+        lookupUrl,
+        lookupLabel: index === 0 ? "대표 URL" : `추가 도메인 ${index}`,
+      });
     }
 
-    setWhoisInfo(result);
-    setMessage("WHOIS 정보를 가져왔습니다.");
+    setIsFetchingWhois(false);
+    setWhoisInfos(results);
+    setMessage(`WHOIS 정보를 ${results.length}개 도메인에서 가져왔습니다.`);
   }
 
   async function fetchDnsInfo() {
@@ -661,7 +757,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
               </button>
               <button
                 type="button"
-                onClick={fetchWhoisInfo}
+                onClick={() => fetchWhoisInfo()}
                 disabled={isFetchingWhois}
                 className="h-11 rounded-md border border-line px-4 text-sm font-semibold transition hover:bg-background disabled:opacity-50"
               >
@@ -732,67 +828,11 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
             </div>
           ) : null}
 
-          {whoisInfo ? (
-            <div className="grid gap-3 rounded-md border border-line bg-background p-4 text-sm">
-              <div>
-                <p className="text-xs font-semibold uppercase text-accent">
-                  WHOIS 정보
-                  {whoisInfo.provider
-                    ? ` · ${
-                        whoisProviderOptions.find(
-                          (option) => option.value === whoisInfo.provider,
-                        )?.label ?? whoisInfo.provider
-                      }`
-                    : ""}
-                </p>
-                <h3 className="mt-1 text-base font-bold">{whoisInfo.domain}</h3>
-              </div>
-              <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">등록기관</dt>
-                  <dd className="mt-1 text-foreground">
-                    {whoisInfo.registrar || "확인 불가"}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">등록일</dt>
-                  <dd className="mt-1 text-foreground">
-                    {formatOptionalDate(whoisInfo.creationDate)}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">만료일</dt>
-                  <dd className="mt-1 text-foreground">
-                    {formatOptionalDate(whoisInfo.expirationDate)}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">최근 갱신일</dt>
-                  <dd className="mt-1 text-foreground">
-                    {formatOptionalDate(whoisInfo.updatedDate)}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">WHOIS 서버</dt>
-                  <dd className="mt-1 break-all text-foreground">
-                    {whoisInfo.whoisServer || "확인 불가"}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">DNSSEC</dt>
-                  <dd className="mt-1 text-foreground">
-                    {whoisInfo.dnssec || "확인 불가"}
-                  </dd>
-                </div>
-              </dl>
-              <div className="rounded-md bg-white p-3">
-                <p className="text-xs font-semibold text-muted">네임서버</p>
-                <p className="mt-1 break-all text-foreground">
-                  {whoisInfo.nameServers.length > 0
-                    ? whoisInfo.nameServers.join(", ")
-                    : "확인 불가"}
-                </p>
-              </div>
+          {whoisInfos.length > 0 ? (
+            <div className="grid gap-3">
+              {whoisInfos.map((whoisInfo) => (
+                <WhoisInfoCard key={whoisInfo.lookupUrl} whoisInfo={whoisInfo} />
+              ))}
             </div>
           ) : null}
 

@@ -4,7 +4,11 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
 import { ReviewSummary } from "@/app/components/review-summary";
 import { ScreenshotUploadControl } from "@/app/components/screenshot-upload-control";
-import { issueTypeLabels, moderationStatusLabels } from "@/app/data/sites";
+import {
+  formatRatingScore,
+  issueTypeLabels,
+  moderationStatusLabels,
+} from "@/app/data/sites";
 import { supabase } from "@/lib/supabase/client";
 
 type ModerationStatus = "pending" | "approved" | "rejected";
@@ -63,6 +67,7 @@ type ScamReportRow = {
   damage_types: string[] | null;
   damage_amount: number | null;
   damage_amount_unknown: boolean;
+  situation_description: string;
   review_status: ModerationStatus;
   is_published: boolean;
   created_at: string;
@@ -148,6 +153,11 @@ type WhoisInfo = {
   nameServers: string[];
   dnssec: string;
   provider?: WhoisProvider;
+};
+
+type WhoisLookupResult = WhoisInfo & {
+  lookupUrl: string;
+  lookupLabel: string;
 };
 
 type WhoisProvider = "api-ninjas" | "apilayer" | "auto";
@@ -271,6 +281,10 @@ function getDomainList(values: AdminSiteFormValues) {
   );
 }
 
+function getValidDomainList(values: AdminSiteFormValues) {
+  return getDomainList(values).filter(isValidUrl);
+}
+
 function createSlug(name: string) {
   const baseSlug =
     name
@@ -318,7 +332,7 @@ async function fetchAdminData(): Promise<AdminDataResult> {
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, incident_date, usage_period, main_category, damage_types, damage_amount, damage_amount_unknown, review_status, is_published, created_at, sites(name, url, screenshot_url)",
+        "id, site_id, incident_date, usage_period, main_category, damage_types, damage_amount, damage_amount_unknown, situation_description, review_status, is_published, created_at, sites(name, url, screenshot_url)",
       )
       .in("review_status", ["pending", "approved", "rejected"])
       .order("created_at", { ascending: false }),
@@ -385,7 +399,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
   const [metadataMessage, setMetadataMessage] = useState("");
   const [metadataErrorMessage, setMetadataErrorMessage] = useState("");
   const [isFetchingWhois, setIsFetchingWhois] = useState(false);
-  const [whoisInfo, setWhoisInfo] = useState<WhoisInfo | null>(null);
+  const [whoisInfos, setWhoisInfos] = useState<WhoisLookupResult[]>([]);
   const [whoisProvider, setWhoisProvider] = useState<WhoisProvider>("auto");
   const [whoisMessage, setWhoisMessage] = useState("");
   const [whoisErrorMessage, setWhoisErrorMessage] = useState("");
@@ -670,7 +684,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     const accessToken = sessionResult.session?.access_token;
 
     if (!accessToken) {
-      return "게시물은 승인됐지만 작성자 텔레그램 알림은 로그인 세션을 확인하지 못해 전송되지 않았습니다.";
+      return "게시물은 승인됐지만 텔레그램 승인 알림은 로그인 세션을 확인하지 못해 전송되지 않았습니다.";
     }
 
     const response = await fetch("/api/admin/telegram/content-approved", {
@@ -690,7 +704,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       error?: string;
     } | null;
 
-    return `게시물은 승인됐지만 작성자 텔레그램 알림 전송에 실패했습니다. ${
+    return `게시물은 승인됐지만 텔레그램 승인 알림 전송에 실패했습니다. ${
       body?.error ?? "봇 연결 상태와 환경변수를 확인해주세요."
     }`;
   }
@@ -956,14 +970,18 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     );
   }
 
-  async function fetchWhoisInfo() {
+  async function fetchWhoisInfo(targetUrls = getValidDomainList(siteFormValues)) {
     setWhoisMessage("");
     setWhoisErrorMessage("");
     setSiteFormMessage("");
     setSiteFormErrorMessage("");
+    setWhoisInfos([]);
 
-    const url = siteFormValues.url.trim();
-    if (!url || !isValidUrl(url)) {
+    const lookupUrls = Array.from(new Set(targetUrls.map(normalizeUrl))).filter(
+      isValidUrl,
+    );
+
+    if (lookupUrls.length === 0) {
       setSiteFormErrors((current) => ({
         ...current,
         url: "WHOIS를 조회할 http:// 또는 https:// URL을 입력해주세요.",
@@ -971,6 +989,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       return;
     }
 
+    const results: WhoisLookupResult[] = [];
     setIsFetchingWhois(true);
 
     const { data: sessionResult } = await supabase.auth.getSession();
@@ -982,29 +1001,39 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       return;
     }
 
-    const response = await fetch("/api/admin/sites/whois", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ url, provider: whoisProvider }),
-    });
-    const result = (await response.json().catch(() => null)) as
-      | (WhoisInfo & { error?: string })
-      | null;
+    for (const [index, lookupUrl] of lookupUrls.entries()) {
+      const response = await fetch("/api/admin/sites/whois", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url: lookupUrl, provider: whoisProvider }),
+      });
+      const result = (await response.json().catch(() => null)) as
+        | (WhoisInfo & { error?: string })
+        | null;
 
-    setIsFetchingWhois(false);
+      if (!response.ok || !result) {
+        setWhoisErrorMessage(
+          `${lookupUrl} WHOIS 정보를 가져오지 못했습니다. ${
+            result?.error ?? ""
+          }`.trim(),
+        );
+        setIsFetchingWhois(false);
+        return;
+      }
 
-    if (!response.ok || !result) {
-      setWhoisErrorMessage(
-        result?.error ?? "WHOIS 정보를 가져오지 못했습니다.",
-      );
-      return;
+      results.push({
+        ...result,
+        lookupUrl,
+        lookupLabel: index === 0 ? "대표 URL" : `추가 도메인 ${index}`,
+      });
     }
 
-    setWhoisInfo(result);
-    setWhoisMessage("WHOIS 정보를 가져왔습니다.");
+    setIsFetchingWhois(false);
+    setWhoisInfos(results);
+    setWhoisMessage(`WHOIS 정보를 ${results.length}개 도메인에서 가져왔습니다.`);
   }
 
   async function fetchDnsInfo() {
@@ -1222,7 +1251,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setMetadata(null);
     setMetadataMessage("");
     setMetadataErrorMessage("");
-    setWhoisInfo(null);
+    setWhoisInfos([]);
     setWhoisMessage("");
     setWhoisErrorMessage("");
     setDnsInfo(null);
@@ -1259,7 +1288,6 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     showReviews ||
     showScamReports ||
     showRejectedReviews;
-
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
       <div className="mb-5">
@@ -1424,7 +1452,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
                 </button>
                 <button
                   type="button"
-                  onClick={fetchWhoisInfo}
+                  onClick={() => fetchWhoisInfo()}
                   disabled={isFetchingWhois}
                   className="h-11 rounded-md border border-line px-4 text-sm font-semibold transition hover:bg-background disabled:opacity-50"
                 >
@@ -1661,67 +1689,11 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
             </div>
           ) : null}
 
-          {whoisInfo ? (
-            <div className="grid gap-3 rounded-md border border-line bg-background p-4 text-sm">
-              <div>
-                <p className="text-xs font-semibold uppercase text-accent">
-                  WHOIS 정보
-                  {whoisInfo.provider
-                    ? ` · ${
-                        whoisProviderOptions.find(
-                          (option) => option.value === whoisInfo.provider,
-                        )?.label ?? whoisInfo.provider
-                      }`
-                    : ""}
-                </p>
-                <h3 className="mt-1 text-base font-bold">{whoisInfo.domain}</h3>
-              </div>
-              <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">등록기관</dt>
-                  <dd className="mt-1 text-foreground">
-                    {whoisInfo.registrar || "확인 불가"}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">등록일</dt>
-                  <dd className="mt-1 text-foreground">
-                    {formatOptionalDate(whoisInfo.creationDate)}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">만료일</dt>
-                  <dd className="mt-1 text-foreground">
-                    {formatOptionalDate(whoisInfo.expirationDate)}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">최근 갱신일</dt>
-                  <dd className="mt-1 text-foreground">
-                    {formatOptionalDate(whoisInfo.updatedDate)}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">WHOIS 서버</dt>
-                  <dd className="mt-1 break-all text-foreground">
-                    {whoisInfo.whoisServer || "확인 불가"}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-white p-3">
-                  <dt className="text-xs font-semibold text-muted">DNSSEC</dt>
-                  <dd className="mt-1 text-foreground">
-                    {whoisInfo.dnssec || "확인 불가"}
-                  </dd>
-                </div>
-              </dl>
-              <div className="rounded-md bg-white p-3">
-                <p className="text-xs font-semibold text-muted">네임서버</p>
-                <p className="mt-1 break-all text-foreground">
-                  {whoisInfo.nameServers.length > 0
-                    ? whoisInfo.nameServers.join(", ")
-                    : "확인 불가"}
-                </p>
-              </div>
+          {whoisInfos.length > 0 ? (
+            <div className="grid gap-3">
+              {whoisInfos.map((whoisInfo) => (
+                <WhoisInfoCard key={whoisInfo.lookupUrl} whoisInfo={whoisInfo} />
+              ))}
             </div>
           ) : null}
 
@@ -1801,6 +1773,8 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
             submissions={pendingSiteDomainSubmissions}
             isUpdating={isUpdating}
             onReview={reviewSiteDomainSubmission}
+            onFetchWhois={(domainUrl) => fetchWhoisInfo([domainUrl])}
+            isFetchingWhois={isFetchingWhois}
           />
           ) : null}
           {showSites ? (
@@ -2090,10 +2064,83 @@ function DnsRecord({ label, values }: { label: string; values: string[] }) {
   );
 }
 
+function WhoisInfoCard({ whoisInfo }: { whoisInfo: WhoisLookupResult }) {
+  return (
+    <div className="grid gap-3 rounded-md border border-line bg-background p-4 text-sm">
+      <div>
+        <p className="text-xs font-semibold uppercase text-accent">
+          WHOIS 정보 · {whoisInfo.lookupLabel}
+          {whoisInfo.provider
+            ? ` · ${
+                whoisProviderOptions.find(
+                  (option) => option.value === whoisInfo.provider,
+                )?.label ?? whoisInfo.provider
+              }`
+            : ""}
+        </p>
+        <h3 className="mt-1 break-all text-base font-bold">
+          {whoisInfo.domain}
+        </h3>
+        <p className="mt-1 break-all text-xs text-muted">
+          조회 URL: {whoisInfo.lookupUrl}
+        </p>
+      </div>
+      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">등록기관</dt>
+          <dd className="mt-1 text-foreground">
+            {whoisInfo.registrar || "확인 불가"}
+          </dd>
+        </div>
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">등록일</dt>
+          <dd className="mt-1 text-foreground">
+            {formatOptionalDate(whoisInfo.creationDate)}
+          </dd>
+        </div>
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">만료일</dt>
+          <dd className="mt-1 text-foreground">
+            {formatOptionalDate(whoisInfo.expirationDate)}
+          </dd>
+        </div>
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">최근 갱신일</dt>
+          <dd className="mt-1 text-foreground">
+            {formatOptionalDate(whoisInfo.updatedDate)}
+          </dd>
+        </div>
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">WHOIS 서버</dt>
+          <dd className="mt-1 break-all text-foreground">
+            {whoisInfo.whoisServer || "확인 불가"}
+          </dd>
+        </div>
+        <div className="rounded-md bg-white p-3">
+          <dt className="text-xs font-semibold text-muted">DNSSEC</dt>
+          <dd className="mt-1 text-foreground">
+            {whoisInfo.dnssec || "확인 불가"}
+          </dd>
+        </div>
+      </dl>
+      <div className="rounded-md bg-white p-3">
+        <p className="text-xs font-semibold text-muted">네임서버</p>
+        <p className="mt-1 break-all text-foreground">
+          {whoisInfo.nameServers.length > 0
+            ? whoisInfo.nameServers.join(", ")
+            : "확인 불가"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function SiteDomainSubmissionTable({
   submissions,
   isUpdating,
   onReview,
+  onFetchWhois,
+  isFetchingWhois,
 }: {
   submissions: SiteDomainSubmissionRow[];
   isUpdating: (
@@ -2102,6 +2149,8 @@ function SiteDomainSubmissionTable({
     status: ModerationStatus,
   ) => boolean;
   onReview: (submissionId: string, status: "approved" | "rejected") => void;
+  onFetchWhois: (domainUrl: string) => void;
+  isFetchingWhois: boolean;
 }) {
   return (
     <section
@@ -2171,6 +2220,14 @@ function SiteDomainSubmissionTable({
                           className="rounded-md border border-line px-3 py-2 text-xs font-semibold disabled:opacity-50"
                         >
                           {rejecting ? "처리 중..." : "거절"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={approving || rejecting || isFetchingWhois}
+                          onClick={() => onFetchWhois(submission.domain_url)}
+                          className="rounded-md border border-line px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                        >
+                          {isFetchingWhois ? "조회 중..." : "WHOIS 조회"}
                         </button>
                       </div>
                     </td>
@@ -2397,7 +2454,9 @@ function ReviewTable({
                   <td className="px-4 py-4">
                     {issueTypeLabels[review.issue_type]}
                   </td>
-                  <td className="px-4 py-4">{review.rating}/5</td>
+                  <td className="px-4 py-4">
+                    {formatRatingScore(review.rating)}
+                  </td>
                   <td className="px-4 py-4">
                     {adminStatusLabels[review.status]}
                   </td>
@@ -2455,12 +2514,13 @@ function ScamReportTable({
         <h2 className="font-semibold">{title}</h2>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
           <thead className="bg-background text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-3 font-semibold">연결된 사이트</th>
               <th className="px-4 py-3 font-semibold">피해 금액</th>
               <th className="px-4 py-3 font-semibold">피해 유형</th>
+              <th className="px-4 py-3 font-semibold">상세 제보 내용</th>
               <th className="px-4 py-3 font-semibold">발생 일자</th>
               <th className="px-4 py-3 font-semibold">검토 상태</th>
               <th className="px-4 py-3 font-semibold">공개 여부</th>
@@ -2489,6 +2549,11 @@ function ScamReportTable({
                     <td className="px-4 py-4">
                       {(report.damage_types ?? []).join(", ") || "확인 필요"}
                     </td>
+                    <td className="max-w-md px-4 py-4">
+                      <p className="line-clamp-4 whitespace-pre-line leading-6 text-muted">
+                        {report.situation_description || "상세 내용 없음"}
+                      </p>
+                    </td>
                     <td className="px-4 py-4">{report.incident_date}</td>
                     <td className="px-4 py-4">{adminStatusLabels[report.review_status]}</td>
                     <td className="px-4 py-4">{report.is_published ? "공개" : "비공개"}</td>
@@ -2507,7 +2572,7 @@ function ScamReportTable({
                 );
               })
             ) : (
-              <EmptyRow colSpan={8} />
+              <EmptyRow colSpan={9} />
             )}
           </tbody>
         </table>
