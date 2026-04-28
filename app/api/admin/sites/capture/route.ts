@@ -3,6 +3,7 @@ import net from "node:net";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 import { buildSiteScreenshotUrl } from "@/app/data/site-screenshot";
 
 export const runtime = "nodejs";
@@ -171,12 +172,15 @@ async function downloadImage(imageUrl: string) {
 async function uploadScreenshot(imageBytes: Uint8Array) {
   const { supabaseUrl, serviceRoleKey, bucket } = getStorageEnv();
   const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const filePath = `captures/${randomUUID()}.png`;
+  const webpBytes = await sharp(imageBytes)
+    .webp({ quality: 82 })
+    .toBuffer();
+  const filePath = `captures/${randomUUID()}.webp`;
 
   const { error } = await supabase.storage
     .from(bucket)
-    .upload(filePath, imageBytes, {
-      contentType: "image/png",
+    .upload(filePath, webpBytes, {
+      contentType: "image/webp",
       upsert: false,
     });
 

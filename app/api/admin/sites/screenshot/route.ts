@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 
 export const runtime = "nodejs";
 
@@ -55,9 +56,27 @@ async function getAdminUser(token: string) {
 function getExtension(contentType: string) {
   if (contentType === "image/x-icon") return "ico";
   if (contentType === "image/vnd.microsoft.icon") return "ico";
-  if (contentType === "image/jpeg") return "jpg";
-  if (contentType === "image/webp") return "webp";
-  return "png";
+  return "webp";
+}
+
+function isIconType(contentType: string) {
+  return contentType === "image/x-icon" || contentType === "image/vnd.microsoft.icon";
+}
+
+async function getUploadImage(file: File) {
+  const imageBytes = new Uint8Array(await file.arrayBuffer());
+
+  if (isIconType(file.type)) {
+    return {
+      bytes: imageBytes,
+      contentType: file.type,
+    };
+  }
+
+  return {
+    bytes: await sharp(imageBytes).webp({ quality: 82 }).toBuffer(),
+    contentType: "image/webp",
+  };
 }
 
 export async function POST(request: Request) {
@@ -97,12 +116,12 @@ export async function POST(request: Request) {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const extension = getExtension(file.type);
     const filePath = `manual/${randomUUID()}.${extension}`;
-    const imageBytes = new Uint8Array(await file.arrayBuffer());
+    const uploadImage = await getUploadImage(file);
 
     const { error } = await supabase.storage
       .from(bucket)
-      .upload(filePath, imageBytes, {
-        contentType: file.type,
+      .upload(filePath, uploadImage.bytes, {
+        contentType: uploadImage.contentType,
         upsert: false,
       });
 

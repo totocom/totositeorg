@@ -32,7 +32,7 @@ export function ScreenshotUploadControl({
   onError,
   accept = "image/png,image/jpeg,image/webp",
   buttonLabel = "이미지 업로드",
-  description = "캡처가 막힌 경우 이미지 파일을 선택하거나, 이 영역을 클릭한 뒤 클립보드 이미지를 붙여넣어 업로드할 수 있습니다. PNG, JPG, WEBP 형식을 지원합니다.",
+  description = "캡처가 막힌 경우 이미지 파일을 선택하거나, 이 영역을 클릭한 뒤 클립보드 이미지를 붙여넣어 업로드할 수 있습니다. PNG, JPG 이미지는 WEBP로 변환되어 저장됩니다.",
   placeholder = "Supabase Storage 이미지 URL",
   successMessage = "수동 이미지가 업로드되었습니다.",
 }: ScreenshotUploadControlProps) {
