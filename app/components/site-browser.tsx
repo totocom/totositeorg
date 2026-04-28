@@ -11,7 +11,8 @@ type SortOption =
   | "reviews"
   | "scam_amount"
   | "scam_count"
-  | "name";
+  | "name"
+  | "name_desc";
 
 type SiteBrowserProps = {
   sites: ReviewTarget[];
@@ -78,6 +79,10 @@ export function SiteBrowser({ sites }: SiteBrowserProps) {
         return first.siteName.localeCompare(second.siteName, "ko");
       }
 
+      if (sortOption === "name_desc") {
+        return second.siteName.localeCompare(first.siteName, "ko");
+      }
+
       return 0;
     });
   }, [query, sites, sortOption]);
@@ -119,6 +124,7 @@ export function SiteBrowser({ sites }: SiteBrowserProps) {
             <option value="latest">최신 등록순</option>
             <option value="domain_age">운영이력 오래된순</option>
             <option value="name">이름순</option>
+            <option value="name_desc">이름 역순</option>
             <option value="reviews">리뷰 많은순</option>
             <option value="rating">평점 높은순</option>
             <option value="scam_amount">먹튀 금액 높은순</option>
