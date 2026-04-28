@@ -147,7 +147,10 @@ type WhoisInfo = {
   expirationDate: string;
   nameServers: string[];
   dnssec: string;
+  provider?: WhoisProvider;
 };
+
+type WhoisProvider = "api-ninjas" | "apilayer" | "auto";
 
 type DnsInfo = {
   domain: string;
@@ -160,6 +163,12 @@ type DnsInfo = {
   soa: string;
   errorMessage: string;
 };
+
+const whoisProviderOptions: { label: string; value: WhoisProvider }[] = [
+  { label: "API-Ninjas", value: "api-ninjas" },
+  { label: "APILayer", value: "apilayer" },
+  { label: "자동 fallback", value: "auto" },
+];
 
 type AdminDataResult =
   | {
@@ -377,6 +386,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
   const [metadataErrorMessage, setMetadataErrorMessage] = useState("");
   const [isFetchingWhois, setIsFetchingWhois] = useState(false);
   const [whoisInfo, setWhoisInfo] = useState<WhoisInfo | null>(null);
+  const [whoisProvider, setWhoisProvider] = useState<WhoisProvider>("auto");
   const [whoisMessage, setWhoisMessage] = useState("");
   const [whoisErrorMessage, setWhoisErrorMessage] = useState("");
   const [isFetchingDns, setIsFetchingDns] = useState(false);
@@ -978,7 +988,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, provider: whoisProvider }),
     });
     const result = (await response.json().catch(() => null)) as
       | (WhoisInfo & { error?: string })
@@ -1437,6 +1447,23 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
                   {isCapturingPage ? "캡처 중..." : "페이지 캡처"}
                 </button>
               </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {whoisProviderOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setWhoisProvider(option.value)}
+                    aria-pressed={whoisProvider === option.value}
+                    className={`h-9 rounded-md border px-3 text-xs font-semibold transition ${
+                      whoisProvider === option.value
+                        ? "border-accent bg-accent text-white"
+                        : "border-line bg-white text-foreground hover:bg-background"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
               {siteFormErrors.url ? (
                 <span className="text-xs text-red-700">{siteFormErrors.url}</span>
               ) : null}
@@ -1639,6 +1666,13 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
               <div>
                 <p className="text-xs font-semibold uppercase text-accent">
                   WHOIS 정보
+                  {whoisInfo.provider
+                    ? ` · ${
+                        whoisProviderOptions.find(
+                          (option) => option.value === whoisInfo.provider,
+                        )?.label ?? whoisInfo.provider
+                      }`
+                    : ""}
                 </p>
                 <h3 className="mt-1 text-base font-bold">{whoisInfo.domain}</h3>
               </div>
