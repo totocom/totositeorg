@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
 import { reviewSurveySections, type SurveyQuestion } from "@/app/data/review-survey";
 import type { ReviewTarget, SiteReview } from "@/app/data/sites";
@@ -17,8 +17,6 @@ type ReviewFormValues = {
   siteId: string;
   answers: SurveyAnswers;
   comment: string;
-  nickname: string;
-  email: string;
 };
 
 type ReviewFormErrors = Partial<Record<keyof ReviewFormValues | string, string>>;
@@ -40,24 +38,19 @@ function initialValues(
   sites: ReviewSiteOption[],
   selectedSiteId = "",
 ): ReviewFormValues {
-  const selectedSite = sites.find((site) => site.id === selectedSiteId);
+  const normalizedSelectedSiteId = selectedSiteId.trim();
+  const selectedSite = sites.find((site) => site.id === normalizedSelectedSiteId);
 
   return {
-    siteId: selectedSiteId ? selectedSite?.id ?? "" : sites[0]?.id ?? "",
+    siteId: normalizedSelectedSiteId ? selectedSite?.id ?? "" : sites[0]?.id ?? "",
     answers: {},
     comment: "",
-    nickname: "",
-    email: "",
   };
-}
-
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
+    value.trim(),
   );
 }
 
@@ -117,7 +110,9 @@ export function SubmitReviewForm({
   sites,
   selectedSiteId = "",
 }: SubmitReviewFormProps) {
+  const normalizedSelectedSiteId = selectedSiteId.trim();
   const { user } = useAuth();
+  const formRef = useRef<HTMLFormElement>(null);
   const fallbackSites = sites.map((site) => ({
     id: site.id,
     siteName: site.siteName,
@@ -126,14 +121,14 @@ export function SubmitReviewForm({
     useState<ReviewSiteOption[]>(fallbackSites);
   const [formStatus, setFormStatus] = useState<FormStatus>("loading-sites");
   const [values, setValues] = useState(() =>
-    initialValues(fallbackSites, selectedSiteId),
+    initialValues(fallbackSites, normalizedSelectedSiteId),
   );
   const [errors, setErrors] = useState<ReviewFormErrors>({});
   const [successMessage, setSuccessMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [siteLoadError, setSiteLoadError] = useState("");
   const [siteSearch, setSiteSearch] = useState("");
-  const isSiteFixed = Boolean(selectedSiteId);
+  const isSiteFixed = Boolean(normalizedSelectedSiteId);
 
   const selectedSiteName = useMemo(() => {
     return siteOptions.find((site) => site.id === values.siteId)?.siteName ?? "사이트";
@@ -150,6 +145,24 @@ export function SubmitReviewForm({
 
     return filtered.slice(0, 12);
   }, [siteOptions, siteSearch]);
+
+  function scrollToFirstError(nextErrors: ReviewFormErrors) {
+    const firstErrorKey = Object.keys(nextErrors)[0];
+
+    if (!firstErrorKey) return;
+
+    requestAnimationFrame(() => {
+      const target =
+        formRef.current?.querySelector<HTMLElement>(
+          `[data-error-key="${CSS.escape(firstErrorKey)}"]`,
+        ) ?? null;
+
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target
+        ?.querySelector<HTMLElement>("input, textarea, button")
+        ?.focus({ preventScroll: true });
+    });
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -178,15 +191,15 @@ export function SubmitReviewForm({
         id: site.id,
         siteName: site.name,
       }));
-      const selectedSite = approvedSites.find((site) => site.id === selectedSiteId);
+      const selectedSite = approvedSites.find((site) => site.id === normalizedSelectedSiteId);
 
       setSiteLoadError(
-        selectedSiteId && !selectedSite
+        normalizedSelectedSiteId && !selectedSite
           ? "요청한 사이트가 승인 목록에 없거나 공개 상태가 아닙니다."
           : "",
       );
       setSiteOptions(approvedSites);
-      setValues(initialValues(approvedSites, selectedSiteId));
+      setValues(initialValues(approvedSites, normalizedSelectedSiteId));
       setSiteSearch(selectedSite?.siteName ?? "");
       setFormStatus("idle");
     }
@@ -196,7 +209,7 @@ export function SubmitReviewForm({
     return () => {
       isMounted = false;
     };
-  }, [selectedSiteId]);
+  }, [normalizedSelectedSiteId]);
 
   function updateField<K extends keyof Omit<ReviewFormValues, "answers">>(
     field: K,
@@ -229,7 +242,9 @@ export function SubmitReviewForm({
       const valuesArray = Array.isArray(currentValues) ? currentValues : [];
       const nextValues = valuesArray.includes(option)
         ? valuesArray.filter((value) => value !== option)
-        : [...valuesArray, option];
+        : option === "없음"
+          ? ["없음"]
+          : [...valuesArray.filter((value) => value !== "없음"), option];
 
       return {
         ...current,
@@ -260,10 +275,6 @@ export function SubmitReviewForm({
       }
     }
 
-    if (values.email.trim() && !isValidEmail(values.email.trim())) {
-      nextErrors.email = "올바른 이메일 형식으로 입력해주세요.";
-    }
-
     return nextErrors;
   }
 
@@ -275,6 +286,7 @@ export function SubmitReviewForm({
     if (Object.keys(nextErrors).length > 0) {
       setSuccessMessage("");
       setSubmitError("");
+      scrollToFirstError(nextErrors);
       return;
     }
 
@@ -289,18 +301,22 @@ export function SubmitReviewForm({
     });
     const title = getTitle(selectedSiteName, visibleAnswers);
 
-    const { error } = await supabase.from("reviews").insert({
-      site_id: values.siteId,
-      user_id: user?.id ?? null,
-      rating: getRating(visibleAnswers),
-      title,
-      experience,
-      issue_type: "general" satisfies SiteReview["issueType"],
-      state_used: "해당 없음",
-      reviewer_name: values.nickname.trim() || null,
-      reviewer_email: values.email.trim() || null,
-      status: "pending",
-    });
+    const { data: insertedReview, error } = await supabase
+      .from("reviews")
+      .insert({
+        site_id: values.siteId,
+        user_id: user?.id ?? null,
+        rating: getRating(visibleAnswers),
+        title,
+        experience,
+        issue_type: "general" satisfies SiteReview["issueType"],
+        state_used: "해당 없음",
+        reviewer_name: null,
+        reviewer_email: null,
+        status: "pending",
+      })
+      .select("id")
+      .single();
 
     setFormStatus("idle");
 
@@ -325,10 +341,52 @@ export function SubmitReviewForm({
       return;
     }
 
-    setSuccessMessage("만족도 평가가 관리자 검토 대기 상태로 접수되었습니다.");
-    setValues(initialValues(siteOptions, selectedSiteId));
-    const selectedSite = siteOptions.find((site) => site.id === selectedSiteId);
+    const notificationError = insertedReview?.id
+      ? await sendContentSubmittedNotification(insertedReview.id)
+      : "";
+
+    setSuccessMessage(
+      notificationError
+        ? `만족도 평가가 관리자 검토 대기 상태로 접수되었습니다. ${notificationError}`
+        : "만족도 평가가 관리자 검토 대기 상태로 접수되었습니다.",
+    );
+    setValues(initialValues(siteOptions, normalizedSelectedSiteId));
+    const selectedSite = siteOptions.find((site) => site.id === normalizedSelectedSiteId);
     setSiteSearch(selectedSite?.siteName ?? "");
+  }
+
+  async function sendContentSubmittedNotification(reviewId: string) {
+    if (!user) {
+      return "";
+    }
+
+    const { data: sessionResult } = await supabase.auth.getSession();
+    const accessToken = sessionResult.session?.access_token;
+
+    if (!accessToken) {
+      return "다만 텔레그램 알림은 로그인 세션을 확인하지 못해 전송되지 않았습니다.";
+    }
+
+    const response = await fetch("/api/telegram/content-submitted", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ type: "review", contentId: reviewId }),
+    });
+
+    if (response.ok) {
+      return "";
+    }
+
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+
+    return `다만 텔레그램 알림 전송에 실패했습니다. ${
+      body?.error ?? "봇 연결 상태와 환경변수를 확인해주세요."
+    }`;
   }
 
   if (formStatus === "loading-sites") {
@@ -357,6 +415,7 @@ export function SubmitReviewForm({
 
   return (
     <form
+      ref={formRef}
       onSubmit={handleSubmit}
       className="grid gap-4 rounded-lg border border-line bg-surface p-5 shadow-sm"
       noValidate
@@ -373,7 +432,7 @@ export function SubmitReviewForm({
         </div>
       ) : null}
 
-      <div className="grid gap-2 text-sm font-medium">
+      <div className="grid gap-2 text-sm font-medium" data-error-key="siteId">
         {isSiteFixed ? (
           <div className="rounded-md border border-line bg-background p-4">
             <p className="text-xs font-semibold uppercase text-muted">
@@ -460,7 +519,11 @@ export function SubmitReviewForm({
               {visibleQuestions.map((question) => {
 
               return (
-                <fieldset key={question.id} className="grid gap-2">
+                <fieldset
+                  key={question.id}
+                  className="grid gap-2"
+                  data-error-key={question.id}
+                >
                   <legend className="text-sm font-semibold text-foreground">
                     {question.label}
                   </legend>
@@ -520,30 +583,6 @@ export function SubmitReviewForm({
           placeholder="추가로 남기고 싶은 이용 경험이나 개선 의견이 있다면 작성해주세요."
         />
       </label>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-1 text-sm font-medium">
-          닉네임 선택
-          <input
-            value={values.nickname}
-            onChange={(event) => updateField("nickname", event.target.value)}
-            className="h-11 rounded-md border border-line px-3 text-sm"
-            placeholder="공개 표시용 닉네임"
-          />
-        </label>
-        <label className="grid gap-1 text-sm font-medium">
-          이메일 선택
-          <input
-            value={values.email}
-            onChange={(event) => updateField("email", event.target.value)}
-            className="h-11 rounded-md border border-line px-3 text-sm"
-            placeholder="검토 관련 안내를 받을 이메일"
-          />
-          {errors.email ? (
-            <span className="text-xs text-red-700">{errors.email}</span>
-          ) : null}
-        </label>
-      </div>
 
       <button
         type="submit"

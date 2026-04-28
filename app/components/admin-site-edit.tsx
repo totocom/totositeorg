@@ -536,6 +536,19 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       return;
     }
 
+    const token = await getAdminToken();
+
+    if (token) {
+      await fetch("/api/admin/sites/refresh-dns", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ siteId }),
+      }).catch(() => null);
+    }
+
     setMessage("사이트 정보가 수정되었습니다. 저장된 사이트로 이동합니다.");
     router.push(siteSlug ? `/sites/${siteSlug}` : "/admin");
   }

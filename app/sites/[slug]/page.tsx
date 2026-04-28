@@ -1,17 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { domainToUnicode } from "node:url";
+import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actions";
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
-import { getPublicDnsInfo } from "@/app/data/domain-dns";
 import { getPublicWhoisInfo } from "@/app/data/domain-whois";
-import { getPublicSiteDetail } from "@/app/data/public-sites";
+import { getPublicSiteDetail, getPublicSites } from "@/app/data/public-sites";
+import type { ReviewTarget } from "@/app/data/sites";
 import { siteUrl } from "@/lib/config";
 
 type SiteDetailPageProps = {
   params: Promise<{
     slug: string;
   }>;
+};
+
+type SameIpSite = {
+  site: ReviewTarget;
+  matchedDomains: string[];
+  matchedIps: string[];
 };
 
 export const dynamic = "force-dynamic";
@@ -75,6 +82,42 @@ function formatDamageAmount(amount: number, unknownCount: number) {
   return formattedAmount;
 }
 
+function getUniqueSiteDomains(site: ReviewTarget) {
+  return Array.from(
+    new Set((site.domains.length > 0 ? site.domains : [site.siteUrl]).filter(Boolean)),
+  );
+}
+
+async function getSameIpSites(site: ReviewTarget, currentIps: Set<string>) {
+  if (currentIps.size === 0) {
+    return [];
+  }
+
+  const { sites } = await getPublicSites();
+  const candidates = sites
+    .filter((candidate) => candidate.id !== site.id)
+    .slice(0, 80);
+
+  const matches = await Promise.all(
+    candidates.map(async (candidate): Promise<SameIpSite | null> => {
+      const candidateIps = candidate.resolvedIps ?? [];
+      const matchedIps = candidateIps.filter((ip) => currentIps.has(ip)).sort();
+
+      if (matchedIps.length === 0) {
+        return null;
+      }
+
+      return {
+        site: candidate,
+        matchedDomains: getUniqueSiteDomains(candidate).slice(0, 1),
+        matchedIps,
+      };
+    }),
+  );
+
+  return matches.filter((match): match is SameIpSite => Boolean(match)).slice(0, 8);
+}
+
 export async function generateMetadata({
   params,
 }: SiteDetailPageProps): Promise<Metadata> {
@@ -111,7 +154,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     type: typeof slug,
   });
 
-  const { site, reviews, scamReports, errorMessage, source } =
+  const { site, reviews, scamReports, dnsRecords, errorMessage, source } =
     await getPublicSiteDetail(slug);
 
   if (!site) {
@@ -170,14 +213,18 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const domainTargets = Array.from(
     new Set((site.domains.length > 0 ? site.domains : [site.siteUrl]).filter(Boolean)),
   ).slice(0, 6);
+  const dnsRecordMap = new Map(
+    dnsRecords.map((record) => [record.domainUrl, record.dnsInfo]),
+  );
   const domainInfos = await Promise.all(
     domainTargets.map(async (domainUrl) => {
-      const [whoisInfo, dnsInfo] = await Promise.all([
-        getPublicWhoisInfo(domainUrl),
-        getPublicDnsInfo(domainUrl),
-      ]);
+      const whoisInfo = await getPublicWhoisInfo(domainUrl);
 
-      return { domainUrl, whoisInfo, dnsInfo };
+      return {
+        domainUrl,
+        whoisInfo,
+        dnsInfo: dnsRecordMap.get(domainUrl) ?? null,
+      };
     }),
   );
   const domainInfoTabs = domainInfos.map(({ domainUrl, whoisInfo, dnsInfo }) => ({
@@ -189,6 +236,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     whoisInfo,
     dnsInfo,
   }));
+  const currentIps = new Set(site.resolvedIps ?? []);
+  const sameIpSites = await getSameIpSites(site, currentIps);
   const scamReportCount = scamReports.length;
   const scamDamageAmount = scamReports.reduce(
     (total, report) => total + Number(report.damageAmount ?? 0),
@@ -215,7 +264,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase text-accent">
-                {site.category}
+                등록 검토 완료
               </p>
               <h1 className="mt-2 text-3xl font-bold">{site.siteName}</h1>
               <p className="mt-2 text-xs font-semibold uppercase text-muted">
@@ -242,29 +291,32 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 </div>
               ) : null}
             </div>
-            <div className="flex shrink-0 gap-2">
-              <div className="min-w-20 rounded-md bg-accent-soft px-3 py-2 text-center">
-                <p className="text-sm font-bold text-accent">
-                  리뷰 {site.reviewCount}건
-                </p>
-                <p className="mt-0.5 text-xs text-accent">
-                  평점{" "}
-                  <span className="font-bold">
-                    {site.averageRating.toFixed(1)}
-                  </span>
-                </p>
-              </div>
-              <div className="min-w-24 rounded-md bg-red-50 px-3 py-2 text-center">
-                <p className="text-sm font-bold text-red-700">
-                  먹튀 {scamReportCount}건
-                </p>
-                <p className="mt-0.5 text-xs text-red-700">
-                  금액{" "}
-                  {formatDamageAmount(
-                    scamDamageAmount,
-                    scamDamageAmountUnknownCount,
-                  )}
-                </p>
+            <div className="flex shrink-0 flex-col gap-3 sm:items-end">
+              <AdminSiteDetailActions siteId={site.id} />
+              <div className="flex gap-2">
+                <div className="min-w-20 rounded-md bg-accent-soft px-3 py-2 text-center">
+                  <p className="text-sm font-bold text-accent">
+                    리뷰 {site.reviewCount}건
+                  </p>
+                  <p className="mt-0.5 text-xs text-accent">
+                    평점{" "}
+                    <span className="font-bold">
+                      {site.averageRating.toFixed(1)}
+                    </span>
+                  </p>
+                </div>
+                <div className="min-w-24 rounded-md bg-red-50 px-3 py-2 text-center">
+                  <p className="text-sm font-bold text-red-700">
+                    먹튀 {scamReportCount}건
+                  </p>
+                  <p className="mt-0.5 text-xs text-red-700">
+                    금액{" "}
+                    {formatDamageAmount(
+                      scamDamageAmount,
+                      scamDamageAmountUnknownCount,
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -298,6 +350,53 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
         ) : null}
 
         <DomainInfoTabs items={domainInfoTabs} />
+
+        {sameIpSites.length > 0 ? (
+          <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">
+            <div>
+              <p className="text-sm font-semibold uppercase text-accent">
+                동일 IP 연결
+              </p>
+              <h2 className="mt-1 text-2xl font-bold">
+                같은 IP를 사용하는 사이트
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                현재 사이트의 DNS A/AAAA 레코드와 겹치는 공개 사이트만 간추려
+                표시합니다.
+              </p>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {sameIpSites.map((match) => (
+                <Link
+                  key={match.site.id}
+                  href={`/sites/${match.site.slug}`}
+                  className="rounded-md border border-line bg-background p-4 transition hover:border-accent"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold text-foreground">
+                        {match.site.siteName}
+                      </p>
+                      <p className="mt-1 break-all text-sm text-muted">
+                        {formatDisplayUrl(match.matchedDomains[0] ?? match.site.siteUrl)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                      {match.matchedIps.map((ip) => (
+                        <span
+                          key={ip}
+                          className="rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent"
+                        >
+                          {ip}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

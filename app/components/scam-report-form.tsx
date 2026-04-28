@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 
@@ -40,7 +40,6 @@ type FormValues = {
   depositTxHash: string;
   depositAmount: string;
   evidenceImageUrls: string[];
-  contactTelegram: string;
   privacyMaskingAgreement: boolean;
   falseReportAgreement: boolean;
 };
@@ -73,7 +72,6 @@ const initialValues: FormValues = {
   depositTxHash: "",
   depositAmount: "",
   evidenceImageUrls: [],
-  contactTelegram: "",
   privacyMaskingAgreement: false,
   falseReportAgreement: false,
 };
@@ -125,7 +123,7 @@ const damageTypes = [
 function initialFormValues(selectedSiteId = ""): FormValues {
   return {
     ...initialValues,
-    siteId: selectedSiteId,
+    siteId: selectedSiteId.trim(),
   };
 }
 
@@ -138,15 +136,18 @@ function parseNumber(value: string) {
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(
-    value,
+    value.trim(),
   );
 }
 
 export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
+  const normalizedSelectedSiteId = selectedSiteId.trim();
   const { user } = useAuth();
+  const sectionRef = useRef<HTMLElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [siteOptions, setSiteOptions] = useState<ScamReportSiteOption[]>([]);
   const [values, setValues] = useState<FormValues>(() =>
-    initialFormValues(selectedSiteId),
+    initialFormValues(normalizedSelectedSiteId),
   );
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -155,7 +156,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
   const [siteSearch, setSiteSearch] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const isSiteFixed = Boolean(selectedSiteId);
+  const isSiteFixed = Boolean(normalizedSelectedSiteId);
 
   const selectedSite = useMemo(
     () => siteOptions.find((site) => site.id === values.siteId) ?? null,
@@ -173,6 +174,28 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
 
     return filtered.slice(0, 12);
   }, [siteOptions, siteSearch]);
+
+  function scrollToFirstError(nextErrors: FormErrors) {
+    const firstErrorKey = Object.keys(nextErrors)[0];
+
+    if (!firstErrorKey) return;
+
+    requestAnimationFrame(() => {
+      const target =
+        formRef.current?.querySelector<HTMLElement>(
+          `[data-error-key="${CSS.escape(firstErrorKey)}"]`,
+        ) ??
+        sectionRef.current?.querySelector<HTMLElement>(
+          `[data-error-key="${CSS.escape(firstErrorKey)}"]`,
+        ) ??
+        null;
+
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target
+        ?.querySelector<HTMLElement>("input, textarea, select, button")
+        ?.focus({ preventScroll: true });
+    });
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -205,17 +228,17 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
             ? site.domains
             : [site.url],
       }));
-      const selectedSite = approvedSites.find((site) => site.id === selectedSiteId);
+      const selectedSite = approvedSites.find((site) => site.id === normalizedSelectedSiteId);
 
       setSiteLoadError(
-        selectedSiteId && !selectedSite
+        normalizedSelectedSiteId && !selectedSite
           ? "요청한 사이트가 승인 목록에 없거나 공개 상태가 아닙니다."
           : "",
       );
       setSiteOptions(approvedSites);
       setValues(
         initialFormValues(
-          selectedSiteId ? selectedSite?.id ?? "" : approvedSites[0]?.id ?? "",
+          normalizedSelectedSiteId ? selectedSite?.id ?? "" : approvedSites[0]?.id ?? "",
         ),
       );
       setSiteSearch(selectedSite?.siteName ?? "");
@@ -227,7 +250,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
     return () => {
       isMounted = false;
     };
-  }, [selectedSiteId]);
+  }, [normalizedSelectedSiteId]);
 
   function updateField<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -312,7 +335,10 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
     const nextErrors = validate();
     setErrors(nextErrors);
 
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      scrollToFirstError(nextErrors);
+      return;
+    }
 
     setIsSubmitting(true);
     setSuccessMessage("");
@@ -336,42 +362,46 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
             .join(" / ")
         : null;
 
-    const { error } = await supabase.from("scam_reports").insert({
-      site_id: values.siteId,
-      user_id: user?.id ?? null,
-      incident_date: values.incidentDate,
-      usage_period: values.usagePeriod,
-      main_category: values.mainCategories.join(", "),
-      category_items: detailItems,
-      category_etc_text: values.categoryEtcText.trim() || null,
-      damage_types: values.damageTypes,
-      damage_type_etc_text: values.damageTypeEtcText.trim() || null,
-      damage_amount: values.damageAmountUnknown ? null : parseNumber(values.damageAmount),
-      damage_amount_unknown: values.damageAmountUnknown,
-      situation_description: values.situationDescription.trim(),
-      deposit_bank_name:
-        values.depositMethod === "bank"
-          ? values.depositBankName.trim() || null
-          : depositNote,
-      deposit_account_number:
-        values.depositMethod === "bank"
-          ? values.depositAccountNumber.trim() || null
-          : values.depositWalletAddress.trim() || null,
-      deposit_account_holder:
-        values.depositMethod === "bank"
-          ? values.depositAccountHolder.trim() || null
-          : values.depositCoinName.trim() || null,
-      deposit_amount: parseNumber(values.depositAmount),
-      deposit_date: null,
-      evidence_image_urls: values.evidenceImageUrls,
-      evidence_note: null,
-      contact_telegram: values.contactTelegram.trim() || null,
-      is_contact_public: false,
-      privacy_masking_agreement: values.privacyMaskingAgreement,
-      false_report_agreement: values.falseReportAgreement,
-      review_status: "pending",
-      is_published: false,
-    });
+    const { data: insertedReport, error } = await supabase
+      .from("scam_reports")
+      .insert({
+        site_id: values.siteId,
+        user_id: user?.id ?? null,
+        incident_date: values.incidentDate,
+        usage_period: values.usagePeriod,
+        main_category: values.mainCategories.join(", "),
+        category_items: detailItems,
+        category_etc_text: values.categoryEtcText.trim() || null,
+        damage_types: values.damageTypes,
+        damage_type_etc_text: values.damageTypeEtcText.trim() || null,
+        damage_amount: values.damageAmountUnknown ? null : parseNumber(values.damageAmount),
+        damage_amount_unknown: values.damageAmountUnknown,
+        situation_description: values.situationDescription.trim(),
+        deposit_bank_name:
+          values.depositMethod === "bank"
+            ? values.depositBankName.trim() || null
+            : depositNote,
+        deposit_account_number:
+          values.depositMethod === "bank"
+            ? values.depositAccountNumber.trim() || null
+            : values.depositWalletAddress.trim() || null,
+        deposit_account_holder:
+          values.depositMethod === "bank"
+            ? values.depositAccountHolder.trim() || null
+            : values.depositCoinName.trim() || null,
+        deposit_amount: parseNumber(values.depositAmount),
+        deposit_date: null,
+        evidence_image_urls: values.evidenceImageUrls,
+        evidence_note: null,
+        contact_telegram: null,
+        is_contact_public: false,
+        privacy_masking_agreement: values.privacyMaskingAgreement,
+        false_report_agreement: values.falseReportAgreement,
+        review_status: "pending",
+        is_published: false,
+      })
+      .select("id")
+      .single();
 
     setIsSubmitting(false);
 
@@ -380,8 +410,46 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
       return;
     }
 
-    setValues(initialFormValues(selectedSiteId || values.siteId));
-    setSuccessMessage("먹튀 피해 제보가 접수되었습니다. 관리자 승인 전까지 공개되지 않습니다.");
+    const notificationError = insertedReport?.id
+      ? await sendContentSubmittedNotification(insertedReport.id)
+      : "";
+
+    setValues(initialFormValues(normalizedSelectedSiteId || values.siteId));
+    setSuccessMessage(
+      notificationError
+        ? `먹튀 피해 제보가 접수되었습니다. 관리자 승인 전까지 공개되지 않습니다. ${notificationError}`
+        : "먹튀 피해 제보가 접수되었습니다. 관리자 승인 전까지 공개되지 않습니다.",
+    );
+  }
+
+  async function sendContentSubmittedNotification(reportId: string) {
+    const { data: sessionResult } = await supabase.auth.getSession();
+    const accessToken = sessionResult.session?.access_token;
+
+    if (!accessToken) {
+      return "다만 텔레그램 알림은 로그인 세션을 확인하지 못해 전송되지 않았습니다.";
+    }
+
+    const response = await fetch("/api/telegram/content-submitted", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ type: "scam_report", contentId: reportId }),
+    });
+
+    if (response.ok) {
+      return "";
+    }
+
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+
+    return `다만 텔레그램 알림 전송에 실패했습니다. ${
+      body?.error ?? "봇 연결 상태와 환경변수를 확인해주세요."
+    }`;
   }
 
   if (isLoadingSites) {
@@ -409,8 +477,11 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
   }
 
   return (
-    <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
-      <div className="grid gap-2 text-sm font-medium">
+    <section
+      ref={sectionRef}
+      className="rounded-lg border border-line bg-surface p-5 shadow-sm"
+    >
+      <div className="grid gap-2 text-sm font-medium" data-error-key="siteId">
         {isSiteFixed ? (
           <div className="rounded-md border border-line bg-background p-4">
             <p className="text-xs font-semibold uppercase text-muted">
@@ -492,7 +563,12 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
         </div>
       ) : null}
 
-      <form onSubmit={handleSubmit} className="mt-5 grid gap-5" noValidate>
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        className="mt-5 grid gap-5"
+        noValidate
+      >
           {!user ? (
             <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
               먹튀 피해 제보는 로그인 사용자만 작성할 수 있습니다.
@@ -500,7 +576,10 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
           ) : null}
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <label className="grid gap-1 text-sm font-medium">
+            <label
+              className="grid gap-1 text-sm font-medium"
+              data-error-key="incidentDate"
+            >
               발생 일자
               <input
                 type="date"
@@ -510,7 +589,10 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
               />
               {errors.incidentDate ? <span className="text-xs text-red-700">{errors.incidentDate}</span> : null}
             </label>
-            <label className="grid gap-1 text-sm font-medium">
+            <label
+              className="grid gap-1 text-sm font-medium"
+              data-error-key="usagePeriod"
+            >
               이용 기간
               <select
                 value={values.usagePeriod}
@@ -526,7 +608,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
             </label>
           </div>
 
-          <fieldset className="grid gap-2">
+          <fieldset className="grid gap-2" data-error-key="mainCategories">
             <legend className="text-sm font-semibold">이용 카테고리</legend>
             <div className="flex flex-wrap gap-2">
               {mainCategories.map((item) => (
@@ -568,7 +650,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
             />
           ) : null}
 
-          <fieldset className="grid gap-2">
+          <fieldset className="grid gap-2" data-error-key="damageTypes">
             <legend className="text-sm font-semibold">피해 유형</legend>
             <div className="flex flex-wrap gap-2">
               {damageTypes.map((item) => (
@@ -590,7 +672,10 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
           </fieldset>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-1 text-sm font-medium">
+            <label
+              className="grid gap-1 text-sm font-medium"
+              data-error-key="damageAmount"
+            >
               피해 금액
               <input
                 value={values.damageAmount}
@@ -611,7 +696,10 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
             </label>
           </div>
 
-          <label className="grid gap-1 text-sm font-medium">
+          <label
+            className="grid gap-1 text-sm font-medium"
+            data-error-key="situationDescription"
+          >
             상황 설명
             <textarea
               value={values.situationDescription}
@@ -638,16 +726,16 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
             </div>
             {values.depositMethod === "bank" ? (
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormInput value={values.depositBankName} onChange={(value) => updateField("depositBankName", value)} placeholder="입금 은행명" error={errors.depositBankName} />
-                <FormInput value={values.depositAccountNumber} onChange={(value) => updateField("depositAccountNumber", value)} placeholder="입금 계좌번호" error={errors.depositAccountNumber} />
-                <FormInput value={values.depositAccountHolder} onChange={(value) => updateField("depositAccountHolder", value)} placeholder="예금주" error={errors.depositAccountHolder} />
+                <FormInput value={values.depositBankName} onChange={(value) => updateField("depositBankName", value)} placeholder="입금 은행명" error={errors.depositBankName} errorKey="depositBankName" />
+                <FormInput value={values.depositAccountNumber} onChange={(value) => updateField("depositAccountNumber", value)} placeholder="입금 계좌번호" error={errors.depositAccountNumber} errorKey="depositAccountNumber" />
+                <FormInput value={values.depositAccountHolder} onChange={(value) => updateField("depositAccountHolder", value)} placeholder="예금주" error={errors.depositAccountHolder} errorKey="depositAccountHolder" />
                 <FormInput value={values.depositAmount} onChange={(value) => updateField("depositAmount", value)} placeholder="입금 금액" />
               </div>
             ) : null}
             {values.depositMethod === "coin" ? (
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormInput value={values.depositCoinName} onChange={(value) => updateField("depositCoinName", value)} placeholder="코인명 예: USDT, BTC" error={errors.depositCoinName} />
-                <FormInput value={values.depositWalletAddress} onChange={(value) => updateField("depositWalletAddress", value)} placeholder="입금 지갑 주소" error={errors.depositWalletAddress} />
+                <FormInput value={values.depositCoinName} onChange={(value) => updateField("depositCoinName", value)} placeholder="코인명 예: USDT, BTC" error={errors.depositCoinName} errorKey="depositCoinName" />
+                <FormInput value={values.depositWalletAddress} onChange={(value) => updateField("depositWalletAddress", value)} placeholder="입금 지갑 주소" error={errors.depositWalletAddress} errorKey="depositWalletAddress" />
                 <FormInput value={values.depositTxHash} onChange={(value) => updateField("depositTxHash", value)} placeholder="트랜잭션 해시 선택" />
                 <FormInput value={values.depositAmount} onChange={(value) => updateField("depositAmount", value)} placeholder="입금 금액" />
               </div>
@@ -668,19 +756,9 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
             </span>
           </label>
 
-          <label className="grid gap-1 text-sm font-medium">
-            연락 가능한 텔레그램 ID
-            <input
-              value={values.contactTelegram}
-              onChange={(event) => updateField("contactTelegram", event.target.value)}
-              className="h-11 rounded-md border border-line px-3 text-sm"
-              placeholder="게시물 승인 시 업데이트 메시지 알림"
-            />
-          </label>
-
           <div className="grid gap-3 text-sm">
-            <CheckboxLine checked={values.privacyMaskingAgreement} onChange={(checked) => updateField("privacyMaskingAgreement", checked)} label="공개 전 개인정보가 마스킹될 수 있음에 동의합니다" error={errors.privacyMaskingAgreement} />
-            <CheckboxLine checked={values.falseReportAgreement} onChange={(checked) => updateField("falseReportAgreement", checked)} label="허위 제보에 대한 책임을 확인했습니다" error={errors.falseReportAgreement} />
+            <CheckboxLine checked={values.privacyMaskingAgreement} onChange={(checked) => updateField("privacyMaskingAgreement", checked)} label="공개 전 개인정보가 마스킹될 수 있음에 동의합니다" error={errors.privacyMaskingAgreement} errorKey="privacyMaskingAgreement" />
+            <CheckboxLine checked={values.falseReportAgreement} onChange={(checked) => updateField("falseReportAgreement", checked)} label="허위 제보에 대한 책임을 확인했습니다" error={errors.falseReportAgreement} errorKey="falseReportAgreement" />
           </div>
 
           <button
@@ -724,14 +802,16 @@ function FormInput({
   onChange,
   placeholder,
   error,
+  errorKey,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   error?: string;
+  errorKey?: string;
 }) {
   return (
-    <label className="grid gap-1">
+    <label className="grid gap-1" data-error-key={errorKey}>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -748,14 +828,16 @@ function CheckboxLine({
   onChange,
   label,
   error,
+  errorKey,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
   error?: string;
+  errorKey?: string;
 }) {
   return (
-    <label className="grid gap-1">
+    <label className="grid gap-1" data-error-key={errorKey}>
       <span className="flex items-center gap-2">
         <input
           type="checkbox"

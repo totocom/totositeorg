@@ -35,6 +35,8 @@ create table if not exists public.sites (
   telegram_chat_id text null,
   telegram_notify_enabled boolean not null default false,
   telegram_notified_at timestamptz null,
+  resolved_ips text[] not null default '{}',
+  dns_checked_at timestamptz null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
@@ -191,6 +193,12 @@ alter table public.sites
 
 alter table public.sites
   add column if not exists telegram_notified_at timestamptz null;
+
+alter table public.sites
+  add column if not exists resolved_ips text[] not null default '{}';
+
+alter table public.sites
+  add column if not exists dns_checked_at timestamptz null;
 
 alter table public.sites
   alter column category set default '기타 베팅';
@@ -368,6 +376,32 @@ create table if not exists public.domain_whois_cache (
   )
 );
 
+create table if not exists public.site_dns_records (
+  id uuid primary key default gen_random_uuid(),
+  site_id uuid not null references public.sites(id) on delete cascade,
+  domain_url text not null,
+  domain text not null,
+  a_records text[] not null default '{}',
+  aaaa_records text[] not null default '{}',
+  cname_records text[] not null default '{}',
+  mx_records text[] not null default '{}',
+  ns_records text[] not null default '{}',
+  txt_records text[] not null default '{}',
+  soa_record text not null default '',
+  error_message text not null default '',
+  checked_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint site_dns_records_site_domain_unique unique (site_id, domain),
+  constraint site_dns_records_domain_url_not_blank check (
+    length(trim(domain_url)) > 0
+  ),
+  constraint site_dns_records_domain_not_blank check (
+    length(trim(domain)) > 0
+  )
+);
+
 create index if not exists sites_status_idx
   on public.sites (status);
 
@@ -379,6 +413,9 @@ create index if not exists sites_slug_idx
 
 create index if not exists sites_domains_idx
   on public.sites using gin (domains);
+
+create index if not exists sites_resolved_ips_idx
+  on public.sites using gin (resolved_ips);
 
 create index if not exists sites_category_idx
   on public.sites (category);
@@ -439,6 +476,18 @@ create index if not exists telegram_signup_codes_code_idx
 
 create index if not exists domain_whois_cache_expires_at_idx
   on public.domain_whois_cache (expires_at);
+
+create index if not exists site_dns_records_site_id_idx
+  on public.site_dns_records (site_id);
+
+create index if not exists site_dns_records_domain_idx
+  on public.site_dns_records (domain);
+
+create index if not exists site_dns_records_a_records_idx
+  on public.site_dns_records using gin (a_records);
+
+create index if not exists site_dns_records_aaaa_records_idx
+  on public.site_dns_records using gin (aaaa_records);
 
 update public.sites
 set slug = regexp_replace(
@@ -504,6 +553,13 @@ drop trigger if exists set_domain_whois_cache_updated_at
   on public.domain_whois_cache;
 create trigger set_domain_whois_cache_updated_at
 before update on public.domain_whois_cache
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_site_dns_records_updated_at
+  on public.site_dns_records;
+create trigger set_site_dns_records_updated_at
+before update on public.site_dns_records
 for each row
 execute function public.set_updated_at();
 
@@ -631,6 +687,7 @@ alter table public.profiles enable row level security;
 alter table public.telegram_subscriptions enable row level security;
 alter table public.telegram_signup_codes enable row level security;
 alter table public.domain_whois_cache enable row level security;
+alter table public.site_dns_records enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -695,6 +752,20 @@ using (
     select 1
     from public.sites
     where sites.id = state_availability.site_id
+      and sites.status = 'approved'
+  )
+);
+
+drop policy if exists "Public can read dns records for approved sites"
+  on public.site_dns_records;
+create policy "Public can read dns records for approved sites"
+on public.site_dns_records
+for select
+using (
+  exists (
+    select 1
+    from public.sites
+    where sites.id = site_dns_records.site_id
       and sites.status = 'approved'
   )
 );
@@ -874,6 +945,14 @@ drop policy if exists "Admins can manage domain whois cache"
   on public.domain_whois_cache;
 create policy "Admins can manage domain whois cache"
 on public.domain_whois_cache
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage site dns records"
+  on public.site_dns_records;
+create policy "Admins can manage site dns records"
+on public.site_dns_records
 for all
 using (public.is_admin())
 with check (public.is_admin());

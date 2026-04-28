@@ -6,6 +6,7 @@ import {
   type ReviewTarget,
   type SiteReview,
 } from "@/app/data/sites";
+import type { PublicDnsInfo } from "@/app/data/domain-dns";
 import { supabase } from "@/lib/supabase/client";
 
 type PublicSiteRow = {
@@ -21,7 +22,15 @@ type PublicSiteRow = {
   category: string;
   available_states: string[];
   license_info: string;
+  resolved_ips?: string[] | null;
+  dns_checked_at?: string | null;
   description: string;
+};
+
+export type PublicSiteDnsRecord = {
+  domainUrl: string;
+  checkedAt: string;
+  dnsInfo: PublicDnsInfo;
 };
 
 type PublicReviewRow = {
@@ -47,8 +56,23 @@ type PublicSiteDetailResult = {
   site: ReviewTarget | null;
   reviews: SiteReview[];
   scamReports: ScamReport[];
+  dnsRecords: PublicSiteDnsRecord[];
   errorMessage: string;
   source: "supabase" | "fallback" | "none";
+};
+
+type PublicSiteDnsRecordRow = {
+  domain_url: string;
+  domain: string;
+  a_records: string[] | null;
+  aaaa_records: string[] | null;
+  cname_records: string[] | null;
+  mx_records: string[] | null;
+  ns_records: string[] | null;
+  txt_records: string[] | null;
+  soa_record: string | null;
+  error_message: string | null;
+  checked_at: string;
 };
 
 type PublicScamReportRow = {
@@ -124,7 +148,27 @@ function mapSiteRow(
     scamReportCount: scamReports.length,
     scamDamageAmount,
     scamDamageAmountUnknownCount,
+    resolvedIps: site.resolved_ips ?? [],
+    dnsCheckedAt: site.dns_checked_at ?? null,
   } satisfies ReviewTarget;
+}
+
+function mapDnsRecordRow(row: PublicSiteDnsRecordRow): PublicSiteDnsRecord {
+  return {
+    domainUrl: row.domain_url,
+    checkedAt: row.checked_at,
+    dnsInfo: {
+      domain: row.domain,
+      a: row.a_records ?? [],
+      aaaa: row.aaaa_records ?? [],
+      cname: row.cname_records ?? [],
+      mx: row.mx_records ?? [],
+      ns: row.ns_records ?? [],
+      txt: row.txt_records ?? [],
+      soa: row.soa_record ?? "",
+      errorMessage: row.error_message ?? "",
+    },
+  };
 }
 
 function mapReviewRow(review: PublicReviewRow) {
@@ -188,7 +232,7 @@ export async function getPublicSites(): Promise<PublicSitesResult> {
     supabase
       .from("sites")
       .select(
-        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, category, available_states, license_info, description",
+        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, category, available_states, license_info, resolved_ips, dns_checked_at, description",
       )
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
@@ -258,6 +302,7 @@ export async function getPublicSiteDetail(
       site: fallbackSite ?? null,
       reviews: fallbackSite ? getApprovedReviewsBySiteId(fallbackSite.id) : [],
       scamReports: [],
+      dnsRecords: [],
       errorMessage: fallbackSite
         ? "Supabase 사이트 상세 정보를 불러오지 못해 개발용 더미 데이터를 표시하고 있습니다."
         : "사이트 정보를 불러오지 못했습니다.",
@@ -294,20 +339,33 @@ export async function getPublicSiteDetail(
       site: mapSiteRow(siteResult.data as PublicSiteRow, []),
       reviews: [],
       scamReports: [],
+      dnsRecords: [],
       errorMessage: "승인된 리뷰 목록을 불러오지 못했습니다.",
       source: "supabase",
     };
   }
 
+  const dnsRecordsResult = await supabase
+    .from("site_dns_records")
+    .select(
+      "domain_url, domain, a_records, aaaa_records, cname_records, mx_records, ns_records, txt_records, soa_record, error_message, checked_at",
+    )
+    .eq("site_id", siteResult.data.id)
+    .order("domain", { ascending: true });
+
   const reviewRows = (reviewsResult.data ?? []) as PublicReviewRow[];
   const scamReportRows = scamReportsResult.error
     ? []
     : ((scamReportsResult.data ?? []) as PublicScamReportRow[]);
+  const dnsRecordRows = dnsRecordsResult.error
+    ? []
+    : ((dnsRecordsResult.data ?? []) as PublicSiteDnsRecordRow[]);
 
   return {
     site: mapSiteRow(siteResult.data as PublicSiteRow, reviewRows),
     reviews: reviewRows.map(mapReviewRow),
     scamReports: scamReportRows.map(mapScamReportRow),
+    dnsRecords: dnsRecordRows.map(mapDnsRecordRow),
     errorMessage: "",
     source: "supabase",
   };

@@ -12,6 +12,11 @@ type SiteRow = {
   created_at: string;
 };
 
+type TelegramSubscriptionRow = {
+  chat_id: string;
+  username: string | null;
+};
+
 function getEnv() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -50,8 +55,23 @@ async function getAuthenticatedSupabase(token: string) {
   return { supabase, user: userResult.user };
 }
 
-function buildSubmissionMessage(site: SiteRow, userEmail?: string) {
+function getTelegramDisplayName(subscription: TelegramSubscriptionRow | null) {
+  if (!subscription) return "";
+  const username = subscription.username?.trim();
+
+  if (username) {
+    return username.startsWith("@") ? username : `@${username}`;
+  }
+
+  return subscription.chat_id;
+}
+
+function buildSubmissionMessage(
+  site: SiteRow,
+  subscription: TelegramSubscriptionRow | null,
+) {
   const domains = site.domains?.filter(Boolean) ?? [];
+  const submitter = getTelegramDisplayName(subscription);
 
   return [
     "새 사이트 제보가 접수되었습니다.",
@@ -59,7 +79,7 @@ function buildSubmissionMessage(site: SiteRow, userEmail?: string) {
     `사이트명: ${site.name}`,
     `대표 URL: ${site.url}`,
     domains.length > 1 ? `추가 URL: ${domains.slice(1).join(", ")}` : "",
-    userEmail ? `제보자: ${userEmail}` : "",
+    submitter ? `제보자 텔레그램: ${submitter}` : "제보자 텔레그램: 확인 불가",
     "",
     "관리자 페이지에서 검토 후 승인해주세요.",
   ]
@@ -133,9 +153,16 @@ export async function POST(request: Request) {
     );
   }
 
+  const { data: subscription } = await auth.supabase
+    .from("telegram_subscriptions")
+    .select("chat_id, username")
+    .eq("user_id", auth.user.id)
+    .eq("is_active", true)
+    .maybeSingle<TelegramSubscriptionRow>();
+
   try {
     await sendTelegramMessage(
-      buildSubmissionMessage(site as SiteRow, auth.user.email ?? undefined),
+      buildSubmissionMessage(site as SiteRow, subscription ?? null),
     );
 
     return NextResponse.json({ ok: true });

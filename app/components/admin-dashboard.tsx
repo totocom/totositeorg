@@ -500,7 +500,12 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     let notificationError = "";
 
     if (table === "sites" && status === "approved") {
+      await refreshSiteDns(id);
       notificationError = await sendSiteApprovalNotification(id);
+    } else if (table === "reviews" && status === "approved") {
+      notificationError = await sendContentApprovalNotification("review", id);
+    } else if (table === "scam_reports" && status === "approved") {
+      notificationError = await sendContentApprovalNotification("scam_report", id);
     }
 
     await loadAdminData();
@@ -508,6 +513,24 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     if (notificationError) {
       setErrorMessage(notificationError);
     }
+  }
+
+  async function refreshSiteDns(siteId: string) {
+    const { data: sessionResult } = await supabase.auth.getSession();
+    const accessToken = sessionResult.session?.access_token;
+
+    if (!accessToken) {
+      return;
+    }
+
+    await fetch("/api/admin/sites/refresh-dns", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ siteId }),
+    }).catch(() => null);
   }
 
   async function sendSiteApprovalNotification(siteId: string) {
@@ -536,6 +559,39 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     } | null;
 
     return `사이트는 승인됐지만 등록자 텔레그램 알림 전송에 실패했습니다. ${
+      body?.error ?? "봇 연결 상태와 환경변수를 확인해주세요."
+    }`;
+  }
+
+  async function sendContentApprovalNotification(
+    type: "review" | "scam_report",
+    contentId: string,
+  ) {
+    const { data: sessionResult } = await supabase.auth.getSession();
+    const accessToken = sessionResult.session?.access_token;
+
+    if (!accessToken) {
+      return "게시물은 승인됐지만 작성자 텔레그램 알림은 로그인 세션을 확인하지 못해 전송되지 않았습니다.";
+    }
+
+    const response = await fetch("/api/admin/telegram/content-approved", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ type, contentId }),
+    });
+
+    if (response.ok) {
+      return "";
+    }
+
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+
+    return `게시물은 승인됐지만 작성자 텔레그램 알림 전송에 실패했습니다. ${
       body?.error ?? "봇 연결 상태와 환경변수를 확인해주세요."
     }`;
   }

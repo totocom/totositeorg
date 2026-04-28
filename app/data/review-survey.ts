@@ -212,10 +212,10 @@ export const reviewSurveySections: SurveySection[] = [
     id: "complaints",
     title: "불만/개선 요청 분류",
     questions: [
-      { id: "odds_complaint", label: "배당 불만", type: "multiple", options: ["배당 낮음", "배당 변동 심함", "인기 경기 배당 불리함"] },
-      { id: "event_complaint", label: "이벤트 불만", type: "multiple", options: ["조건 복잡함", "보상 낮음", "지급 지연", "이벤트 부족"] },
-      { id: "cs_complaint", label: "고객센터 불만", type: "multiple", options: ["응답 느림", "답변 불친절", "해결 안 됨", "매크로 답변"] },
-      { id: "withdraw_complaint", label: "환전 불만", type: "multiple", options: ["환전 지연", "한도 불만", "조건 불만", "수수료 불만"] },
+      { id: "odds_complaint", label: "배당 불만", type: "multiple", options: ["배당 낮음", "배당 변동 심함", "인기 경기 배당 불리함", "없음"] },
+      { id: "event_complaint", label: "이벤트 불만", type: "multiple", options: ["조건 복잡함", "보상 낮음", "지급 지연", "이벤트 부족", "없음"] },
+      { id: "cs_complaint", label: "고객센터 불만", type: "multiple", options: ["응답 느림", "답변 불친절", "해결 안 됨", "매크로 답변", "없음"] },
+      { id: "withdraw_complaint", label: "환전 불만", type: "multiple", options: ["환전 지연", "한도 불만", "조건 불만", "수수료 불만", "없음"] },
     ],
   },
   {
@@ -226,8 +226,8 @@ export const reviewSurveySections: SurveySection[] = [
       { id: "reuse_intention", label: "재이용 의향", type: "single", options: ["반드시 이용", "이용할 것 같음", "고민 중", "이용 안 함"] },
       { id: "recommendation", label: "추천 의향", type: "single", options: ["적극 추천", "추천", "보통", "비추천"] },
       { id: "best_part", label: "가장 만족한 부분", type: "single", options: ["배당", "이벤트", "충환전", "고객센터", "게임 종류", "사용 편의성"] },
-      { id: "worst_part", label: "가장 불만족한 부분", type: "single", options: ["배당", "이벤트", "충환전", "고객센터", "규정", "사이트 오류"] },
-      { id: "improvement_priority", label: "개선 우선순위", type: "single", options: ["배당 개선", "이벤트 확대", "환전 속도", "고객센터", "규정 완화", "앱 개선"] },
+      { id: "worst_part", label: "가장 불만족한 부분", type: "single", options: ["배당", "이벤트", "충환전", "고객센터", "규정", "사이트 오류", "없음"] },
+      { id: "improvement_priority", label: "개선 우선순위", type: "single", options: ["배당 개선", "이벤트 확대", "환전 속도", "고객센터", "규정 완화", "앱 개선", "없음"] },
     ],
   },
 ];

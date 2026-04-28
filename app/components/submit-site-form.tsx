@@ -341,20 +341,6 @@ export function SubmitSiteForm() {
         ) : null}
       </label>
 
-      <div className="rounded-md border border-line bg-background p-4 text-sm">
-        <p className="font-semibold text-foreground">승인 알림 안내</p>
-        <p className="mt-1 leading-6 text-muted">
-          등록 요청 승인 알림은 내 계정의 텔레그램 연결 상태에 따라
-          전송됩니다.
-        </p>
-        <a
-          href="/account"
-          className="mt-3 inline-flex h-10 items-center rounded-md border border-line px-4 text-sm font-semibold text-foreground"
-        >
-          계정에서 알림 연결하기
-        </a>
-      </div>
-
       <button
         type="submit"
         disabled={formStatus === "submitting"}

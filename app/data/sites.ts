@@ -37,6 +37,8 @@ export type ReviewTarget = {
   scamReportCount?: number;
   scamDamageAmount?: number;
   scamDamageAmountUnknownCount?: number;
+  resolvedIps?: string[];
+  dnsCheckedAt?: string | null;
   domainSearchText?: string;
   oldestDomainCreationDate?: string;
 };
