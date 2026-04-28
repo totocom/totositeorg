@@ -430,7 +430,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                         {report.damageTypes.join(", ")}
                       </p>
                       <p className="mt-1 text-xs text-muted">
-                        발생일 {report.incidentDate} · 이용 기간 {report.usagePeriod}
+                        발생일 {report.incidentDate} · 이용 기간{" "}
+                        {report.usagePeriod} · 작성자{" "}
+                        {report.authorNickname ?? "익명"}
                       </p>
                     </div>
                     <p className="rounded-md bg-surface px-3 py-1 text-sm font-semibold">
@@ -500,7 +502,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   </p>
                 </div>
                 <ReviewSummary siteName={site.siteName} experience={review.experience} />
-                <p className="mt-3 text-xs text-muted">{review.createdAt}</p>
+                <p className="mt-3 text-xs text-muted">
+                  작성자 {review.authorNickname ?? "익명"} · {review.createdAt}
+                </p>
               </article>
             ))
           ) : (

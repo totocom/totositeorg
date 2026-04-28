@@ -46,6 +46,7 @@ export type ReviewTarget = {
 export type SiteReview = {
   id: string;
   siteId: string;
+  authorNickname?: string | null;
   rating: number;
   title: string;
   experience: string;
@@ -58,6 +59,7 @@ export type SiteReview = {
 export type ScamReport = {
   id: string;
   siteId: string;
+  authorNickname?: string | null;
   incidentDate: string;
   usagePeriod: string;
   mainCategory: string;

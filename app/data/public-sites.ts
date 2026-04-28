@@ -36,6 +36,8 @@ export type PublicSiteDnsRecord = {
 type PublicReviewRow = {
   id: string;
   site_id: string;
+  user_id: string | null;
+  reviewer_name?: string | null;
   rating: number;
   title: string;
   experience: string;
@@ -92,6 +94,7 @@ type PublicSiteDnsRecordRow = {
 type PublicScamReportRow = {
   id: string;
   site_id: string;
+  user_id: string | null;
   incident_date: string;
   usage_period: string;
   main_category: string;
@@ -105,6 +108,11 @@ type PublicScamReportRow = {
   review_status: "pending" | "approved" | "rejected";
   is_published: boolean;
   created_at: string;
+};
+
+type PublicProfileNicknameRow = {
+  user_id: string;
+  nickname: string | null;
 };
 
 function calculateAverageRating(reviews: PublicReviewRow[]) {
@@ -185,10 +193,53 @@ function mapDnsRecordRow(row: PublicSiteDnsRecordRow): PublicSiteDnsRecord {
   };
 }
 
-function mapReviewRow(review: PublicReviewRow) {
+async function getPublicNicknameMap(userIds: Array<string | null | undefined>) {
+  const uniqueUserIds = Array.from(
+    new Set(userIds.filter((userId): userId is string => Boolean(userId))),
+  );
+
+  if (uniqueUserIds.length === 0) return new Map<string, string>();
+
+  const { data, error } = await supabase
+    .from("public_profile_nicknames")
+    .select("user_id, nickname")
+    .in("user_id", uniqueUserIds);
+
+  if (error) {
+    return new Map<string, string>();
+  }
+
+  return new Map(
+    ((data ?? []) as PublicProfileNicknameRow[])
+      .filter((profile) => profile.nickname?.trim())
+      .map((profile) => [profile.user_id, profile.nickname?.trim() ?? ""]),
+  );
+}
+
+function getAuthorNickname(
+  userId: string | null,
+  nicknameMap: Map<string, string>,
+  fallbackName?: string | null,
+) {
+  if (userId && nicknameMap.has(userId)) {
+    return nicknameMap.get(userId) ?? null;
+  }
+
+  return fallbackName?.trim() || null;
+}
+
+function mapReviewRow(
+  review: PublicReviewRow,
+  nicknameMap = new Map<string, string>(),
+) {
   return {
     id: review.id,
     siteId: review.site_id,
+    authorNickname: getAuthorNickname(
+      review.user_id,
+      nicknameMap,
+      review.reviewer_name,
+    ),
     rating: review.rating,
     title: review.title,
     experience: review.experience,
@@ -199,10 +250,14 @@ function mapReviewRow(review: PublicReviewRow) {
   } satisfies SiteReview;
 }
 
-function mapScamReportRow(report: PublicScamReportRow): ScamReport {
+function mapScamReportRow(
+  report: PublicScamReportRow,
+  nicknameMap = new Map<string, string>(),
+): ScamReport {
   return {
     id: report.id,
     siteId: report.site_id,
+    authorNickname: getAuthorNickname(report.user_id, nicknameMap),
     incidentDate: report.incident_date,
     usagePeriod: report.usage_period,
     mainCategory: report.main_category,
@@ -252,12 +307,12 @@ export async function getPublicSites(): Promise<PublicSitesResult> {
       .order("created_at", { ascending: false }),
     supabase
       .from("reviews")
-      .select("id, site_id, rating, title, experience, issue_type, state_used, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, state_used, created_at")
       .eq("status", "approved"),
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("review_status", "approved")
       .eq("is_published", true)
@@ -327,14 +382,14 @@ export async function getPublicSiteDetail(
   const [reviewsResult, scamReportsResult] = await Promise.all([
     supabase
       .from("reviews")
-      .select("id, site_id, rating, title, experience, issue_type, state_used, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, state_used, created_at")
       .eq("site_id", siteResult.data.id)
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("site_id", siteResult.data.id)
       .eq("review_status", "approved")
@@ -374,11 +429,17 @@ export async function getPublicSiteDetail(
   const dnsRecordRows = dnsRecordsResult.error
     ? []
     : ((dnsRecordsResult.data ?? []) as PublicSiteDnsRecordRow[]);
+  const nicknameMap = await getPublicNicknameMap([
+    ...reviewRows.map((review) => review.user_id),
+    ...scamReportRows.map((report) => report.user_id),
+  ]);
 
   return {
     site: mapSiteRow(siteResult.data as PublicSiteRow, reviewRows),
-    reviews: reviewRows.map(mapReviewRow),
-    scamReports: scamReportRows.map(mapScamReportRow),
+    reviews: reviewRows.map((review) => mapReviewRow(review, nicknameMap)),
+    scamReports: scamReportRows.map((report) =>
+      mapScamReportRow(report, nicknameMap),
+    ),
     dnsRecords: dnsRecordRows.map(mapDnsRecordRow),
     errorMessage: "",
     source: "supabase",
@@ -397,13 +458,13 @@ export async function getPublicReviewList(): Promise<
       .eq("status", "approved"),
     supabase
       .from("reviews")
-      .select("id, site_id, rating, title, experience, issue_type, state_used, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, state_used, created_at")
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("review_status", "approved")
       .eq("is_published", true),
@@ -431,6 +492,9 @@ export async function getPublicReviewList(): Promise<
   const scamReportRows = scamReportsResult.error
     ? []
     : ((scamReportsResult.data ?? []) as PublicScamReportRow[]);
+  const nicknameMap = await getPublicNicknameMap(
+    reviewRows.map((review) => review.user_id),
+  );
   const siteMap = new Map(
     siteRows.map((site) => [
       site.id,
@@ -446,7 +510,7 @@ export async function getPublicReviewList(): Promise<
     items: reviewRows.flatMap((review) => {
       const site = siteMap.get(review.site_id);
 
-      return site ? [{ ...mapReviewRow(review), site }] : [];
+      return site ? [{ ...mapReviewRow(review, nicknameMap), site }] : [];
     }),
     errorMessage: "",
     source: "supabase",
@@ -465,12 +529,12 @@ export async function getPublicScamReportList(): Promise<
       .eq("status", "approved"),
     supabase
       .from("reviews")
-      .select("id, site_id, rating, title, experience, issue_type, state_used, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, state_used, created_at")
       .eq("status", "approved"),
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, damage_types, damage_amount, damage_amount_unknown, situation_description, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("review_status", "approved")
       .eq("is_published", true)
@@ -490,6 +554,9 @@ export async function getPublicScamReportList(): Promise<
     ? []
     : ((reviewsResult.data ?? []) as PublicReviewRow[]);
   const scamReportRows = (scamReportsResult.data ?? []) as PublicScamReportRow[];
+  const nicknameMap = await getPublicNicknameMap(
+    scamReportRows.map((report) => report.user_id),
+  );
   const siteMap = new Map(
     siteRows.map((site) => [
       site.id,
@@ -505,7 +572,7 @@ export async function getPublicScamReportList(): Promise<
     items: scamReportRows.flatMap((report) => {
       const site = siteMap.get(report.site_id);
 
-      return site ? [{ ...mapScamReportRow(report), site }] : [];
+      return site ? [{ ...mapScamReportRow(report, nicknameMap), site }] : [];
     }),
     errorMessage: "",
     source: "supabase",

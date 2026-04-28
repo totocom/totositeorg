@@ -160,6 +160,7 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
                   </h2>
                   <p className="mt-1 text-xs text-muted">
                     {issueTypeLabels[review.issueType]} · {review.stateUsed} ·{" "}
+                    작성자 {review.authorNickname ?? "익명"} ·{" "}
                     {formatDate(review.createdAt)}
                   </p>
                 </div>

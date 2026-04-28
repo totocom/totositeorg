@@ -191,7 +191,8 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
                   </h2>
                   <p className="mt-1 text-xs text-muted">
                     발생일 {formatDate(report.incidentDate)} · 접수일{" "}
-                    {formatDate(report.createdAt)}
+                    {formatDate(report.createdAt)} · 작성자{" "}
+                    {report.authorNickname ?? "익명"}
                   </p>
                 </div>
                 <p className="w-fit rounded-md bg-red-50 px-3 py-1 text-sm font-semibold text-red-700">

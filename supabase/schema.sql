@@ -523,6 +523,14 @@ create index if not exists site_domain_submissions_user_id_idx
 create index if not exists site_domain_submissions_status_idx
   on public.site_domain_submissions (status);
 
+create or replace view public.public_profile_nicknames as
+select
+  user_id,
+  nickname
+from public.profiles;
+
+grant select on public.public_profile_nicknames to anon, authenticated;
+
 update public.sites
 set slug = regexp_replace(
   trim(both '-' from lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'))),
