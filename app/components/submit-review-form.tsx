@@ -310,7 +310,6 @@ export function SubmitReviewForm({
         title,
         experience,
         issue_type: "general" satisfies SiteReview["issueType"],
-        state_used: "해당 없음",
         reviewer_name: null,
         reviewer_email: null,
         status: "pending",

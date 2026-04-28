@@ -45,7 +45,6 @@ type ReviewRow = {
   title: string;
   experience: string;
   issue_type: keyof typeof issueTypeLabels;
-  state_used: string;
   reviewer_name: string | null;
   reviewer_email: string | null;
   status: ModerationStatus;
@@ -303,7 +302,7 @@ async function fetchAdminData(): Promise<AdminDataResult> {
     supabase
       .from("reviews")
       .select(
-        "id, site_id, rating, title, experience, issue_type, state_used, reviewer_name, reviewer_email, status, created_at, sites(name)",
+        "id, site_id, rating, title, experience, issue_type, reviewer_name, reviewer_email, status, created_at, sites(name)",
       )
       .in("status", ["pending", "approved", "rejected"])
       .order("created_at", { ascending: false }),
@@ -2340,7 +2339,6 @@ function ReviewTable({
               <th className="px-4 py-3 font-semibold">리뷰</th>
               <th className="px-4 py-3 font-semibold">사이트</th>
               <th className="px-4 py-3 font-semibold">문제 유형</th>
-              <th className="px-4 py-3 font-semibold">이용한 주</th>
               <th className="px-4 py-3 font-semibold">평점</th>
               <th className="px-4 py-3 font-semibold">상태</th>
               <th className="px-4 py-3 font-semibold">작성일</th>
@@ -2365,7 +2363,6 @@ function ReviewTable({
                   <td className="px-4 py-4">
                     {issueTypeLabels[review.issue_type]}
                   </td>
-                  <td className="px-4 py-4">{review.state_used}</td>
                   <td className="px-4 py-4">{review.rating}/5</td>
                   <td className="px-4 py-4">
                     {adminStatusLabels[review.status]}

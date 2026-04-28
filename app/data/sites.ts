@@ -51,7 +51,6 @@ export type SiteReview = {
   title: string;
   experience: string;
   issueType: IssueType;
-  stateUsed: string;
   createdAt: string;
   status: ModerationStatus;
 };
@@ -216,7 +215,6 @@ export const reviews: SiteReview[] = [
     experience:
       "서울에서 이용했습니다. 가입 시 본인 확인이 요구되었지만 안내 문구는 이해하기 쉬웠고, 이용 가능 지역 안내를 다시 확인할 수 있었습니다.",
     issueType: "general",
-    stateUsed: "서울",
     createdAt: "2026-04-18",
     status: "approved",
   },
@@ -228,7 +226,6 @@ export const reviews: SiteReview[] = [
     experience:
       "부산에서 이용했습니다. 입금 처리 과정은 명확했지만, 출금 예상 시간과 추가 확인 단계에 대한 안내는 조금 부족하게 느껴졌습니다.",
     issueType: "payment",
-    stateUsed: "부산",
     createdAt: "2026-04-20",
     status: "approved",
   },
@@ -240,7 +237,6 @@ export const reviews: SiteReview[] = [
     experience:
       "경기에서 계정 인증을 진행했습니다. 제출 서류 안내는 있었지만 검토 지연 시 현재 상태를 확인하기 어려웠습니다.",
     issueType: "kyc",
-    stateUsed: "경기",
     createdAt: "2026-04-22",
     status: "pending",
   },
@@ -252,7 +248,6 @@ export const reviews: SiteReview[] = [
     experience:
       "서울에서 이용 가능 여부와 프로모션 조건을 확인했습니다. 조건 설명이 길어 핵심 제한 사항을 따로 확인해야 했습니다.",
     issueType: "bonus_terms",
-    stateUsed: "서울",
     createdAt: "2026-04-23",
     status: "pending",
   },

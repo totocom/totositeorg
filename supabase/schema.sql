@@ -67,7 +67,6 @@ create table if not exists public.reviews (
   title text not null,
   experience text not null,
   issue_type text not null,
-  state_used text not null,
   reviewer_name text null,
   reviewer_email text null,
   status text not null default 'pending',
@@ -90,9 +89,6 @@ create table if not exists public.reviews (
       'account_limit',
       'other'
     )
-  ),
-  constraint reviews_state_used_not_blank check (
-    length(trim(state_used)) > 0
   ),
   constraint reviews_email_format check (
     reviewer_email is null
@@ -261,6 +257,12 @@ end $$;
 alter table public.reviews
   add column if not exists user_id uuid null references auth.users(id)
   on delete set null;
+
+alter table public.reviews
+  drop constraint if exists reviews_state_used_not_blank;
+
+alter table public.reviews
+  drop column if exists state_used;
 
 alter table public.scam_reports
   add column if not exists site_id uuid not null references public.sites(id)

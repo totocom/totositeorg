@@ -42,7 +42,6 @@ type PublicReviewRow = {
   title: string;
   experience: string;
   issue_type: IssueType;
-  state_used: string;
   created_at: string;
 };
 
@@ -244,7 +243,6 @@ function mapReviewRow(
     title: review.title,
     experience: review.experience,
     issueType: review.issue_type,
-    stateUsed: review.state_used,
     createdAt: review.created_at,
     status: "approved",
   } satisfies SiteReview;
@@ -307,7 +305,7 @@ export async function getPublicSites(): Promise<PublicSitesResult> {
       .order("created_at", { ascending: false }),
     supabase
       .from("reviews")
-      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, state_used, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, created_at")
       .eq("status", "approved"),
     supabase
       .from("scam_reports")
@@ -382,7 +380,7 @@ export async function getPublicSiteDetail(
   const [reviewsResult, scamReportsResult] = await Promise.all([
     supabase
       .from("reviews")
-      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, state_used, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, created_at")
       .eq("site_id", siteResult.data.id)
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
@@ -458,7 +456,7 @@ export async function getPublicReviewList(): Promise<
       .eq("status", "approved"),
     supabase
       .from("reviews")
-      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, state_used, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, created_at")
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
     supabase
@@ -529,7 +527,7 @@ export async function getPublicScamReportList(): Promise<
       .eq("status", "approved"),
     supabase
       .from("reviews")
-      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, state_used, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, created_at")
       .eq("status", "approved"),
     supabase
       .from("scam_reports")
