@@ -35,6 +35,7 @@ type DuplicateResult = {
 
 const defaultSiteCategory = "기타 베팅";
 const defaultLicenseInfo = "관리자 등록 사이트";
+const minDescriptionLength = 10;
 
 const initialValues = (): SiteFormValues => ({
   siteNameKo: "",
@@ -97,6 +98,14 @@ function createSlug(name: string) {
   return `${baseSlug}-${suffix}`;
 }
 
+function normalizeDescription(value: string) {
+  return value.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+}
+
+function getVisibleTextLength(value: string) {
+  return Array.from(normalizeDescription(value)).length;
+}
+
 function getSiteSubmissionErrorMessage(error: SupabaseWriteError) {
   const message = error.message ?? "";
   const details = error.details ?? "";
@@ -109,6 +118,13 @@ function getSiteSubmissionErrorMessage(error: SupabaseWriteError) {
 
   if (error.code === "42501") {
     return "제보를 저장할 권한이 없습니다. Supabase RLS 정책을 확인해주세요.";
+  }
+
+  if (
+    error.code === "23514" &&
+    message.includes("sites_description_length")
+  ) {
+    return `간단 설명은 공백을 제외하고 최소 ${minDescriptionLength}자 이상 입력해주세요.`;
   }
 
   if (error.code === "23514") {
@@ -250,10 +266,12 @@ export function SubmitSiteForm() {
         "같은 이름의 사이트가 있습니다. 동일명 다른 사이트인 경우 확인 체크를 해주세요.";
     }
 
-    if (!values.shortDescription.trim()) {
+    const descriptionLength = getVisibleTextLength(values.shortDescription);
+
+    if (!normalizeDescription(values.shortDescription)) {
       nextErrors.shortDescription = "간단 설명을 입력해주세요.";
-    } else if (values.shortDescription.trim().length < 10) {
-      nextErrors.shortDescription = "사이트 설명은 최소 10자 이상 입력해주세요.";
+    } else if (descriptionLength < minDescriptionLength) {
+      nextErrors.shortDescription = `사이트 설명은 최소 ${minDescriptionLength}자 이상 입력해주세요.`;
     }
 
     return nextErrors;
@@ -304,6 +322,17 @@ export function SubmitSiteForm() {
       }
     }
 
+    const description = normalizeDescription(values.shortDescription);
+
+    if (Array.from(description).length < minDescriptionLength) {
+      setFormStatus("idle");
+      setErrors((current) => ({
+        ...current,
+        shortDescription: `사이트 설명은 최소 ${minDescriptionLength}자 이상 입력해주세요.`,
+      }));
+      return;
+    }
+
     const { data: insertedSite, error } = await supabase
       .from("sites")
       .insert({
@@ -317,7 +346,7 @@ export function SubmitSiteForm() {
         category: defaultSiteCategory,
         available_states: ["전체"],
         license_info: defaultLicenseInfo,
-        description: values.shortDescription.trim(),
+        description,
         status: "pending",
       })
       .select("id")
@@ -549,6 +578,9 @@ export function SubmitSiteForm() {
           className="min-h-32 rounded-md border border-line px-3 py-3 text-sm"
           placeholder="사이트의 서비스 범위와 확인이 필요한 정보를 중립적으로 작성해주세요."
         />
+        <span className="text-xs text-muted">
+          현재 {getVisibleTextLength(values.shortDescription)} / {minDescriptionLength}자
+        </span>
         {errors.shortDescription ? (
           <span className="text-xs text-red-700">
             {errors.shortDescription}
