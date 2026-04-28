@@ -402,6 +402,25 @@ create table if not exists public.site_dns_records (
   )
 );
 
+create table if not exists public.site_domain_submissions (
+  id uuid primary key default gen_random_uuid(),
+  site_id uuid not null references public.sites(id) on delete cascade,
+  user_id uuid null references auth.users(id) on delete set null,
+  domain_url text not null,
+  status text not null default 'pending',
+  admin_memo text null,
+  reviewed_at timestamptz null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint site_domain_submissions_domain_url_format check (
+    domain_url ~* '^https?://'
+  ),
+  constraint site_domain_submissions_status_allowed check (
+    status in ('pending', 'approved', 'rejected')
+  )
+);
+
 create index if not exists sites_status_idx
   on public.sites (status);
 
@@ -495,6 +514,15 @@ create index if not exists site_dns_records_a_records_idx
 create index if not exists site_dns_records_aaaa_records_idx
   on public.site_dns_records using gin (aaaa_records);
 
+create index if not exists site_domain_submissions_site_id_idx
+  on public.site_domain_submissions (site_id);
+
+create index if not exists site_domain_submissions_user_id_idx
+  on public.site_domain_submissions (user_id);
+
+create index if not exists site_domain_submissions_status_idx
+  on public.site_domain_submissions (status);
+
 update public.sites
 set slug = regexp_replace(
   trim(both '-' from lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'))),
@@ -566,6 +594,13 @@ drop trigger if exists set_site_dns_records_updated_at
   on public.site_dns_records;
 create trigger set_site_dns_records_updated_at
 before update on public.site_dns_records
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_site_domain_submissions_updated_at
+  on public.site_domain_submissions;
+create trigger set_site_domain_submissions_updated_at
+before update on public.site_domain_submissions
 for each row
 execute function public.set_updated_at();
 
@@ -705,6 +740,7 @@ alter table public.telegram_subscriptions enable row level security;
 alter table public.telegram_signup_codes enable row level security;
 alter table public.domain_whois_cache enable row level security;
 alter table public.site_dns_records enable row level security;
+alter table public.site_domain_submissions enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -843,6 +879,23 @@ on public.scam_reports
 for select
 using (user_id = auth.uid());
 
+drop policy if exists "Authenticated users can submit site domains"
+  on public.site_domain_submissions;
+create policy "Authenticated users can submit site domains"
+on public.site_domain_submissions
+for insert
+with check (
+  status = 'pending'
+  and user_id = auth.uid()
+);
+
+drop policy if exists "Users can read own site domain submissions"
+  on public.site_domain_submissions;
+create policy "Users can read own site domain submissions"
+on public.site_domain_submissions
+for select
+using (user_id = auth.uid());
+
 -- Admin lookup policy:
 -- Authenticated users can read their own admin_users row to let the client
 -- determine whether the current email is an admin.
@@ -970,6 +1023,14 @@ drop policy if exists "Admins can manage site dns records"
   on public.site_dns_records;
 create policy "Admins can manage site dns records"
 on public.site_dns_records
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage site domain submissions"
+  on public.site_domain_submissions;
+create policy "Admins can manage site domain submissions"
+on public.site_domain_submissions
 for all
 using (public.is_admin())
 with check (public.is_admin());

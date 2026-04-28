@@ -74,6 +74,19 @@ type ScamReportRow = {
   }[] | null;
 };
 
+type SiteDomainSubmissionRow = {
+  id: string;
+  site_id: string;
+  user_id: string | null;
+  domain_url: string;
+  status: ModerationStatus;
+  created_at: string;
+  sites?: {
+    name: string;
+    url: string;
+  }[] | null;
+};
+
 type AdminUserRow = {
   id: string;
   email: string;
@@ -90,7 +103,7 @@ type AdminUserRow = {
 };
 
 type UpdatingItem = {
-  table: "sites" | "reviews" | "scam_reports";
+  table: "sites" | "reviews" | "scam_reports" | "site_domain_submissions";
   id: string;
   status: ModerationStatus;
 } | null;
@@ -154,12 +167,14 @@ type AdminDataResult =
       sites: SiteRow[];
       reviews: ReviewRow[];
       scamReports: ScamReportRow[];
+      siteDomainSubmissions: SiteDomainSubmissionRow[];
       errorMessage: "";
     }
   | {
       sites: [];
       reviews: [];
       scamReports: [];
+      siteDomainSubmissions: [];
       errorMessage: string;
     };
 
@@ -272,7 +287,12 @@ function getDisplayName(nameKo: string, nameEn: string) {
 }
 
 async function fetchAdminData(): Promise<AdminDataResult> {
-  const [sitesResult, reviewsResult, scamReportsResult] = await Promise.all([
+  const [
+    sitesResult,
+    reviewsResult,
+    scamReportsResult,
+    siteDomainSubmissionsResult,
+  ] = await Promise.all([
     supabase
       .from("sites")
       .select(
@@ -294,13 +314,24 @@ async function fetchAdminData(): Promise<AdminDataResult> {
       )
       .in("review_status", ["pending", "approved", "rejected"])
       .order("created_at", { ascending: false }),
+    supabase
+      .from("site_domain_submissions")
+      .select("id, site_id, user_id, domain_url, status, created_at, sites(name, url)")
+      .in("status", ["pending", "approved", "rejected"])
+      .order("created_at", { ascending: false }),
   ]);
 
-  if (sitesResult.error || reviewsResult.error || scamReportsResult.error) {
+  if (
+    sitesResult.error ||
+    reviewsResult.error ||
+    scamReportsResult.error ||
+    siteDomainSubmissionsResult.error
+  ) {
     return {
       sites: [],
       reviews: [],
       scamReports: [],
+      siteDomainSubmissions: [],
       errorMessage:
         "관리자 데이터를 불러오지 못했습니다. Supabase RLS 정책 또는 네트워크 상태를 확인해주세요.",
     };
@@ -310,6 +341,8 @@ async function fetchAdminData(): Promise<AdminDataResult> {
     sites: (sitesResult.data ?? []) as SiteRow[],
     reviews: (reviewsResult.data ?? []) as ReviewRow[],
     scamReports: (scamReportsResult.data ?? []) as ScamReportRow[],
+    siteDomainSubmissions:
+      (siteDomainSubmissionsResult.data ?? []) as SiteDomainSubmissionRow[],
     errorMessage: "",
   };
 }
@@ -319,6 +352,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
   const [sites, setSites] = useState<SiteRow[]>([]);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [scamReports, setScamReports] = useState<ScamReportRow[]>([]);
+  const [siteDomainSubmissions, setSiteDomainSubmissions] = useState<
+    SiteDomainSubmissionRow[]
+  >([]);
   const [adminUsers, setAdminUsers] = useState<AdminUserRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
@@ -390,6 +426,11 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     () => scamReports.filter((report) => report.review_status === "rejected"),
     [scamReports],
   );
+  const pendingSiteDomainSubmissions = useMemo(
+    () =>
+      siteDomainSubmissions.filter((submission) => submission.status === "pending"),
+    [siteDomainSubmissions],
+  );
 
   async function loadAdminData() {
     setIsLoading(true);
@@ -399,6 +440,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setSites(result.sites);
     setReviews(result.reviews);
     setScamReports(result.scamReports);
+    setSiteDomainSubmissions(result.siteDomainSubmissions);
     setIsLoading(false);
   }
 
@@ -451,6 +493,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       setSites(result.sites);
       setReviews(result.reviews);
       setScamReports(result.scamReports);
+      setSiteDomainSubmissions(result.siteDomainSubmissions);
       setIsLoading(false);
     });
     Promise.resolve().then(() => loadAdminUsers());
@@ -513,6 +556,53 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     if (notificationError) {
       setErrorMessage(notificationError);
     }
+  }
+
+  async function reviewSiteDomainSubmission(
+    submissionId: string,
+    status: "approved" | "rejected",
+  ) {
+    setUpdatingItem({
+      table: "site_domain_submissions",
+      id: submissionId,
+      status,
+    });
+    setErrorMessage("");
+
+    const { data: sessionResult } = await supabase.auth.getSession();
+    const accessToken = sessionResult.session?.access_token;
+
+    if (!accessToken) {
+      setUpdatingItem(null);
+      setErrorMessage("관리자 로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    const response = await fetch("/api/admin/site-domains/review", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ submissionId, status }),
+    });
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+      siteId?: string;
+    } | null;
+
+    setUpdatingItem(null);
+
+    if (!response.ok) {
+      setErrorMessage(body?.error ?? "도메인 추가 요청 처리에 실패했습니다.");
+      return;
+    }
+
+    if (status === "approved" && body?.siteId) {
+      await refreshSiteDns(body.siteId);
+    }
+
+    await loadAdminData();
   }
 
   async function refreshSiteDns(siteId: string) {
@@ -1138,7 +1228,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
   }
 
   const isUpdating = (
-    table: "sites" | "reviews" | "scam_reports",
+    table: "sites" | "reviews" | "scam_reports" | "site_domain_submissions",
     id: string,
     status: ModerationStatus,
   ) =>
@@ -1191,6 +1281,11 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
           label="승인 대기 사이트"
           value={pendingSites.length}
           href="/admin/sites"
+        />
+        <SummaryCard
+          label="도메인 추가 요청"
+          value={pendingSiteDomainSubmissions.length}
+          href="/admin/sites#site-domain-submissions"
         />
         <SummaryCard
           label="승인 대기 리뷰"
@@ -1669,6 +1764,13 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       ) : showModerationTables ? (
         <div className="grid gap-6">
           {showSites ? (
+          <SiteDomainSubmissionTable
+            submissions={pendingSiteDomainSubmissions}
+            isUpdating={isUpdating}
+            onReview={reviewSiteDomainSubmission}
+          />
+          ) : null}
+          {showSites ? (
           <SiteTable
             anchorId="sites"
             title="승인 대기 사이트"
@@ -1952,6 +2054,103 @@ function DnsRecord({ label, values }: { label: string; values: string[] }) {
         {values.length > 0 ? values.join(", ") : "없음"}
       </dd>
     </div>
+  );
+}
+
+function SiteDomainSubmissionTable({
+  submissions,
+  isUpdating,
+  onReview,
+}: {
+  submissions: SiteDomainSubmissionRow[];
+  isUpdating: (
+    table: "sites" | "reviews" | "scam_reports" | "site_domain_submissions",
+    id: string,
+    status: ModerationStatus,
+  ) => boolean;
+  onReview: (submissionId: string, status: "approved" | "rejected") => void;
+}) {
+  return (
+    <section
+      id="site-domain-submissions"
+      className="overflow-hidden rounded-lg border border-line bg-surface shadow-sm"
+    >
+      <div className="border-b border-line px-4 py-3">
+        <h2 className="font-semibold">도메인 추가 요청</h2>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+          <thead className="bg-background text-xs uppercase text-muted">
+            <tr>
+              <th className="px-4 py-3 font-semibold">사이트</th>
+              <th className="px-4 py-3 font-semibold">추가 도메인</th>
+              <th className="px-4 py-3 font-semibold">요청일</th>
+              <th className="px-4 py-3 font-semibold">작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            {submissions.length > 0 ? (
+              submissions.map((submission) => {
+                const approving = isUpdating(
+                  "site_domain_submissions",
+                  submission.id,
+                  "approved",
+                );
+                const rejecting = isUpdating(
+                  "site_domain_submissions",
+                  submission.id,
+                  "rejected",
+                );
+                const site = Array.isArray(submission.sites)
+                  ? submission.sites[0]
+                  : submission.sites;
+
+                return (
+                  <tr key={submission.id} className="border-t border-line">
+                    <td className="px-4 py-4">
+                      <p className="font-semibold">
+                        {site?.name ?? submission.site_id}
+                      </p>
+                      <p className="break-all text-xs text-muted">
+                        {site?.url ?? "-"}
+                      </p>
+                    </td>
+                    <td className="break-all px-4 py-4">
+                      {submission.domain_url}
+                    </td>
+                    <td className="px-4 py-4">
+                      {formatDate(submission.created_at)}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={approving || rejecting}
+                          onClick={() => onReview(submission.id, "approved")}
+                          className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                        >
+                          {approving ? "처리 중..." : "승인"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={approving || rejecting}
+                          onClick={() => onReview(submission.id, "rejected")}
+                          className="rounded-md border border-line px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                        >
+                          {rejecting ? "처리 중..." : "거절"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <EmptyRow colSpan={4} />
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

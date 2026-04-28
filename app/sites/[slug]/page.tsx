@@ -228,6 +228,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     }),
   );
   const domainInfoTabs = domainInfos.map(({ domainUrl, whoisInfo, dnsInfo }) => ({
+    siteId: site.id,
     domainUrl,
     displayDomain: formatDisplayDomain(
       whoisInfo?.domain || dnsInfo?.domain || domainUrl,

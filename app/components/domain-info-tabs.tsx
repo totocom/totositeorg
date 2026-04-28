@@ -3,8 +3,10 @@
 import { useState } from "react";
 import type { PublicDnsInfo } from "@/app/data/domain-dns";
 import type { PublicWhoisInfo } from "@/app/data/domain-whois";
+import { SiteDomainSubmissionForm } from "@/app/components/site-domain-submission-form";
 
 export type DomainInfoTabItem = {
+  siteId: string;
   domainUrl: string;
   displayDomain: string;
   domainAge: string;
@@ -63,6 +65,8 @@ export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
         </p>
         <h2 className="mt-1 text-xl font-bold">도메인 이력 및 DNS</h2>
       </div>
+
+      <SiteDomainSubmissionForm siteId={items[0]?.siteId ?? ""} />
 
       <div className="border-b border-line px-5 py-3">
         <div className="flex gap-2 overflow-x-auto pb-1">
