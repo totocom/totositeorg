@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
 import { ReviewSummary } from "@/app/components/review-summary";
+import { ScreenshotUploadControl } from "@/app/components/screenshot-upload-control";
 import { issueTypeLabels, moderationStatusLabels } from "@/app/data/sites";
 import { supabase } from "@/lib/supabase/client";
 
@@ -27,6 +28,7 @@ type SiteRow = {
   url: string;
   domains: string[] | null;
   screenshot_url: string | null;
+  favicon_url: string | null;
   category: string;
   available_states: string[];
   license_info: string;
@@ -108,6 +110,7 @@ type AdminSiteFormValues = {
   nameEn: string;
   url: string;
   domainsText: string;
+  faviconUrl: string;
   description: string;
 };
 
@@ -169,6 +172,7 @@ const initialAdminSiteFormValues: AdminSiteFormValues = {
   nameEn: "",
   url: "",
   domainsText: "",
+  faviconUrl: "",
   description: "",
 };
 
@@ -222,6 +226,18 @@ function normalizeUrl(value: string) {
   }
 }
 
+function getDefaultFaviconUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  try {
+    const url = new URL(trimmed);
+    return new URL("/favicon.ico", url.origin).toString();
+  } catch {
+    return "";
+  }
+}
+
 function getDomainList(values: AdminSiteFormValues) {
   return Array.from(
     new Set(
@@ -260,7 +276,7 @@ async function fetchAdminData(): Promise<AdminDataResult> {
     supabase
       .from("sites")
       .select(
-        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, category, available_states, license_info, status, description, contact_telegram, created_at",
+        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, category, available_states, license_info, status, description, contact_telegram, created_at",
       )
       .in("status", ["pending", "approved", "rejected"])
       .order("created_at", { ascending: false }),
@@ -658,7 +674,19 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     key: K,
     value: AdminSiteFormValues[K],
   ) {
-    setSiteFormValues((current) => ({ ...current, [key]: value }));
+    setSiteFormValues((current) => {
+      const next = { ...current, [key]: value };
+
+      if (
+        key === "url" &&
+        typeof value === "string" &&
+        !current.faviconUrl.trim()
+      ) {
+        next.faviconUrl = getDefaultFaviconUrl(value);
+      }
+
+      return next;
+    });
     setSiteFormErrors((current) => ({ ...current, [key]: undefined }));
     setSiteFormMessage("");
     setSiteFormErrorMessage("");
@@ -695,6 +723,13 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     if (invalidDomains.length > 0) {
       nextErrors.domainsText =
         "추가 도메인은 http:// 또는 https://로 시작하는 URL만 입력해주세요.";
+    }
+
+    if (
+      siteFormValues.faviconUrl.trim() &&
+      !isValidUrl(siteFormValues.faviconUrl.trim())
+    ) {
+      nextErrors.faviconUrl = "파비콘 이미지 URL 형식이 올바르지 않습니다.";
     }
 
     if (siteFormValues.description.trim().length < 30) {
@@ -755,6 +790,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setSiteFormValues((current) => ({
       ...current,
       nameKo: current.nameKo.trim() || result.siteName || result.title,
+      faviconUrl: current.faviconUrl.trim() || result.faviconUrl || "",
       description:
         current.description.trim().length >= 30
           ? current.description
@@ -954,6 +990,11 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       return;
     }
 
+    if (pageCaptureUrl.trim() && !isValidUrl(pageCaptureUrl.trim())) {
+      setSiteFormErrorMessage("수동 캡처 이미지 URL 형식이 올바르지 않습니다.");
+      return;
+    }
+
     setIsCreatingSite(true);
     setSiteFormMessage("");
     setSiteFormErrorMessage("");
@@ -968,7 +1009,11 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
         name_en: siteFormValues.nameEn.trim() || null,
         url: siteFormValues.url.trim(),
         domains: getDomainList(siteFormValues),
-        screenshot_url: pageCaptureUrl || null,
+        screenshot_url: pageCaptureUrl.trim() || null,
+        favicon_url:
+          siteFormValues.faviconUrl.trim() ||
+          getDefaultFaviconUrl(siteFormValues.url) ||
+          null,
         category: defaultSiteCategory,
         available_states: ["전체"],
         license_info: defaultLicenseInfo,
@@ -1046,7 +1091,6 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     updatingItem.status === status;
   const isDeleting = (table: "sites" | "reviews" | "scam_reports", id: string) =>
     deletingItem?.table === table && deletingItem.id === id;
-  const isHome = section === "home";
   const showSites = section === "sites";
   const showRejectedSites = section === "rejected-sites";
   const showSiteRegistration = section === "site-registration";
@@ -1074,15 +1118,6 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
         </p>
       </div>
 
-      {isHome ? <AdminSectionCards /> : (
-        <a
-          href="/admin"
-          className="mb-6 inline-flex h-10 items-center rounded-md border border-line px-4 text-sm font-semibold"
-        >
-          관리자 홈으로
-        </a>
-      )}
-
       {errorMessage ? (
         <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {errorMessage}
@@ -1096,16 +1131,56 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       ) : null}
 
       <section className="mb-6 grid gap-3 sm:grid-cols-4">
-        <SummaryCard label="승인 대기 사이트" value={pendingSites.length} />
-        <SummaryCard label="승인 대기 리뷰" value={pendingReviews.length} />
-        <SummaryCard label="승인 대기 먹튀 제보" value={pendingScamReports.length} />
-        <SummaryCard label="승인된 사이트" value={approvedSites.length} />
-        <SummaryCard label="승인된 리뷰" value={approvedReviews.length} />
-        <SummaryCard label="승인된 먹튀 제보" value={approvedScamReports.length} />
-        <SummaryCard label="거절된 사이트" value={rejectedSites.length} />
-        <SummaryCard label="거절된 리뷰" value={rejectedReviews.length} />
-        <SummaryCard label="거절된 먹튀 제보" value={rejectedScamReports.length} />
-        <SummaryCard label="전체 회원" value={adminUsers.length} />
+        <SummaryCard
+          label="승인 대기 사이트"
+          value={pendingSites.length}
+          href="/admin/sites"
+        />
+        <SummaryCard
+          label="승인 대기 리뷰"
+          value={pendingReviews.length}
+          href="/admin/reviews"
+        />
+        <SummaryCard
+          label="승인 대기 먹튀 제보"
+          value={pendingScamReports.length}
+          href="/admin/scam-reports"
+        />
+        <SummaryCard
+          label="승인된 사이트"
+          value={approvedSites.length}
+          href="/admin/sites#approved-sites"
+        />
+        <SummaryCard
+          label="승인된 리뷰"
+          value={approvedReviews.length}
+          href="/admin/reviews#approved-reviews"
+        />
+        <SummaryCard
+          label="승인된 먹튀 제보"
+          value={approvedScamReports.length}
+          href="/admin/scam-reports#approved-scam-reports"
+        />
+        <SummaryCard
+          label="거절된 사이트"
+          value={rejectedSites.length}
+          href="/admin/rejected-sites"
+        />
+        <SummaryCard
+          label="거절된 리뷰"
+          value={rejectedReviews.length}
+          href="/admin/rejected-reviews"
+        />
+        <SummaryCard
+          label="거절된 먹튀 제보"
+          value={rejectedScamReports.length}
+          href="/admin/scam-reports#rejected-scam-reports"
+        />
+        <SummaryCard
+          label="전체 회원"
+          value={adminUsers.length}
+          href="/admin/users"
+        />
       </section>
 
       {showUsers ? (
@@ -1255,6 +1330,54 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
               </div>
             </div>
           ) : null}
+
+          <div className="grid gap-2 text-sm font-medium">
+            파비콘 이미지
+            <ScreenshotUploadControl
+              value={siteFormValues.faviconUrl}
+              onChange={(url) => updateSiteForm("faviconUrl", url)}
+              onMessage={setMetadataMessage}
+              onError={setMetadataErrorMessage}
+              accept="image/png,image/jpeg,image/webp,image/x-icon,image/vnd.microsoft.icon"
+              buttonLabel="파비콘 업로드"
+              placeholder="https://example.com/favicon.ico"
+              successMessage="파비콘 이미지가 업로드되었습니다."
+              description="자동 메타정보가 차단된 경우 파비콘 파일을 직접 업로드하거나 URL을 입력할 수 있습니다. PNG, JPG, WEBP, ICO 형식을 지원합니다."
+            />
+            {siteFormErrors.faviconUrl ? (
+              <span className="text-xs text-red-700">
+                {siteFormErrors.faviconUrl}
+              </span>
+            ) : null}
+          </div>
+
+          {siteFormValues.faviconUrl ? (
+            <div className="flex items-center gap-3 rounded-md border border-line bg-background p-3 text-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={siteFormValues.faviconUrl}
+                alt="파비콘 미리보기"
+                className="h-10 w-10 rounded-md border border-line bg-white object-contain"
+              />
+              <span className="break-all text-muted">
+                {siteFormValues.faviconUrl}
+              </span>
+            </div>
+          ) : null}
+
+          <div className="grid gap-2 text-sm font-medium">
+            수동 캡처 이미지
+            <ScreenshotUploadControl
+              value={pageCaptureUrl}
+              onChange={(url) => {
+                setPageCaptureUrl(url);
+                setPendingPageCaptureUrl("");
+                setPageCaptureErrorMessage("");
+              }}
+              onMessage={setPageCaptureMessage}
+              onError={setPageCaptureErrorMessage}
+            />
+          </div>
 
           {pendingPageCaptureUrl ? (
             <div className="grid gap-3 rounded-md border border-line bg-background p-4 text-sm">
@@ -1603,72 +1726,6 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
   );
 }
 
-const adminSections: Array<{
-  href: string;
-  title: string;
-  description: string;
-}> = [
-  {
-    href: "/admin/sites",
-    title: "사이트 관리",
-    description: "승인 대기 및 승인된 사이트를 검토합니다.",
-  },
-  {
-    href: "/admin/rejected-sites",
-    title: "사이트 거절 목록",
-    description: "거절 처리된 사이트를 다시 확인합니다.",
-  },
-  {
-    href: "/admin/site-registration",
-    title: "사이트 등록",
-    description: "관리자가 사이트 정보를 직접 등록합니다.",
-  },
-  {
-    href: "/admin/users",
-    title: "회원 관리",
-    description: "가입 회원을 확인하고 필요 시 삭제합니다.",
-  },
-  {
-    href: "/admin/reviews",
-    title: "리뷰 관리",
-    description: "승인 대기 및 승인된 리뷰를 검토합니다.",
-  },
-  {
-    href: "/admin/scam-reports",
-    title: "먹튀 제보 관리",
-    description: "먹튀 제보의 검토 상태와 공개 여부를 관리합니다.",
-  },
-  {
-    href: "/admin/rejected-reviews",
-    title: "리뷰 거절 목록",
-    description: "거절 처리된 리뷰를 다시 확인합니다.",
-  },
-  {
-    href: "/admin/surveys",
-    title: "설문 관리",
-    description: "만족도 평가로 접수된 리뷰를 관리합니다.",
-  },
-];
-
-function AdminSectionCards() {
-  return (
-    <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {adminSections.map((adminSection) => (
-        <a
-          key={adminSection.href}
-          href={adminSection.href}
-          className="rounded-lg border border-line bg-surface p-4 shadow-sm transition hover:border-accent"
-        >
-          <h2 className="font-semibold">{adminSection.title}</h2>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            {adminSection.description}
-          </p>
-        </a>
-      ))}
-    </section>
-  );
-}
-
 function UserTable({
   users,
   isLoading,
@@ -1811,12 +1868,23 @@ function UserTable({
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+function SummaryCard({
+  label,
+  value,
+  href,
+}: {
+  label: string;
+  value: number;
+  href: string;
+}) {
   return (
-    <div className="rounded-lg border border-line bg-surface p-4 shadow-sm">
+    <a
+      href={href}
+      className="rounded-lg border border-line bg-surface p-4 shadow-sm transition hover:border-accent hover:bg-background"
+    >
       <p className="text-sm text-muted">{label}</p>
       <p className="mt-2 text-3xl font-bold">{value}</p>
-    </div>
+    </a>
   );
 }
 

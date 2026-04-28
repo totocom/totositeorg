@@ -21,6 +21,7 @@ create table if not exists public.sites (
   url text not null,
   domains text[] not null default '{}',
   screenshot_url text null,
+  favicon_url text null,
   -- TODO: category is no longer exposed in the site registration UI.
   -- Keep the column temporarily for existing data compatibility.
   category text not null default '기타 베팅',
@@ -175,6 +176,9 @@ alter table public.sites
 
 alter table public.sites
   add column if not exists screenshot_url text null;
+
+alter table public.sites
+  add column if not exists favicon_url text null;
 
 alter table public.sites
   add column if not exists contact_telegram text null;
@@ -351,6 +355,19 @@ create table if not exists public.telegram_signup_codes (
   )
 );
 
+create table if not exists public.domain_whois_cache (
+  domain text primary key,
+  payload jsonb not null,
+  fetched_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint domain_whois_cache_domain_format check (
+    domain ~ '^[a-z0-9.-]+\.[a-z]{2,}$'
+  )
+);
+
 create index if not exists sites_status_idx
   on public.sites (status);
 
@@ -420,6 +437,9 @@ create index if not exists telegram_subscriptions_chat_id_idx
 create index if not exists telegram_signup_codes_code_idx
   on public.telegram_signup_codes (verification_code);
 
+create index if not exists domain_whois_cache_expires_at_idx
+  on public.domain_whois_cache (expires_at);
+
 update public.sites
 set slug = regexp_replace(
   trim(both '-' from lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'))),
@@ -477,6 +497,13 @@ execute function public.set_updated_at();
 drop trigger if exists set_profiles_updated_at on public.profiles;
 create trigger set_profiles_updated_at
 before update on public.profiles
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_domain_whois_cache_updated_at
+  on public.domain_whois_cache;
+create trigger set_domain_whois_cache_updated_at
+before update on public.domain_whois_cache
 for each row
 execute function public.set_updated_at();
 
@@ -603,6 +630,7 @@ alter table public.admin_users enable row level security;
 alter table public.profiles enable row level security;
 alter table public.telegram_subscriptions enable row level security;
 alter table public.telegram_signup_codes enable row level security;
+alter table public.domain_whois_cache enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -841,3 +869,11 @@ create policy "Admins can read profiles"
 on public.profiles
 for select
 using (public.is_admin());
+
+drop policy if exists "Admins can manage domain whois cache"
+  on public.domain_whois_cache;
+create policy "Admins can manage domain whois cache"
+on public.domain_whois_cache
+for all
+using (public.is_admin())
+with check (public.is_admin());

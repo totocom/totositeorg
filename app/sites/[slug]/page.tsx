@@ -291,7 +291,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={site.screenshotUrl}
-              alt={`${site.siteName} 페이지 캡처 이미지`}
+              alt={`${site.siteName} 토토사이트 상세 메인 페이지`}
               className="aspect-video w-full bg-background object-cover"
             />
           </section>

@@ -23,28 +23,38 @@ export function SiteCard({ site }: SiteCardProps) {
   const scamReportCount = site.scamReportCount ?? 0;
   const scamDamageAmount = site.scamDamageAmount ?? 0;
   const scamDamageAmountUnknownCount = site.scamDamageAmountUnknownCount ?? 0;
+  const faviconAlt = `${site.siteName} 토토사이트 파비콘`;
+  const fallbackInitial = site.siteName.trim().charAt(0) || "?";
 
   return (
     <Link
       href={`/sites/${site.slug}`}
       className="block rounded-lg border border-line bg-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
     >
-      {site.screenshotUrl ? (
-        <div className="mb-4 overflow-hidden rounded-md border border-line bg-background">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={site.screenshotUrl}
-            alt={`${site.siteName} 페이지 캡처`}
-            className="aspect-video w-full object-cover"
-          />
-        </div>
-      ) : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-foreground">
-            {site.siteName}
-          </h2>
-          <p className="mt-1 break-all text-sm text-muted">{site.siteUrl}</p>
+        <div className="flex min-w-0 gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-background">
+            {site.faviconUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={site.faviconUrl}
+                alt={faviconAlt}
+                loading="lazy"
+                decoding="async"
+                className="h-8 w-8 object-contain"
+              />
+            ) : (
+              <span className="text-lg font-bold text-accent">
+                {fallbackInitial}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-xl font-semibold text-foreground">
+              {site.siteName}
+            </h2>
+            <p className="mt-1 break-all text-sm text-muted">{site.siteUrl}</p>
+          </div>
         </div>
         <div className="flex shrink-0 gap-2">
           <div className="min-w-20 rounded-md bg-accent-soft px-3 py-2 text-center">

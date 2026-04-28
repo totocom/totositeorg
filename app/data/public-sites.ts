@@ -17,6 +17,7 @@ type PublicSiteRow = {
   url: string;
   domains?: string[] | null;
   screenshot_url?: string | null;
+  favicon_url?: string | null;
   category: string;
   available_states: string[];
   license_info: string;
@@ -111,6 +112,7 @@ function mapSiteRow(
     siteUrl: site.url,
     domains,
     screenshotUrl: site.screenshot_url ?? null,
+    faviconUrl: site.favicon_url ?? null,
     category: site.category,
     availableStates: site.available_states,
     licenseInfo: site.license_info,
@@ -186,7 +188,7 @@ export async function getPublicSites(): Promise<PublicSitesResult> {
     supabase
       .from("sites")
       .select(
-        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, category, available_states, license_info, description",
+        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, category, available_states, license_info, description",
       )
       .eq("status", "approved")
       .order("created_at", { ascending: false }),

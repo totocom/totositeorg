@@ -26,14 +26,6 @@ type UserReview = {
   }[] | null;
 };
 
-type TelegramSubscription = {
-  chat_id: string;
-  username: string | null;
-  first_name: string | null;
-  is_active: boolean;
-  updated_at: string;
-};
-
 type UserProfile = {
   username: string;
   nickname: string;
@@ -45,18 +37,14 @@ type AccountDataResult =
       sites: UserSite[];
       reviews: UserReview[];
       profile: UserProfile | null;
-      telegramSubscription: TelegramSubscription | null;
       errorMessage: "";
     }
   | {
       sites: [];
       reviews: [];
       profile: null;
-      telegramSubscription: null;
       errorMessage: string;
     };
-
-const telegramBotUrl = process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? "";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("ko-KR", {
@@ -70,21 +58,8 @@ function getReviewSiteName(review: UserReview) {
   return review.sites?.[0]?.name ?? "알 수 없음";
 }
 
-function getTelegramStartUrl(userId: string) {
-  if (!telegramBotUrl) return "";
-
-  try {
-    const url = new URL(telegramBotUrl);
-    url.searchParams.set("start", userId);
-    return url.toString();
-  } catch {
-    const separator = telegramBotUrl.includes("?") ? "&" : "?";
-    return `${telegramBotUrl}${separator}start=${encodeURIComponent(userId)}`;
-  }
-}
-
 async function fetchAccountData(userId: string): Promise<AccountDataResult> {
-  const [sitesResult, reviewsResult, profileResult, telegramResult] = await Promise.all([
+  const [sitesResult, reviewsResult, profileResult] = await Promise.all([
     supabase
       .from("sites")
       .select("id, name, url, category, status, created_at")
@@ -100,24 +75,17 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
       .select("username, nickname, telegram_verified_at")
       .eq("user_id", userId)
       .maybeSingle(),
-    supabase
-      .from("telegram_subscriptions")
-      .select("chat_id, username, first_name, is_active, updated_at")
-      .eq("user_id", userId)
-      .maybeSingle(),
   ]);
 
   if (
     sitesResult.error ||
     reviewsResult.error ||
-    profileResult.error ||
-    telegramResult.error
+    profileResult.error
   ) {
     return {
       sites: [],
       reviews: [],
       profile: null,
-      telegramSubscription: null,
       errorMessage:
         "내 작성 내역을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
     };
@@ -127,8 +95,6 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
     sites: (sitesResult.data ?? []) as UserSite[],
     reviews: (reviewsResult.data ?? []) as UserReview[],
     profile: (profileResult.data as UserProfile | null) ?? null,
-    telegramSubscription:
-      (telegramResult.data as TelegramSubscription | null) ?? null,
     errorMessage: "",
   };
 }
@@ -138,11 +104,7 @@ export function AccountDashboard() {
   const [sites, setSites] = useState<UserSite[]>([]);
   const [reviews, setReviews] = useState<UserReview[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [telegramSubscription, setTelegramSubscription] =
-    useState<TelegramSubscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshingTelegram, setIsRefreshingTelegram] = useState(false);
-  const [telegramCopyMessage, setTelegramCopyMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -167,7 +129,6 @@ export function AccountDashboard() {
       setSites(result.sites);
       setReviews(result.reviews);
       setProfile(result.profile);
-      setTelegramSubscription(result.telegramSubscription);
       setErrorMessage(result.errorMessage);
       setIsLoading(false);
     }
@@ -208,42 +169,6 @@ export function AccountDashboard() {
     );
   }
 
-  const telegramStartUrl = getTelegramStartUrl(user.id);
-  const telegramStartCommand = `/start ${user.id}`;
-
-  async function refreshTelegramConnection() {
-    if (!user) return;
-
-    setIsRefreshingTelegram(true);
-    setTelegramCopyMessage("");
-
-    const { data, error } = await supabase
-      .from("telegram_subscriptions")
-      .select("chat_id, username, first_name, is_active, updated_at")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    setIsRefreshingTelegram(false);
-
-    if (error) {
-      setErrorMessage("텔레그램 연결 상태를 다시 확인하지 못했습니다.");
-      return;
-    }
-
-    setTelegramSubscription((data as TelegramSubscription | null) ?? null);
-  }
-
-  async function copyTelegramStartCommand() {
-    setTelegramCopyMessage("");
-
-    try {
-      await navigator.clipboard.writeText(telegramStartCommand);
-      setTelegramCopyMessage("연결 명령어를 복사했습니다.");
-    } catch {
-      setTelegramCopyMessage("복사하지 못했습니다. 명령어를 직접 선택해서 복사해주세요.");
-    }
-  }
-
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
       <div className="mb-5">
@@ -264,78 +189,6 @@ export function AccountDashboard() {
           <div>
             <p className="text-sm text-muted">내 이메일</p>
             <p className="mt-2 break-all font-semibold">{user.email}</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">텔레그램 알림 연결</h2>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              사이트 제보가 승인되면 연결된 텔레그램 대화로 알림을 보내드립니다.
-            </p>
-            {telegramSubscription?.is_active ? (
-              <p className="mt-3 text-sm font-semibold text-accent">
-                연결됨
-                {telegramSubscription.username
-                  ? ` · @${telegramSubscription.username}`
-                  : ""}
-              </p>
-            ) : (
-              <p className="mt-3 text-sm font-semibold text-muted">
-                아직 텔레그램 알림이 연결되지 않았습니다.
-              </p>
-            )}
-            {!telegramSubscription?.is_active ? (
-              <div className="mt-4 rounded-md border border-line bg-background p-3 text-sm">
-                <p className="text-muted">
-                  봇을 이미 시작한 상태라 버튼 연결이 안 되면 아래 명령어를
-                  텔레그램 봇 대화방에 보내주세요.
-                </p>
-                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <code className="break-all rounded-md bg-surface px-3 py-2 text-xs">
-                    {telegramStartCommand}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={copyTelegramStartCommand}
-                    className="h-9 rounded-md border border-line px-3 text-xs font-semibold"
-                  >
-                    복사
-                  </button>
-                </div>
-                {telegramCopyMessage ? (
-                  <p className="mt-2 text-xs font-semibold text-accent">
-                    {telegramCopyMessage}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-          <div className="flex flex-col gap-2">
-            {telegramStartUrl ? (
-              <a
-                href={telegramStartUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
-              >
-                텔레그램 봇 시작하기
-              </a>
-            ) : (
-              <p className="text-sm font-semibold text-muted">
-                텔레그램 봇 링크 설정이 필요합니다.
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={refreshTelegramConnection}
-              disabled={isRefreshingTelegram}
-              className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-sm font-semibold disabled:opacity-50"
-            >
-              {isRefreshingTelegram ? "확인 중..." : "연결 상태 새로고침"}
-            </button>
           </div>
         </div>
       </section>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
+import { ScreenshotUploadControl } from "@/app/components/screenshot-upload-control";
 import { supabase } from "@/lib/supabase/client";
 
 type SiteRow = {
@@ -15,6 +16,7 @@ type SiteRow = {
   url: string;
   domains: string[] | null;
   screenshot_url: string | null;
+  favicon_url: string | null;
   description: string;
 };
 
@@ -24,6 +26,7 @@ type EditValues = {
   url: string;
   domainsText: string;
   screenshotUrl: string;
+  faviconUrl: string;
   description: string;
 };
 
@@ -39,6 +42,7 @@ const initialValues: EditValues = {
   url: "",
   domainsText: "",
   screenshotUrl: "",
+  faviconUrl: "",
   description: "",
 };
 
@@ -95,6 +99,18 @@ function normalizeUrl(value: string) {
   }
 }
 
+function getDefaultFaviconUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  try {
+    const url = new URL(trimmed);
+    return new URL("/favicon.ico", url.origin).toString();
+  } catch {
+    return "";
+  }
+}
+
 function getDomainList(values: EditValues) {
   return Array.from(
     new Set(
@@ -126,6 +142,7 @@ function valuesFromSite(site: SiteRow): EditValues {
     url: site.url,
     domainsText: extraDomains.join("\n"),
     screenshotUrl: site.screenshot_url ?? "",
+    faviconUrl: site.favicon_url ?? getDefaultFaviconUrl(site.url),
     description: site.description,
   };
 }
@@ -183,7 +200,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
       const { data, error } = await supabase
         .from("sites")
-        .select("id, slug, name, name_ko, name_en, url, domains, screenshot_url, description")
+        .select("id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, description")
         .eq("id", siteId)
         .single();
 
@@ -213,7 +230,19 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   }, [isAdmin, isLoading, siteId]);
 
   function updateField<K extends keyof EditValues>(key: K, value: EditValues[K]) {
-    setValues((current) => ({ ...current, [key]: value }));
+    setValues((current) => {
+      const next = { ...current, [key]: value };
+
+      if (
+        key === "url" &&
+        typeof value === "string" &&
+        !current.faviconUrl.trim()
+      ) {
+        next.faviconUrl = getDefaultFaviconUrl(value);
+      }
+
+      return next;
+    });
     setErrors((current) => ({ ...current, [key]: undefined }));
     setMessage("");
     setErrorMessage("");
@@ -243,6 +272,10 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
     if (values.screenshotUrl.trim() && !isValidUrl(values.screenshotUrl.trim())) {
       nextErrors.screenshotUrl = "캡처 이미지 URL 형식이 올바르지 않습니다.";
+    }
+
+    if (values.faviconUrl.trim() && !isValidUrl(values.faviconUrl.trim())) {
+      nextErrors.faviconUrl = "파비콘 이미지 URL 형식이 올바르지 않습니다.";
     }
 
     if (values.description.trim().length < 30) {
@@ -301,6 +334,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     setValues((current) => ({
       ...current,
       nameKo: current.nameKo.trim() || result.siteName || result.title,
+      faviconUrl: current.faviconUrl.trim() || result.faviconUrl || "",
       description:
         current.description.trim().length >= 30
           ? current.description
@@ -479,6 +513,8 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         url: values.url.trim(),
         domains: getDomainList(values),
         screenshot_url: values.screenshotUrl.trim() || null,
+        favicon_url:
+          values.faviconUrl.trim() || getDefaultFaviconUrl(values.url) || null,
         description: values.description.trim(),
       })
       .eq("id", siteId);
@@ -752,17 +788,43 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
           </label>
 
           <div className="grid gap-2 text-sm font-medium">
-            캡처 이미지 URL
-            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-              <input
-                value={values.screenshotUrl}
-                onChange={(event) =>
-                  updateField("screenshotUrl", event.target.value)
-                }
-                className="h-11 rounded-md border border-line px-3 text-sm"
-                placeholder="Supabase Storage 이미지 URL"
+            파비콘 이미지
+            <ScreenshotUploadControl
+              value={values.faviconUrl}
+              onChange={(url) => updateField("faviconUrl", url)}
+              onMessage={setMessage}
+              onError={setErrorMessage}
+              accept="image/png,image/jpeg,image/webp,image/x-icon,image/vnd.microsoft.icon"
+              buttonLabel="파비콘 업로드"
+              placeholder="https://example.com/favicon.ico"
+              successMessage="파비콘 이미지가 업로드되었습니다."
+              description="자동 메타정보가 차단된 경우 파비콘 파일을 직접 업로드하거나 URL을 입력할 수 있습니다. PNG, JPG, WEBP, ICO 형식을 지원합니다."
+            />
+            {errors.faviconUrl ? (
+              <span className="text-xs text-red-700">{errors.faviconUrl}</span>
+            ) : null}
+          </div>
+
+          {values.faviconUrl ? (
+            <div className="flex items-center gap-3 rounded-md border border-line bg-background p-3 text-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={values.faviconUrl}
+                alt="파비콘 미리보기"
+                className="h-10 w-10 rounded-md border border-line bg-white object-contain"
               />
+              <span className="break-all text-muted">{values.faviconUrl}</span>
             </div>
+          ) : null}
+
+          <div className="grid gap-2 text-sm font-medium">
+            캡처 이미지 URL
+            <ScreenshotUploadControl
+              value={values.screenshotUrl}
+              onChange={(url) => updateField("screenshotUrl", url)}
+              onMessage={setMessage}
+              onError={setErrorMessage}
+            />
             {errors.screenshotUrl ? (
               <span className="text-xs text-red-700">{errors.screenshotUrl}</span>
             ) : null}

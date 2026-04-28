@@ -25,6 +25,7 @@ export type ReviewTarget = {
   siteUrl: string;
   domains: string[];
   screenshotUrl: string | null;
+  faviconUrl?: string | null;
   category: string;
   availableStates: string[];
   licenseInfo: string;
@@ -131,6 +132,7 @@ export const sites: ReviewTarget[] = [
     siteUrl: "https://kbetsports.example",
     domains: ["https://kbetsports.example"],
     screenshotUrl: null,
+    faviconUrl: null,
     category: "스포츠토토",
     availableStates: ["서울", "부산", "경기", "인천"],
     licenseInfo:
@@ -149,6 +151,7 @@ export const sites: ReviewTarget[] = [
     siteUrl: "https://royalcasinokr.example",
     domains: ["https://royalcasinokr.example"],
     screenshotUrl: null,
+    faviconUrl: null,
     category: "온라인카지노",
     availableStates: ["서울", "부산", "대구", "경기", "제주"],
     licenseInfo:
@@ -167,6 +170,7 @@ export const sites: ReviewTarget[] = [
     siteUrl: "https://hangangpoker.example",
     domains: ["https://hangangpoker.example"],
     screenshotUrl: null,
+    faviconUrl: null,
     category: "포커",
     availableStates: ["서울", "경기", "인천"],
     licenseInfo:
@@ -185,6 +189,7 @@ export const sites: ReviewTarget[] = [
     siteUrl: "https://esportsbetkr.example",
     domains: ["https://esportsbetkr.example"],
     screenshotUrl: null,
+    faviconUrl: null,
     category: "e스포츠 베팅",
     availableStates: ["서울", "부산", "대전", "광주"],
     licenseInfo:

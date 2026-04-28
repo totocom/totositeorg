@@ -13,7 +13,30 @@ type MetadataResponse = {
   faviconUrl: string;
   finalUrl: string;
   statusCode: number;
+  source?: "metadata-api" | "direct";
 };
+
+type ExternalMetadataResponse = Partial<{
+  ok: unknown;
+  title: unknown;
+  description: unknown;
+  siteName: unknown;
+  site_name: unknown;
+  image: unknown;
+  imageUrl: unknown;
+  image_url: unknown;
+  ogImage: unknown;
+  faviconUrl: unknown;
+  favicon_url: unknown;
+  canonical: unknown;
+  finalUrl: unknown;
+  final_url: unknown;
+  url: unknown;
+  statusCode: unknown;
+  status_code: unknown;
+  status: unknown;
+  error: unknown;
+}>;
 
 const PRIVATE_IPV4_RANGES = [
   /^10\./,
@@ -33,6 +56,34 @@ function getEnv() {
   }
 
   return { supabaseUrl, supabaseAnonKey };
+}
+
+function firstString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function firstNumber(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const numberValue = Number(value);
+
+      if (Number.isFinite(numberValue)) {
+        return numberValue;
+      }
+    }
+  }
+
+  return 0;
 }
 
 function normalizeUrl(value: unknown) {
@@ -151,7 +202,116 @@ function extractMetadata(html: string, finalUrl: string, statusCode: number): Me
     faviconUrl,
     finalUrl,
     statusCode,
+    source: "direct",
   };
+}
+
+function normalizeExternalMetadata(
+  result: ExternalMetadataResponse,
+  fallbackUrl: string,
+): MetadataResponse | null {
+  if (result.ok === false) {
+    return null;
+  }
+
+  const title = firstString(result.title);
+  const description = firstString(result.description);
+  const siteName = firstString(result.siteName, result.site_name);
+  const finalUrl =
+    firstString(result.canonical, result.finalUrl, result.final_url, result.url) ||
+    fallbackUrl;
+  const imageUrl = absolutizeUrl(
+    firstString(result.image, result.imageUrl, result.image_url, result.ogImage),
+    finalUrl,
+  );
+  const faviconUrl = absolutizeUrl(
+    firstString(result.faviconUrl, result.favicon_url),
+    finalUrl,
+  );
+  const statusCode =
+    firstNumber(result.statusCode, result.status_code, result.status) || 200;
+
+  if (isBlockedMetadata(statusCode, title, description)) {
+    return null;
+  }
+
+  if (!title && !description && !siteName && !imageUrl && !faviconUrl) {
+    return null;
+  }
+
+  return {
+    title,
+    description,
+    siteName,
+    imageUrl,
+    faviconUrl,
+    finalUrl,
+    statusCode,
+    source: "metadata-api",
+  };
+}
+
+function isBlockedMetadata(
+  statusCode: number,
+  title: string,
+  description: string,
+) {
+  const normalizedTitle = title.toLowerCase();
+  const normalizedDescription = description.toLowerCase();
+
+  return (
+    statusCode >= 400 ||
+    normalizedTitle.includes("attention required") ||
+    normalizedTitle.includes("cloudflare") ||
+    normalizedDescription.includes("cloudflare")
+  );
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function fetchMetadataWithProxy(targetUrl: string) {
+  const metadataApiUrl = process.env.METADATA_API_URL;
+  const metadataApiKey =
+    process.env.METADATA_API_KEY || process.env.CAPTURE_API_KEY;
+
+  if (!metadataApiUrl || !metadataApiKey) {
+    return null;
+  }
+
+  const response = await fetchWithTimeout(
+    metadataApiUrl,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": metadataApiKey,
+      },
+      body: JSON.stringify({ url: targetUrl }),
+    },
+    20_000,
+  );
+  const result = (await response.json().catch(() => null)) as
+    | ExternalMetadataResponse
+    | null;
+
+  if (!response.ok || !result) {
+    return null;
+  }
+
+  return normalizeExternalMetadata(result, targetUrl);
 }
 
 async function getAdminUser(token: string) {
@@ -201,29 +361,50 @@ export async function POST(request: Request) {
   try {
     await assertPublicHost(targetUrl);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    const response = await fetch(targetUrl, {
-      redirect: "follow",
-      signal: controller.signal,
-      headers: {
-        accept: "text/html,application/xhtml+xml",
-        "user-agent": "Mozilla/5.0 metadata-fetcher",
+    const proxyMetadata = await fetchMetadataWithProxy(targetUrl.toString());
+
+    if (proxyMetadata) {
+      return NextResponse.json(proxyMetadata, { status: 200 });
+    }
+
+    const response = await fetchWithTimeout(
+      targetUrl.toString(),
+      {
+        redirect: "follow",
+        headers: {
+          accept: "text/html,application/xhtml+xml",
+          "user-agent": "Mozilla/5.0 metadata-fetcher",
+        },
       },
-    });
-    clearTimeout(timeoutId);
+      8000,
+    );
 
     const contentType = response.headers.get("content-type") ?? "";
     if (!contentType.toLowerCase().includes("text/html")) {
       return NextResponse.json(
-        { error: "HTML 페이지에서만 도메인 정보를 가져올 수 있습니다." },
+        {
+          error:
+            "자동으로 메타정보를 가져오지 못했습니다. 사이트명, 설명, 이미지는 수동으로 입력하거나 페이지 캡처를 사용해주세요.",
+        },
         { status: 415 },
       );
     }
 
     const html = (await response.text()).slice(0, 500_000);
+    const metadata = extractMetadata(html, response.url, response.status);
+
+    if (isBlockedMetadata(metadata.statusCode, metadata.title, metadata.description)) {
+      return NextResponse.json(
+        {
+          error:
+            "보안 페이지 또는 차단 페이지가 감지되어 메타정보를 자동 반영하지 않았습니다. 사이트명, 설명, 이미지는 수동으로 입력하거나 페이지 캡처를 사용해주세요.",
+        },
+        { status: 400 },
+      );
+    }
+
     return NextResponse.json(
-      extractMetadata(html, response.url, response.status),
+      metadata,
       { status: 200 },
     );
   } catch (error) {
@@ -234,6 +415,11 @@ export async function POST(request: Request) {
           ? error.message
           : "도메인 정보를 가져오지 못했습니다.";
 
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: `${message} 사이트명, 설명, 이미지는 수동으로 입력하거나 페이지 캡처를 사용해주세요.`,
+      },
+      { status: 400 },
+    );
   }
 }
