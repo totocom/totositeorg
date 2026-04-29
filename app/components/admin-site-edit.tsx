@@ -1043,7 +1043,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
               <img
                 src={values.faviconUrl}
                 alt="파비콘 미리보기"
-                className="h-10 w-10 rounded-md border border-line bg-white object-contain"
+                className="favicon-frame h-10 w-10 rounded-md border border-line object-contain"
               />
               <span className="break-all text-muted">{values.faviconUrl}</span>
             </div>

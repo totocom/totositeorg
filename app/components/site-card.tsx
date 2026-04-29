@@ -59,7 +59,7 @@ export function SiteCard({ site }: SiteCardProps) {
       className="group block rounded-xl border border-line bg-surface p-5 shadow-sm transition hover:border-accent/40 hover:neon-card"
     >
       <div className="flex items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-background">
+        <div className="favicon-frame flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line">
           {site.faviconUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
