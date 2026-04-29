@@ -14,6 +14,7 @@ import {
   calculateSiteTrustScore,
   formatRatingScore,
   formatTrustScore,
+  getTrustScoreTone,
   type ReviewTarget,
 } from "@/app/data/sites";
 
@@ -138,36 +139,54 @@ async function getSameIpSites(site: ReviewTarget, currentIps: Set<string>) {
   return matches.filter((match): match is SameIpSite => Boolean(match)).slice(0, 8);
 }
 
+function getTrustToneClasses(tone: string) {
+  if (tone === "danger") {
+    return {
+      text: "text-red-600 dark:text-red-400",
+      border: "border-red-200 dark:border-red-900",
+      background: "bg-red-50 dark:bg-red-950/40",
+      bar: "bg-red-500",
+    };
+  }
+
+  if (tone === "warning") {
+    return {
+      text: "text-yellow-700 dark:text-yellow-300",
+      border: "border-yellow-200 dark:border-yellow-900",
+      background: "bg-yellow-50 dark:bg-yellow-950/40",
+      bar: "bg-yellow-500",
+    };
+  }
+
+  return {
+    text: "text-accent",
+    border: "border-accent/20",
+    background: "bg-accent-soft",
+    bar: "bg-accent",
+  };
+}
+
 function TrustScoreMetric({
   label,
   value,
-  max,
-  tone = "neutral",
 }: {
   label: string;
   value: number;
-  max: number;
-  tone?: "neutral" | "safe" | "danger";
 }) {
-  const percentage = Math.max(0, Math.min(100, (value / max) * 100));
-  const barClass =
-    tone === "danger"
-      ? "bg-red-500"
-      : tone === "safe"
-        ? "bg-accent"
-        : "bg-foreground";
+  const percentage = Math.max(0, Math.min(100, value));
+  const toneClasses = getTrustToneClasses(getTrustScoreTone(value));
 
   return (
     <div className="rounded-lg border border-line bg-background p-3">
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-semibold text-muted">{label}</span>
-        <span className="text-sm font-black text-foreground">
-          {value}/{max}
+        <span className={`text-sm font-black ${toneClasses.text}`}>
+          {value}/100
         </span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
         <div
-          className={`h-full rounded-full ${barClass}`}
+          className={`h-full rounded-full ${toneClasses.bar}`}
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -321,6 +340,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     scamDamageAmountUnknownCount,
     oldestDomainCreationDate: oldestDomainCreationDate ?? undefined,
   });
+  const trustToneClasses = getTrustToneClasses(getTrustScoreTone(trustScore.total));
   const screenshotPreviewUrl = site.screenshotThumbUrl || site.screenshotUrl;
   const logoAlt = `${site.siteName} 토토사이트 로고`;
 
@@ -387,12 +407,14 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
             {/* 오른쪽: 평점 + 먹튀 */}
             <div className="flex shrink-0 flex-row gap-3">
-              <div className="neon-safe flex-1 rounded-xl border border-line bg-accent-soft px-4 py-3 text-center sm:flex-none">
-                <p className="text-xs font-semibold text-accent/80">신뢰 점수</p>
-                <p className="mt-1 text-xl font-black text-accent">
+              <div className={`flex-1 rounded-xl border px-4 py-3 text-center sm:flex-none ${trustToneClasses.border} ${trustToneClasses.background}`}>
+                <p className={`text-xs font-semibold ${trustToneClasses.text}`}>신뢰 점수</p>
+                <p className={`mt-1 text-xl font-black ${trustToneClasses.text}`}>
                   {formatTrustScore(trustScore)}
                 </p>
-                <p className="mt-1 text-xs text-accent/80">먹튀 50 · 도메인 25 · 경험 25</p>
+                <p className="mt-1 text-xs text-muted">
+                  원점수 {trustScore.rawTotal}/300 환산
+                </p>
               </div>
               {scamReportCount > 0 ? (
                 <div className="neon-scam flex-1 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center dark:border-red-900 dark:bg-red-950/40 sm:flex-none">
@@ -438,18 +460,14 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               <TrustScoreMetric
                 label="먹튀 리스크"
                 value={trustScore.scamRisk}
-                max={50}
-                tone={scamReportCount > 0 ? "danger" : "safe"}
               />
               <TrustScoreMetric
                 label="도메인 운영 이력"
                 value={trustScore.domainAge}
-                max={25}
               />
               <TrustScoreMetric
                 label="이용자 경험"
                 value={trustScore.userExperience}
-                max={25}
               />
             </div>
             <p className="mt-3 text-xs leading-5 text-muted">

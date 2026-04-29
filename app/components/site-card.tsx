@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   calculateSiteTrustScore,
   formatTrustScore,
+  getTrustScoreTone,
   type ReviewTarget,
 } from "@/app/data/sites";
 
@@ -37,6 +38,20 @@ function formatDamageAmount(amount: number, unknownCount: number) {
   }
 
   return formattedAmount;
+}
+
+function getTrustToneClasses(score: number) {
+  const tone = getTrustScoreTone(score);
+
+  if (tone === "danger") {
+    return "text-red-600 dark:text-red-400";
+  }
+
+  if (tone === "warning") {
+    return "text-yellow-700 dark:text-yellow-300";
+  }
+
+  return "text-accent";
 }
 
 export function SiteCard({ site }: SiteCardProps) {
@@ -84,7 +99,7 @@ export function SiteCard({ site }: SiteCardProps) {
           </h2>
           <p className="mt-0.5 break-all text-xs text-muted">{site.siteUrl}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="neon-star text-sm font-black text-accent">
+            <span className={`neon-star text-sm font-black ${getTrustToneClasses(trustScore.total)}`}>
               신뢰 점수 {formatTrustScore(trustScore)}
             </span>
             <span className="text-xs text-muted">리뷰 {site.reviewCount}건</span>
@@ -116,7 +131,7 @@ export function SiteCard({ site }: SiteCardProps) {
         </div>
       )}
       <p className="mt-2 text-xs leading-5 text-muted">
-        {trustScore.summary}
+        원점수 {trustScore.rawTotal}/300 환산 · {trustScore.summary}
       </p>
     </Link>
   );

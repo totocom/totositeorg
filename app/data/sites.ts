@@ -47,6 +47,7 @@ export type ReviewTarget = {
 
 export type SiteTrustScore = {
   total: number;
+  rawTotal: number;
   scamRisk: number;
   domainAge: number;
   userExperience: number;
@@ -117,6 +118,12 @@ export function formatTrustScore(score: SiteTrustScore | undefined) {
   return `${score?.total ?? 0}/100`;
 }
 
+export function getTrustScoreTone(score: number) {
+  if (score <= 33) return "danger";
+  if (score <= 67) return "warning";
+  return "safe";
+}
+
 function getDomainAgeMonths(oldestDomainCreationDate?: string) {
   if (!oldestDomainCreationDate) return null;
 
@@ -139,26 +146,26 @@ function calculateScamRiskScore(
   scamDamageAmount = 0,
   scamDamageAmountUnknownCount = 0,
 ) {
-  let score = 50;
+  let score = 100;
 
   if (scamReportCount >= 4) {
-    score = 5;
+    score = 10;
   } else if (scamReportCount >= 2) {
-    score = 20;
+    score = 40;
   } else if (scamReportCount === 1) {
-    score = 35;
+    score = 70;
   }
 
   if (scamDamageAmount >= 10_000_000) {
-    score -= 15;
+    score -= 30;
   } else if (scamDamageAmount >= 5_000_000) {
-    score -= 10;
+    score -= 20;
   } else if (scamDamageAmount >= 1_000_000) {
-    score -= 5;
+    score -= 10;
   }
 
   if (scamDamageAmountUnknownCount > 0) {
-    score -= 3;
+    score -= 6;
   }
 
   return Math.max(0, Math.round(score));
@@ -167,18 +174,18 @@ function calculateScamRiskScore(
 function calculateDomainAgeScore(oldestDomainCreationDate?: string) {
   const ageMonths = getDomainAgeMonths(oldestDomainCreationDate);
 
-  if (ageMonths === null) return 6;
-  if (ageMonths >= 60) return 25;
-  if (ageMonths >= 36) return 20;
-  if (ageMonths >= 12) return 14;
-  if (ageMonths >= 6) return 8;
-  return 4;
+  if (ageMonths === null) return 24;
+  if (ageMonths >= 60) return 100;
+  if (ageMonths >= 36) return 80;
+  if (ageMonths >= 12) return 56;
+  if (ageMonths >= 6) return 32;
+  return 16;
 }
 
 function calculateUserExperienceScore(averageRating = 0, reviewCount = 0) {
-  if (reviewCount <= 0) return 10;
+  if (reviewCount <= 0) return 40;
 
-  const base = Math.max(0, Math.min(5, averageRating)) * 5;
+  const base = Math.max(0, Math.min(5, averageRating)) * 20;
   const reviewWeight = reviewCount >= 5 ? 1 : reviewCount >= 2 ? 0.85 : 0.7;
 
   return Math.round(base * reviewWeight);
@@ -219,9 +226,11 @@ export function calculateSiteTrustScore(params: {
     params.averageRating,
     params.reviewCount,
   );
+  const rawTotal = Math.max(0, Math.min(300, scamRisk + domainAge + userExperience));
 
   return {
-    total: Math.max(0, Math.min(100, scamRisk + domainAge + userExperience)),
+    total: Math.round(rawTotal / 3),
+    rawTotal,
     scamRisk,
     domainAge,
     userExperience,
