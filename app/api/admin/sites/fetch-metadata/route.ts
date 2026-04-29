@@ -182,6 +182,14 @@ function absolutizeUrl(value: string, baseUrl: string) {
   }
 }
 
+function getDefaultFaviconUrl(baseUrl: string) {
+  try {
+    return new URL("/favicon.ico", baseUrl).toString();
+  } catch {
+    return "";
+  }
+}
+
 function extractMetadata(html: string, finalUrl: string, statusCode: number): MetadataResponse {
   const title =
     getMetaContent(html, "og:title") ||
@@ -196,7 +204,7 @@ function extractMetadata(html: string, finalUrl: string, statusCode: number): Me
     getMetaContent(html, "og:image") || getMetaContent(html, "twitter:image"),
     finalUrl,
   );
-  const faviconUrl = absolutizeUrl(
+  const linkedFaviconUrl = absolutizeUrl(
     getTagContent(
       html,
       /<link\s+[^>]*rel=["'][^"']*(?:icon|shortcut icon|apple-touch-icon)[^"']*["'][^>]*href=["']([^"']*)["'][^>]*>/i,
@@ -207,6 +215,7 @@ function extractMetadata(html: string, finalUrl: string, statusCode: number): Me
       ),
     finalUrl,
   );
+  const faviconUrl = linkedFaviconUrl || getDefaultFaviconUrl(finalUrl);
 
   return {
     title,
@@ -241,7 +250,7 @@ function normalizeExternalMetadata(
   const faviconUrl = absolutizeUrl(
     firstString(result.faviconUrl, result.favicon_url),
     finalUrl,
-  );
+  ) || getDefaultFaviconUrl(finalUrl);
   const statusCode =
     firstNumber(result.statusCode, result.status_code, result.status) || 200;
 
@@ -352,9 +361,13 @@ async function storeFaviconUrl(faviconUrl: string) {
     const response = await fetchWithTimeout(
       parsedUrl.toString(),
       {
+        redirect: "follow",
         headers: {
           accept: "image/avif,image/webp,image/png,image/jpeg,image/svg+xml,image/x-icon,image/*,*/*;q=0.8",
-          "user-agent": "Mozilla/5.0 favicon-fetcher",
+          "accept-language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+          referer: `${parsedUrl.origin}/`,
+          "user-agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         },
       },
       10_000,
@@ -412,7 +425,7 @@ async function localizeMetadataFavicon(metadata: MetadataResponse) {
 
   return {
     ...metadata,
-    faviconUrl: storedFaviconUrl,
+    faviconUrl: storedFaviconUrl || metadata.faviconUrl,
   };
 }
 
