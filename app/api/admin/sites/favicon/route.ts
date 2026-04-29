@@ -96,6 +96,42 @@ async function fetchWithTimeout(
   }
 }
 
+function getFetchErrorMessage(error: unknown) {
+  if (error instanceof Error && error.name === "AbortError") {
+    return "파비콘 URL 응답 시간이 초과되었습니다.";
+  }
+
+  if (error instanceof TypeError && error.message === "fetch failed") {
+    const cause = error.cause;
+    const code =
+      cause && typeof cause === "object" && "code" in cause
+        ? String(cause.code)
+        : "";
+
+    if (code === "ENOTFOUND") {
+      return "파비콘 도메인의 DNS를 찾지 못했습니다.";
+    }
+
+    if (code === "ECONNRESET") {
+      return "파비콘 서버가 연결을 중간에 종료했습니다.";
+    }
+
+    if (code === "ETIMEDOUT" || code === "UND_ERR_CONNECT_TIMEOUT") {
+      return "파비콘 서버 연결 시간이 초과되었습니다.";
+    }
+
+    if (code) {
+      return `파비콘 URL에 서버에서 연결하지 못했습니다. (${code})`;
+    }
+
+    return "파비콘 URL에 서버에서 연결하지 못했습니다. 상대 사이트가 서버 요청을 차단했거나 SSL/네트워크 연결이 실패했습니다.";
+  }
+
+  return error instanceof Error
+    ? error.message
+    : "파비콘 파일을 저장소에 복사하지 못했습니다.";
+}
+
 function isLikelyIco(contentType: string, url: URL) {
   return (
     contentType.includes("image/x-icon") ||
@@ -296,10 +332,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "파비콘 파일을 저장소에 복사하지 못했습니다.",
+        error: getFetchErrorMessage(error),
       },
       { status: 400 },
     );

@@ -305,6 +305,42 @@ async function fetchWithTimeout(
   }
 }
 
+function getFetchErrorMessage(error: unknown) {
+  if (error instanceof Error && error.name === "AbortError") {
+    return "사이트 응답 시간이 초과되었습니다.";
+  }
+
+  if (error instanceof TypeError && error.message === "fetch failed") {
+    const cause = error.cause;
+    const code =
+      cause && typeof cause === "object" && "code" in cause
+        ? String(cause.code)
+        : "";
+
+    if (code === "ENOTFOUND") {
+      return "사이트 도메인의 DNS를 찾지 못했습니다.";
+    }
+
+    if (code === "ECONNRESET") {
+      return "상대 사이트가 연결을 중간에 종료했습니다.";
+    }
+
+    if (code === "ETIMEDOUT" || code === "UND_ERR_CONNECT_TIMEOUT") {
+      return "상대 사이트 연결 시간이 초과되었습니다.";
+    }
+
+    if (code) {
+      return `사이트에 서버에서 연결하지 못했습니다. (${code})`;
+    }
+
+    return "사이트에 서버에서 연결하지 못했습니다. 상대 사이트가 서버 요청을 차단했거나 SSL/네트워크 연결이 실패했습니다.";
+  }
+
+  return error instanceof Error
+    ? error.message
+    : "도메인 정보를 가져오지 못했습니다.";
+}
+
 function isLikelyIco(contentType: string, url: URL) {
   return (
     contentType.includes("image/x-icon") ||
@@ -438,27 +474,31 @@ async function fetchMetadataWithProxy(targetUrl: string) {
     return null;
   }
 
-  const response = await fetchWithTimeout(
-    metadataApiUrl,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": metadataApiKey,
+  try {
+    const response = await fetchWithTimeout(
+      metadataApiUrl,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": metadataApiKey,
+        },
+        body: JSON.stringify({ url: targetUrl }),
       },
-      body: JSON.stringify({ url: targetUrl }),
-    },
-    20_000,
-  );
-  const result = (await response.json().catch(() => null)) as
-    | ExternalMetadataResponse
-    | null;
+      20_000,
+    );
+    const result = (await response.json().catch(() => null)) as
+      | ExternalMetadataResponse
+      | null;
 
-  if (!response.ok || !result) {
+    if (!response.ok || !result) {
+      return null;
+    }
+
+    return normalizeExternalMetadata(result, targetUrl);
+  } catch {
     return null;
   }
-
-  return normalizeExternalMetadata(result, targetUrl);
 }
 
 async function getAdminUser(token: string) {
@@ -555,12 +595,7 @@ export async function POST(request: Request) {
       { status: 200 },
     );
   } catch (error) {
-    const message =
-      error instanceof Error && error.name === "AbortError"
-        ? "사이트 응답 시간이 초과되었습니다."
-        : error instanceof Error
-          ? error.message
-          : "도메인 정보를 가져오지 못했습니다.";
+    const message = getFetchErrorMessage(error);
 
     return NextResponse.json(
       {
