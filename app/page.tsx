@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
 
@@ -93,13 +92,12 @@ export default async function Home() {
             <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
                 <div className="flex items-center gap-2">
-                  <Image
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
                     src="/android-chrome-192x192.png"
                     alt="토토사이트 추천 로고"
-                    width={64}
-                    height={64}
-                    sizes="32px"
-                    priority
+                    width="64"
+                    height="64"
                     className="neon-logo h-8 w-8 shrink-0"
                   />
                   <span className="text-sm font-semibold text-white/60">검증된 토토사이트 정보</span>
