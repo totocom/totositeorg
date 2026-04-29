@@ -7,7 +7,6 @@ import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
-import { SameIpSitesSection } from "@/app/components/same-ip-sites-section";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
 import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
@@ -274,7 +273,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
       isLoaded: false,
     };
   });
-  const currentIps = Array.from(new Set(site.resolvedIps ?? [])).sort();
   const scamReportCount = scamReports.length;
   const scamDamageAmount = scamReports.reduce(
     (total, report) => total + Number(report.damageAmount ?? 0),
@@ -466,9 +464,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
         {/* 도메인 & DNS */}
         <DomainInfoTabs items={domainInfoTabs} />
-
-        {/* 동일 IP 사이트 */}
-        <SameIpSitesSection siteId={site.id} currentIps={currentIps} />
 
         {/* 먹튀 피해 이력 */}
         <section id="scam-reports" className="mt-5 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
