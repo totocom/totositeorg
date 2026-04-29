@@ -385,14 +385,16 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               className="group block"
               aria-label={`${site.siteName} 원본 캡처 이미지 보기`}
             >
-              <div className="relative aspect-video w-full bg-background">
+              <div className="px-6 py-4 bg-background">
+                <div className="relative aspect-video w-full max-w-3xl mx-auto overflow-hidden rounded-lg">
                 <Image
                   src={screenshotPreviewUrl}
                   alt={`${site.siteName} 토토사이트 상세 메인 페이지`}
                   fill
-                  sizes="(min-width: 1024px) 896px, (min-width: 640px) calc(100vw - 48px), calc(100vw - 32px)"
+                  sizes="(min-width: 1024px) 768px, (min-width: 640px) calc(100vw - 96px), calc(100vw - 48px)"
                   className="object-cover transition duration-200 group-hover:scale-[1.01]"
                 />
+                </div>
               </div>
             </Link>
           </section>
