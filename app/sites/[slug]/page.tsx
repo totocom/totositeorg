@@ -341,7 +341,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
           {/* 등록 도메인 */}
           {site.domains.length > 1 ? (
-            <div className="border-t border-line px-5 py-3">
+            <div className="px-5 pb-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">등록 도메인</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {site.domains.map((domain) => (
@@ -358,7 +358,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
           {/* 사이트 개요 */}
           {site.shortDescription ? (
-            <div className="border-t border-line px-5 py-4">
+            <div className="px-5 pb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">사이트 개요</p>
               <p className="mt-2 text-sm leading-7 text-foreground">{site.shortDescription}</p>
             </div>
