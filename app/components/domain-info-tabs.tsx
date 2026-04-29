@@ -54,7 +54,7 @@ function DnsRecord({ label, values }: { label: string; values: string[] }) {
                 {canSearchByIp ? (
                   <Link
                     href={`/sites?search=${encodeURIComponent(value)}`}
-                    className="inline-flex h-7 items-center rounded-md border border-line bg-white px-2 text-xs font-semibold text-foreground transition hover:border-accent hover:text-accent"
+                    className="inline-flex h-7 items-center rounded-md border border-line bg-background px-2 text-xs font-semibold text-foreground transition hover:border-accent hover:text-accent"
                   >
                     아이피로 검색
                   </Link>

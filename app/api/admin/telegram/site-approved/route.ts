@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { siteUrl } from "@/lib/config";
+import { getApprovedContentChannelId } from "@/lib/telegram";
 
 export const runtime = "nodejs";
 
@@ -69,6 +70,18 @@ function buildApprovalMessage(site: SiteRow) {
   ].join("\n");
 }
 
+function buildChannelApprovalMessage(site: SiteRow) {
+  const publicUrl = site.slug ? `${siteUrl}/sites/${site.slug}` : site.url;
+
+  return [
+    `${site.name} 사이트가 새로 등록되었습니다.`,
+    "",
+    "새로 공개된 사이트 정보를 확인해보세요.",
+    "",
+    `바로가기: ${publicUrl}`,
+  ].join("\n");
+}
+
 async function sendTelegramMessage(chatId: string, text: string) {
   const token = getTelegramToken();
 
@@ -130,45 +143,63 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!site.user_id) {
-    return NextResponse.json({ ok: true, skipped: "no_user" });
-  }
-
-  const { data: subscription, error: subscriptionError } = await supabase
-    .from("telegram_subscriptions")
-    .select("chat_id")
-    .eq("user_id", site.user_id)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (subscriptionError || !subscription) {
-    return NextResponse.json({ ok: true, skipped: "no_subscription" });
-  }
+  const deliveryErrors: string[] = [];
 
   try {
     await sendTelegramMessage(
-      (subscription as TelegramSubscriptionRow).chat_id,
-      buildApprovalMessage(site as SiteRow),
+      getApprovedContentChannelId(),
+      buildChannelApprovalMessage(site as SiteRow),
     );
-
-    await supabase
-      .from("sites")
-      .update({
-        telegram_notify_enabled: true,
-        telegram_notified_at: new Date().toISOString(),
-      })
-      .eq("id", site.id);
-
-    return NextResponse.json({ ok: true });
   } catch (error) {
+    deliveryErrors.push(
+      `채널 알림 실패: ${
+        error instanceof Error ? error.message : "텔레그램 메시지 전송에 실패했습니다."
+      }`,
+    );
+  }
+
+  if (site.user_id) {
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from("telegram_subscriptions")
+      .select("chat_id")
+      .eq("user_id", site.user_id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (!subscriptionError && subscription) {
+      try {
+        await sendTelegramMessage(
+          (subscription as TelegramSubscriptionRow).chat_id,
+          buildApprovalMessage(site as SiteRow),
+        );
+      } catch (error) {
+        deliveryErrors.push(
+          `등록자 알림 실패: ${
+            error instanceof Error
+              ? error.message
+              : "텔레그램 메시지 전송에 실패했습니다."
+          }`,
+        );
+      }
+    }
+  }
+
+  if (deliveryErrors.length > 0) {
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "텔레그램 메시지 전송에 실패했습니다.",
+        error: deliveryErrors.join(" / "),
       },
       { status: 502 },
     );
   }
+
+  await supabase
+    .from("sites")
+    .update({
+      telegram_notify_enabled: true,
+      telegram_notified_at: new Date().toISOString(),
+    })
+    .eq("id", site.id);
+
+  return NextResponse.json({ ok: true });
 }

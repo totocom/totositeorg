@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getAdminTelegramChatId } from "@/lib/telegram";
 
 export const runtime = "nodejs";
 
@@ -30,10 +31,6 @@ function getEnv() {
 
 function getTelegramToken() {
   return (process.env.TELEGRAM_BOT_TOKEN ?? "").replace(/^bot/i, "").trim();
-}
-
-function getTelegramChatId() {
-  return process.env.TELEGRAM_CHAT_ID?.trim() ?? "";
 }
 
 async function getAuthenticatedSupabase(token: string) {
@@ -89,7 +86,7 @@ function buildSubmissionMessage(
 
 async function sendTelegramMessage(text: string) {
   const token = getTelegramToken();
-  const chatId = getTelegramChatId();
+  const chatId = getAdminTelegramChatId();
 
   if (!token) {
     throw new Error("TELEGRAM_BOT_TOKEN 환경변수가 설정되지 않았습니다.");

@@ -388,6 +388,15 @@ create table if not exists public.telegram_signup_codes (
   )
 );
 
+create table if not exists public.site_telegram_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  site_id uuid not null references public.sites(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+
+  constraint site_telegram_subscriptions_site_user_unique unique (site_id, user_id)
+);
+
 create table if not exists public.domain_whois_cache (
   domain text primary key,
   payload jsonb not null,
@@ -573,6 +582,12 @@ create index if not exists telegram_subscriptions_chat_id_idx
 
 create index if not exists telegram_signup_codes_code_idx
   on public.telegram_signup_codes (verification_code);
+
+create index if not exists site_telegram_subscriptions_site_id_idx
+  on public.site_telegram_subscriptions (site_id);
+
+create index if not exists site_telegram_subscriptions_user_id_idx
+  on public.site_telegram_subscriptions (user_id);
 
 create index if not exists domain_whois_cache_expires_at_idx
   on public.domain_whois_cache (expires_at);
@@ -855,6 +870,7 @@ alter table public.profiles enable row level security;
 alter table public.admin_ip_allowlist enable row level security;
 alter table public.telegram_subscriptions enable row level security;
 alter table public.telegram_signup_codes enable row level security;
+alter table public.site_telegram_subscriptions enable row level security;
 alter table public.domain_whois_cache enable row level security;
 alter table public.site_dns_records enable row level security;
 alter table public.site_domain_submissions enable row level security;
@@ -1065,6 +1081,27 @@ on public.telegram_subscriptions
 for select
 using (user_id = auth.uid());
 
+drop policy if exists "Users can read own site telegram subscriptions"
+  on public.site_telegram_subscriptions;
+create policy "Users can read own site telegram subscriptions"
+on public.site_telegram_subscriptions
+for select
+using (user_id = auth.uid());
+
+drop policy if exists "Users can insert own site telegram subscriptions"
+  on public.site_telegram_subscriptions;
+create policy "Users can insert own site telegram subscriptions"
+on public.site_telegram_subscriptions
+for insert
+with check (user_id = auth.uid());
+
+drop policy if exists "Users can delete own site telegram subscriptions"
+  on public.site_telegram_subscriptions;
+create policy "Users can delete own site telegram subscriptions"
+on public.site_telegram_subscriptions
+for delete
+using (user_id = auth.uid());
+
 -- Admin moderation policies:
 -- Admins can read and update all sites/reviews for moderation.
 drop policy if exists "Admins can read all sites" on public.sites;
@@ -1144,6 +1181,14 @@ create policy "Admins can read telegram subscriptions"
 on public.telegram_subscriptions
 for select
 using (public.is_admin());
+
+drop policy if exists "Admins can manage site telegram subscriptions"
+  on public.site_telegram_subscriptions;
+create policy "Admins can manage site telegram subscriptions"
+on public.site_telegram_subscriptions
+for all
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "Admins can read profiles" on public.profiles;
 create policy "Admins can read profiles"

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getAdminTelegramChatId } from "@/lib/telegram";
 
 export const runtime = "nodejs";
 
@@ -35,10 +36,6 @@ function getEnv() {
 
 function getTelegramToken() {
   return (process.env.TELEGRAM_BOT_TOKEN ?? "").replace(/^bot/i, "").trim();
-}
-
-function getAdminTelegramChatId() {
-  return process.env.TELEGRAM_CHAT_ID?.trim() ?? "";
 }
 
 async function getAuthenticatedUser(token: string) {

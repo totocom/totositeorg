@@ -22,6 +22,12 @@ type TelegramUpdate = {
   message?: TelegramMessage;
 };
 
+type SiteRow = {
+  id: string;
+  name: string;
+  slug: string | null;
+};
+
 function getEnv() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -53,7 +59,33 @@ function getStartPayload(text: string) {
   return match?.[1]?.trim() ?? "";
 }
 
-async function sendTelegramMessage(chatId: string, text: string) {
+function getStopSlug(text: string) {
+  const match = text.trim().match(/^\/stop(?:@\w+)?\s+([a-z0-9]+(?:-[a-z0-9]+)*)$/i);
+  return match?.[1]?.toLowerCase() ?? "";
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function getUnsubscriptionMessage(site: SiteRow) {
+  return [
+    "🔕 <b>텔레그램 알림 구독이 해제되었습니다</b>",
+    "",
+    "🏷 <b>사이트</b>",
+    escapeHtml(site.name),
+    "",
+    "⚪ <b>구독 상태</b>",
+    "알림 수신 중지",
+    "",
+    "이 사이트의 새 평가나 제보 알림은 더 이상 전송되지 않습니다.",
+  ].join("\n");
+}
+
+async function sendTelegramMessage(chatId: string, text: string, parseMode?: "HTML") {
   const token = getTelegramToken();
 
   if (!token) {
@@ -68,6 +100,7 @@ async function sendTelegramMessage(chatId: string, text: string) {
     body: JSON.stringify({
       chat_id: chatId,
       text,
+      parse_mode: parseMode,
       disable_web_page_preview: true,
     }),
   });
@@ -87,14 +120,68 @@ export async function POST(request: Request) {
   const from = message?.from;
   const text = message?.text ?? "";
   const payload = getStartPayload(text);
+  const stopSlug = getStopSlug(text);
 
-  if (!chatId || !from || !payload) {
+  if (!chatId || !from || (!payload && !stopSlug)) {
     return NextResponse.json({ ok: true });
   }
 
   const signupCode = getSignupCode(payload);
   const { supabaseUrl, serviceRoleKey } = getEnv();
   const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  if (stopSlug) {
+    const { data: telegramSubscription } = await supabase
+      .from("telegram_subscriptions")
+      .select("user_id")
+      .eq("chat_id", String(chatId))
+      .eq("is_active", true)
+      .maybeSingle<{ user_id: string }>();
+
+    if (!telegramSubscription) {
+      await sendTelegramMessage(
+        String(chatId),
+        "연결된 계정이 없습니다. 사이트에서 로그인 후 텔레그램을 먼저 연결해주세요.",
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    const { data: site } = await supabase
+      .from("sites")
+      .select("id, name, slug")
+      .eq("slug", stopSlug)
+      .maybeSingle<SiteRow>();
+
+    if (!site) {
+      await sendTelegramMessage(
+        String(chatId),
+        "구독 해제할 사이트를 찾지 못했습니다. 명령어의 사이트 주소를 확인해주세요.",
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    const { error } = await supabase
+      .from("site_telegram_subscriptions")
+      .delete()
+      .eq("site_id", site.id)
+      .eq("user_id", telegramSubscription.user_id);
+
+    if (error) {
+      await sendTelegramMessage(
+        String(chatId),
+        "구독 해제에 실패했습니다. 잠시 후 다시 시도해주세요.",
+      );
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    await sendTelegramMessage(
+      String(chatId),
+      getUnsubscriptionMessage(site),
+      "HTML",
+    );
+
+    return NextResponse.json({ ok: true });
+  }
 
   if (signupCode) {
     const { error } = await supabase.from("telegram_signup_codes").upsert(

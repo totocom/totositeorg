@@ -197,7 +197,7 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
                     {report.authorNickname ?? "익명"}
                   </p>
                 </div>
-                <p className="w-fit rounded-md bg-red-50 px-3 py-1 text-sm font-semibold text-red-700">
+                <p className="w-fit rounded-md bg-red-50 px-3 py-1 text-sm font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-400">
                   {formatDamageAmount(
                     report.damageAmount,
                     report.damageAmountUnknown,

@@ -577,7 +577,7 @@ export function SubmitReviewForm({
                         "rounded-md px-3 py-2 text-left text-sm transition",
                         selected
                           ? "bg-accent text-white"
-                          : "bg-white text-foreground hover:bg-accent-soft hover:text-accent",
+                          : "bg-background text-foreground hover:bg-accent-soft hover:text-accent",
                       ].join(" ")}
                     >
                       {site.siteName}
@@ -643,7 +643,7 @@ export function SubmitReviewForm({
                             "flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm transition",
                             checked
                               ? "border-accent bg-accent-soft text-accent"
-                              : "border-line bg-white text-muted hover:text-foreground",
+                              : "border-line bg-background text-muted hover:text-foreground",
                           ].join(" ")}
                         >
                           <input
@@ -688,7 +688,7 @@ export function SubmitReviewForm({
       <button
         type="submit"
         disabled={formStatus === "submitting" || !user}
-        className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50"
+        className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95 disabled:opacity-50"
       >
         {formStatus === "submitting"
           ? "저장 중..."

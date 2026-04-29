@@ -6,6 +6,20 @@ import { useAuth } from "@/app/components/auth-provider";
 import { formatRatingScore, moderationStatusLabels } from "@/app/data/sites";
 import { supabase } from "@/lib/supabase/client";
 
+function StatusBadge({ status }: { status: keyof typeof moderationStatusLabels }) {
+  const colorClass =
+    status === "approved"
+      ? "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400"
+      : status === "rejected"
+        ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"
+        : "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400";
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${colorClass}`}>
+      {moderationStatusLabels[status]}
+    </span>
+  );
+}
+
 type UserSite = {
   id: string;
   name: string;
@@ -247,9 +261,7 @@ export function AccountDashboard() {
                     </p>
                     <h3 className="mt-1 font-semibold">{review.title}</h3>
                   </div>
-                  <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold">
-                    {moderationStatusLabels[review.status]}
-                  </span>
+                  <StatusBadge status={review.status} />
                 </div>
                 <p className="mt-2 text-sm text-muted">
                   평점 {formatRatingScore(review.rating)} ·{" "}
@@ -289,9 +301,7 @@ export function AccountDashboard() {
                       {(report.damage_types ?? []).join(", ") || "피해 유형 미입력"}
                     </h3>
                   </div>
-                  <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold">
-                    {moderationStatusLabels[report.review_status]}
-                  </span>
+                  <StatusBadge status={report.review_status} />
                 </div>
                 <p className="mt-2 text-sm text-muted">
                   제보일 {formatDate(report.created_at)} ·{" "}
@@ -324,17 +334,12 @@ export function AccountDashboard() {
               >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase text-accent">
-                      {site.category}
-                    </p>
-                    <h3 className="mt-1 font-semibold">{site.name}</h3>
+                    <h3 className="font-semibold">{site.name}</h3>
                     <p className="mt-1 break-all text-sm text-muted">
                       {site.url}
                     </p>
                   </div>
-                  <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold">
-                    {moderationStatusLabels[site.status]}
-                  </span>
+                  <StatusBadge status={site.status} />
                 </div>
                 <p className="mt-2 text-sm text-muted">
                   제보일 {formatDate(site.created_at)}

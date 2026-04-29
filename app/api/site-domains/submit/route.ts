@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { siteUrl } from "@/lib/config";
+import { getAdminTelegramChatId } from "@/lib/telegram";
 
 export const runtime = "nodejs";
 
@@ -40,10 +41,6 @@ function getEnv() {
 
 function getTelegramToken() {
   return (process.env.TELEGRAM_BOT_TOKEN ?? "").replace(/^bot/i, "").trim();
-}
-
-function getTelegramChatId() {
-  return process.env.TELEGRAM_CHAT_ID?.trim() ?? "";
 }
 
 function normalizeUrl(value: unknown) {
@@ -108,7 +105,7 @@ function getTelegramDisplayName(subscription: TelegramSubscriptionRow | null) {
 
 async function sendTelegramMessage(text: string) {
   const token = getTelegramToken();
-  const chatId = getTelegramChatId();
+  const chatId = getAdminTelegramChatId();
 
   if (!token || !chatId) return;
 

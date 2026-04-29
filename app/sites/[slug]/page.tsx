@@ -7,6 +7,7 @@ import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
+import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
 import { getPublicWhoisInfo } from "@/app/data/domain-whois";
 import { getPublicSiteDetail, getPublicSites } from "@/app/data/public-sites";
 import { formatRatingScore, type ReviewTarget } from "@/app/data/sites";
@@ -389,6 +390,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
         </article>
 
+        <SiteTelegramAlertSubscription siteId={site.id} siteName={site.siteName} />
+
         {/* 스크린샷 */}
         {site.screenshotUrl && screenshotPreviewUrl ? (
           <section className="mt-5 overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
@@ -500,7 +503,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </div>
           ) : (
             <div className="p-10 text-center">
-              <p className="text-3xl">🛡️</p>
+              <p className="text-3xl">⚠️</p>
               <h3 className="mt-3 font-bold">아직 승인된 피해 제보가 없습니다</h3>
               <p className="mt-2 text-sm text-muted">
                 이 사이트에 대한 먹튀 피해 이력은 관리자 검토 후 공개됩니다.

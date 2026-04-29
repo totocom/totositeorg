@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { siteUrl } from "@/lib/config";
+import { getApprovedContentChannelId } from "@/lib/telegram";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,12 @@ type SiteRow = {
 };
 
 type TelegramSubscriptionRow = {
+  user_id?: string;
   chat_id: string;
+};
+
+type SiteTelegramSubscriptionRow = {
+  user_id: string;
 };
 
 function getEnv() {
@@ -37,10 +43,6 @@ function getEnv() {
 
 function getTelegramToken() {
   return (process.env.TELEGRAM_BOT_TOKEN ?? "").replace(/^bot/i, "").trim();
-}
-
-function getApprovedContentChannelId() {
-  return process.env.TELEGRAM_APPROVED_CONTENT_CHANNEL_ID?.trim() || "@totosite_org";
 }
 
 async function getIsAdmin(token: string) {
@@ -103,6 +105,19 @@ function getChannelApprovedMessage(type: ContentType, site: SiteRow) {
     `${site.name} ${label}가 승인되었습니다.`,
     "",
     "새로 공개된 게시물을 확인해보세요.",
+    "",
+    `바로가기: ${contentUrl}`,
+  ].join("\n");
+}
+
+function getSiteSubscriberMessage(type: ContentType, site: SiteRow) {
+  const label = type === "scam_report" ? "먹튀 피해 제보" : "만족도 평가";
+  const contentUrl = getSiteContentUrl(type, site);
+
+  return [
+    `🔔 ${site.name} 새 ${label} 공개`,
+    "",
+    "구독한 사이트에 새 게시물이 승인되어 공개되었습니다.",
     "",
     `바로가기: ${contentUrl}`,
   ].join("\n");
@@ -252,6 +267,53 @@ export async function POST(request: Request) {
               : "텔레그램 메시지 전송에 실패했습니다."
           }`,
         );
+      }
+    }
+  }
+
+  const { data: siteSubscriptions, error: siteSubscriptionError } = await supabase
+    .from("site_telegram_subscriptions")
+    .select("user_id")
+    .eq("site_id", site.id)
+    .returns<SiteTelegramSubscriptionRow[]>();
+
+  if (siteSubscriptionError) {
+    deliveryErrors.push(`구독자 조회 실패: ${siteSubscriptionError.message}`);
+  } else {
+    const subscriberUserIds = Array.from(
+      new Set(
+        (siteSubscriptions ?? [])
+          .map((subscription) => subscription.user_id)
+          .filter((userId) => userId && userId !== content.user_id),
+      ),
+    );
+
+    if (subscriberUserIds.length > 0) {
+      const { data: subscriberChats, error: subscriberChatError } = await supabase
+        .from("telegram_subscriptions")
+        .select("user_id, chat_id")
+        .in("user_id", subscriberUserIds)
+        .eq("is_active", true)
+        .returns<TelegramSubscriptionRow[]>();
+
+      if (subscriberChatError) {
+        deliveryErrors.push(`구독자 텔레그램 조회 실패: ${subscriberChatError.message}`);
+      } else {
+        const subscriberMessage = getSiteSubscriberMessage(type, site);
+
+        for (const subscriberChat of subscriberChats ?? []) {
+          try {
+            await sendTelegramMessage(subscriberChat.chat_id, subscriberMessage);
+          } catch (error) {
+            deliveryErrors.push(
+              `구독자 알림 실패: ${
+                error instanceof Error
+                  ? error.message
+                  : "텔레그램 메시지 전송에 실패했습니다."
+              }`,
+            );
+          }
+        }
       }
     }
   }

@@ -137,7 +137,7 @@ const categoryDetailQuestions = [
     id: "otherBettingItems",
     parent: "기타 베팅",
     label: "기타 베팅 세부 항목",
-    options: ["이벤트 베팅", "가상 스포츠", "라이브 베팅", "특수 베팅"],
+    options: ["이벤트 베팅", "가상 스포츠", "라이브 베팅", "특수 베팅", "기타"],
   },
 ] as const;
 const damageTypes = [
@@ -448,8 +448,17 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
       const nextValues = currentValues.includes(value)
         ? currentValues.filter((item) => item !== value)
         : [...currentValues, value];
+      const nextValue = { ...current, [key]: nextValues };
 
-      return { ...current, [key]: nextValues };
+      if (key === "damageTypes" && value === "기타" && !nextValues.includes("기타")) {
+        return { ...nextValue, damageTypeEtcText: "" };
+      }
+
+      if (key === "otherBettingItems" && value === "기타" && !nextValues.includes("기타")) {
+        return { ...nextValue, categoryEtcText: "" };
+      }
+
+      return nextValue;
     });
     setErrors((current) => ({ ...current, [key]: undefined }));
   }
@@ -537,9 +546,13 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
         usage_period: values.usagePeriod,
         main_category: values.mainCategories.join(", "),
         category_items: detailItems,
-        category_etc_text: values.categoryEtcText.trim() || null,
+        category_etc_text: values.otherBettingItems.includes("기타")
+          ? values.categoryEtcText.trim() || null
+          : null,
         damage_types: values.damageTypes,
-        damage_type_etc_text: values.damageTypeEtcText.trim() || null,
+        damage_type_etc_text: values.damageTypes.includes("기타")
+          ? values.damageTypeEtcText.trim() || null
+          : null,
         damage_amount: values.damageAmountUnknown ? null : parseNumber(values.damageAmount),
         damage_amount_unknown: values.damageAmountUnknown,
         situation_description: values.situationDescription.trim(),
@@ -706,7 +719,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
                         "rounded-md px-3 py-2 text-left text-sm transition",
                         selected
                           ? "bg-accent text-white"
-                          : "bg-white text-foreground hover:bg-accent-soft hover:text-accent",
+                          : "bg-background text-foreground hover:bg-accent-soft hover:text-accent",
                       ].join(" ")}
                     >
                       {site.siteName}
@@ -758,7 +771,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
               <button
                 type="button"
                 onClick={scrollToReportForm}
-                className="h-10 rounded-md border border-accent px-3 text-sm font-semibold text-accent transition hover:bg-white"
+                className="h-10 rounded-md border border-accent px-3 text-sm font-semibold text-accent transition hover:bg-accent-soft"
               >
                 작성한 먹튀 제보 수정하기
               </button>
@@ -773,7 +786,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
               </p>
               <Link
                 href={`/submit-review?siteId=${encodeURIComponent(values.siteId)}`}
-                className="inline-flex h-10 items-center justify-center rounded-md border border-accent px-3 text-sm font-semibold text-accent transition hover:bg-white"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-accent px-3 text-sm font-semibold text-accent transition hover:bg-accent-soft"
               >
                 작성한 만족도 평가 수정하기
               </Link>
@@ -816,7 +829,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
               <select
                 value={values.usagePeriod}
                 onChange={(event) => updateField("usagePeriod", event.target.value)}
-                className="h-11 rounded-md border border-line bg-white px-3 text-sm"
+                className="h-11 rounded-md border border-line bg-background px-3 text-sm"
               >
                 <option value="">선택</option>
                 {usagePeriods.map((period) => (
@@ -860,7 +873,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
             ) : null,
           )}
 
-          {values.mainCategories.includes("기타 베팅") ? (
+          {values.otherBettingItems.includes("기타") ? (
             <input
               value={values.categoryEtcText}
               onChange={(event) => updateField("categoryEtcText", event.target.value)}
@@ -881,12 +894,14 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
                 />
               ))}
             </div>
-            <input
-              value={values.damageTypeEtcText}
-              onChange={(event) => updateField("damageTypeEtcText", event.target.value)}
-              className="h-11 rounded-md border border-line px-3 text-sm"
-              placeholder="기타 피해 유형"
-            />
+            {values.damageTypes.includes("기타") ? (
+              <input
+                value={values.damageTypeEtcText}
+                onChange={(event) => updateField("damageTypeEtcText", event.target.value)}
+                className="h-11 rounded-md border border-line px-3 text-sm"
+                placeholder="기타 피해 유형"
+              />
+            ) : null}
             {errors.damageTypes ? <span className="text-xs text-red-700">{errors.damageTypes}</span> : null}
           </fieldset>
 
@@ -983,7 +998,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
           <button
             type="submit"
             disabled={isSubmitting || !user}
-            className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50"
+            className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95 disabled:opacity-50"
           >
             {isSubmitting
               ? "제출 중..."
@@ -1012,7 +1027,7 @@ function ChoicePill({
       className={`rounded-full border px-3 py-2 text-sm font-semibold transition ${
         checked
           ? "border-accent bg-accent-soft text-accent"
-          : "border-line bg-white text-muted hover:text-foreground"
+          : "border-line bg-background text-muted hover:text-foreground"
       }`}
     >
       {label}
