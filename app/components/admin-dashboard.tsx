@@ -697,6 +697,41 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     }`;
   }
 
+  async function getAdminToken() {
+    const { data: sessionResult } = await supabase.auth.getSession();
+    return sessionResult.session?.access_token ?? "";
+  }
+
+  async function storeFaviconUrl(faviconUrl: string) {
+    const trimmedUrl = faviconUrl.trim();
+
+    if (!trimmedUrl) return "";
+
+    const token = await getAdminToken();
+
+    if (!token) {
+      throw new Error("관리자 로그인 세션을 확인하지 못했습니다.");
+    }
+
+    const response = await fetch("/api/admin/sites/favicon", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ url: trimmedUrl }),
+    });
+    const result = (await response.json().catch(() => null)) as
+      | { faviconUrl?: string; error?: string }
+      | null;
+
+    if (!response.ok || !result?.faviconUrl) {
+      throw new Error(result?.error ?? "파비콘 파일을 저장소에 복사하지 못했습니다.");
+    }
+
+    return result.faviconUrl;
+  }
+
   async function deleteItem(table: "sites" | "reviews" | "scam_reports", id: string) {
     const confirmed = window.confirm(
       table === "sites"
@@ -1163,6 +1198,20 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setSiteFormMessage("");
     setSiteFormErrorMessage("");
 
+    let faviconUrl = "";
+
+    try {
+      faviconUrl = await storeFaviconUrl(siteFormValues.faviconUrl);
+    } catch (error) {
+      setIsCreatingSite(false);
+      setSiteFormErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "파비콘 파일을 저장소에 복사하지 못했습니다.",
+      );
+      return;
+    }
+
     const { data: insertedSite, error: insertError } = await supabase
       .from("sites")
       .insert({
@@ -1174,7 +1223,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
         url: siteFormValues.url.trim(),
         domains: getDomainList(siteFormValues),
         screenshot_url: pageCaptureUrl.trim() || null,
-        favicon_url: siteFormValues.faviconUrl.trim() || null,
+        favicon_url: faviconUrl || null,
         category: defaultSiteCategory,
         available_states: ["전체"],
         license_info: defaultLicenseInfo,

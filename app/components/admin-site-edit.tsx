@@ -360,6 +360,36 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     return sessionResult.session?.access_token ?? "";
   }
 
+  async function storeFaviconUrl(faviconUrl: string) {
+    const trimmedUrl = faviconUrl.trim();
+
+    if (!trimmedUrl) return "";
+
+    const token = await getAdminToken();
+
+    if (!token) {
+      throw new Error("관리자 로그인 세션을 확인하지 못했습니다.");
+    }
+
+    const response = await fetch("/api/admin/sites/favicon", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ url: trimmedUrl }),
+    });
+    const result = (await response.json().catch(() => null)) as
+      | { faviconUrl?: string; error?: string }
+      | null;
+
+    if (!response.ok || !result?.faviconUrl) {
+      throw new Error(result?.error ?? "파비콘 파일을 저장소에 복사하지 못했습니다.");
+    }
+
+    return result.faviconUrl;
+  }
+
   async function fetchSiteMetadata() {
     setMessage("");
     setErrorMessage("");
@@ -590,6 +620,20 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     setMessage("");
     setErrorMessage("");
 
+    let faviconUrl = "";
+
+    try {
+      faviconUrl = await storeFaviconUrl(values.faviconUrl);
+    } catch (error) {
+      setIsSaving(false);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "파비콘 파일을 저장소에 복사하지 못했습니다.",
+      );
+      return;
+    }
+
     const { error } = await supabase
       .from("sites")
       .update({
@@ -599,7 +643,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         url: values.url.trim(),
         domains: getDomainList(values),
         screenshot_url: values.screenshotUrl.trim() || null,
-        favicon_url: values.faviconUrl.trim() || null,
+        favicon_url: faviconUrl || null,
         description: values.description.trim(),
       })
       .eq("id", siteId);
