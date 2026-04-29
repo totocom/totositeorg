@@ -407,7 +407,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
             {/* 오른쪽: 평점 + 먹튀 */}
             <div className="flex shrink-0 flex-row gap-3">
-              <div className={`flex-1 rounded-xl border px-4 py-3 text-center sm:flex-none ${trustToneClasses.border} ${trustToneClasses.background}`}>
+              <div className={`neon-safe flex-1 rounded-xl border px-4 py-3 text-center sm:flex-none ${trustToneClasses.border} ${trustToneClasses.background}`}>
                 <p className={`text-xs font-semibold ${trustToneClasses.text}`}>신뢰 점수</p>
                 <p className={`mt-1 text-xl font-black ${trustToneClasses.text}`}>
                   {formatTrustScore(trustScore)}
