@@ -55,6 +55,12 @@ textarea {
   .neon-safe {
     box-shadow: 0 0 8px #00b67a44, 0 0 16px #00b67a22;
   }
+  .neon-warning {
+    box-shadow: 0 0 8px #eab30855, 0 0 16px #eab30822;
+  }
+  .neon-danger {
+    box-shadow: 0 0 8px #ef444455, 0 0 16px #ef444422;
+  }
   .neon-scam {
     box-shadow: 0 0 8px #ef444455, 0 0 16px #ef444422;
   }

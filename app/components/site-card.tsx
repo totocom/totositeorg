@@ -131,7 +131,7 @@ export function SiteCard({ site }: SiteCardProps) {
         </div>
       )}
       <p className="mt-2 text-xs leading-5 text-muted">
-        원점수 {trustScore.rawTotal}/300 환산 · {trustScore.summary}
+        {trustScore.summary}
       </p>
     </Link>
   );

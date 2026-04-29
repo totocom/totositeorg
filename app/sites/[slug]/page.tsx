@@ -146,6 +146,7 @@ function getTrustToneClasses(tone: string) {
       border: "border-red-200 dark:border-red-900",
       background: "bg-red-50 dark:bg-red-950/40",
       bar: "bg-red-500",
+      neon: "neon-danger",
     };
   }
 
@@ -155,6 +156,7 @@ function getTrustToneClasses(tone: string) {
       border: "border-yellow-200 dark:border-yellow-900",
       background: "bg-yellow-50 dark:bg-yellow-950/40",
       bar: "bg-yellow-500",
+      neon: "neon-warning",
     };
   }
 
@@ -163,6 +165,7 @@ function getTrustToneClasses(tone: string) {
     border: "border-accent/20",
     background: "bg-accent-soft",
     bar: "bg-accent",
+    neon: "neon-safe",
   };
 }
 
@@ -407,13 +410,10 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
             {/* 오른쪽: 평점 + 먹튀 */}
             <div className="flex shrink-0 flex-row gap-3">
-              <div className={`neon-safe flex-1 rounded-xl border px-4 py-3 text-center sm:flex-none ${trustToneClasses.border} ${trustToneClasses.background}`}>
+              <div className={`${trustToneClasses.neon} flex-1 rounded-xl border px-4 py-3 text-center sm:flex-none ${trustToneClasses.border} ${trustToneClasses.background}`}>
                 <p className={`text-xs font-semibold ${trustToneClasses.text}`}>신뢰 점수</p>
                 <p className={`mt-1 text-xl font-black ${trustToneClasses.text}`}>
                   {formatTrustScore(trustScore)}
-                </p>
-                <p className="mt-1 text-xs text-muted">
-                  원점수 {trustScore.rawTotal}/300 환산
                 </p>
               </div>
               {scamReportCount > 0 ? (
