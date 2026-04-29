@@ -11,6 +11,7 @@ type ContentRow = {
   id: string;
   site_id: string;
   user_id: string | null;
+  rating?: number | null;
   damage_amount?: number | null;
   damage_amount_unknown?: boolean | null;
 };
@@ -86,7 +87,7 @@ function getSiteContentUrl(type: ContentType, site: SiteRow) {
 }
 
 function getApprovedMessage(type: ContentType, site: SiteRow) {
-  const label = type === "scam_report" ? "먹튀 제보" : "만족도 평가";
+  const label = type === "scam_report" ? "먹튀 제보" : "이용 만족 평가";
   const contentUrl = getSiteContentUrl(type, site);
 
   return [
@@ -105,6 +106,13 @@ function formatDamageAmount(content: ContentRow) {
   }
 
   return `${Number(content.damage_amount).toLocaleString("ko-KR")}원`;
+}
+
+function formatReviewScore(content: ContentRow) {
+  const rating = Number(content.rating ?? 0);
+  const score = Math.max(0, Math.min(100, Math.round(rating * 20)));
+
+  return score.toLocaleString("ko-KR");
 }
 
 function getScamReportApprovedMessage(site: SiteRow, content: ContentRow) {
@@ -127,6 +135,26 @@ function getScamReportApprovedMessage(site: SiteRow, content: ContentRow) {
   ].join("\n");
 }
 
+function getReviewApprovedMessage(site: SiteRow, content: ContentRow) {
+  const contentUrl = getSiteContentUrl("review", site);
+
+  return [
+    "✅ 이용 만족 평가 승인 안내",
+    "",
+    "🏷 사이트명",
+    site.name,
+    "",
+    "⭐ 평가 점수",
+    `${formatReviewScore(content)}점 / 100점`,
+    "",
+    "해당 사이트에 등록된 이용 만족 평가가 승인되어 공개되었습니다.",
+    "새로 공개된 평가 내용을 확인해보세요.",
+    "",
+    "🔗 바로가기",
+    contentUrl,
+  ].join("\n");
+}
+
 function getChannelApprovedMessage(
   type: ContentType,
   site: SiteRow,
@@ -136,15 +164,7 @@ function getChannelApprovedMessage(
     return getScamReportApprovedMessage(site, content);
   }
 
-  const contentUrl = getSiteContentUrl(type, site);
-
-  return [
-    `${site.name} 만족도 평가가 승인되었습니다.`,
-    "",
-    "새로 공개된 게시물을 확인해보세요.",
-    "",
-    `바로가기: ${contentUrl}`,
-  ].join("\n");
+  return getReviewApprovedMessage(site, content);
 }
 
 function getSiteSubscriberMessage(
@@ -156,15 +176,7 @@ function getSiteSubscriberMessage(
     return getScamReportApprovedMessage(site, content);
   }
 
-  const contentUrl = getSiteContentUrl(type, site);
-
-  return [
-    `🔔 ${site.name} 새 만족도 평가 공개`,
-    "",
-    "구독한 사이트에 새 게시물이 승인되어 공개되었습니다.",
-    "",
-    `바로가기: ${contentUrl}`,
-  ].join("\n");
+  return getReviewApprovedMessage(site, content);
 }
 
 async function sendTelegramMessage(chatId: string, text: string) {
@@ -203,7 +215,7 @@ async function getContent(
   if (type === "review") {
     const { data, error } = await supabase
       .from("reviews")
-      .select("id, site_id, user_id")
+      .select("id, site_id, user_id, rating")
       .eq("id", contentId)
       .eq("status", "approved")
       .maybeSingle<ContentRow>();
@@ -301,7 +313,9 @@ export async function POST(request: Request) {
       try {
         await sendTelegramMessage(
           subscription.chat_id,
-          getApprovedMessage(type, site),
+          type === "review"
+            ? getReviewApprovedMessage(site, content)
+            : getApprovedMessage(type, site),
         );
       } catch (error) {
         deliveryErrors.push(
