@@ -23,7 +23,6 @@ export function getApprovedContentChannelId() {
   return (
     normalizeTelegramChatId(process.env.TELEGRAM_APPROVED_CONTENT_CHANNEL_ID) ||
     normalizeTelegramChatId(process.env.TELEGRAM_CHANNEL_ID) ||
-    normalizeTelegramChatId(process.env.TELEGRAM_CHAT_ID) ||
     defaultPublicChannelId
   );
 }
