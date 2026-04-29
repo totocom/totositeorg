@@ -288,30 +288,50 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           {/* 상단: 로고 + 이름 + 뱃지 */}
           <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between">
             {/* 왼쪽 */}
-            <div className="flex min-w-0 items-start gap-4">
-              {site.faviconUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={site.faviconUrl}
-                  alt={logoAlt}
-                  className="h-16 w-16 shrink-0 rounded-xl border border-line bg-white object-contain p-1.5 dark:bg-surface"
-                />
-              ) : (
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-line bg-background text-xl font-bold text-accent">
-                  {site.siteName.trim().charAt(0)}
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-start gap-4">
+                {site.faviconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={site.faviconUrl}
+                    alt={logoAlt}
+                    className="h-16 w-16 shrink-0 rounded-xl border border-line bg-white object-contain p-1.5 dark:bg-surface"
+                  />
+                ) : (
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-line bg-background text-xl font-bold text-accent">
+                    {site.siteName.trim().charAt(0)}
+                  </div>
+                )}
+                <div className="min-w-0 pt-0.5">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-accent">
+                    ✓ 등록 검토 완료
+                  </p>
+                  <h1 className="mt-1.5 break-keep text-2xl font-bold sm:text-3xl">
+                    {site.siteName}
+                  </h1>
+                  <p className="mt-1 break-all text-sm text-muted">
+                    {formatDisplayUrl(site.siteUrl)}
+                  </p>
                 </div>
-              )}
-              <div className="min-w-0 pt-0.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-                  ✓ 등록 검토 완료
-                </p>
-                <h1 className="mt-1.5 break-keep text-2xl font-bold sm:text-3xl">
-                  {site.siteName}
-                </h1>
-                <p className="mt-1 break-all text-sm text-muted">
-                  {formatDisplayUrl(site.siteUrl)}
-                </p>
               </div>
+
+              {site.domains.length > 1 ? (
+                <div className="mt-4 min-w-0 sm:pl-20">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                    등록 도메인
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {site.domains.map((domain) => (
+                      <span
+                        key={domain}
+                        className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted"
+                      >
+                        {formatDisplayUrl(domain)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {/* 오른쪽: 평점 + 먹튀 */}
@@ -338,23 +358,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               )}
             </div>
           </div>
-
-          {/* 등록 도메인 */}
-          {site.domains.length > 1 ? (
-            <div className="px-5 pb-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">등록 도메인</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {site.domains.map((domain) => (
-                  <span
-                    key={domain}
-                    className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted"
-                  >
-                    {formatDisplayUrl(domain)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
 
           {/* 사이트 개요 */}
           {site.shortDescription ? (
