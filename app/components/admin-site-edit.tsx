@@ -261,6 +261,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   const [isFetchingDns, setIsFetchingDns] = useState(false);
   const [dnsInfo, setDnsInfo] = useState<DnsInfo | null>(null);
   const [isCapturingPage, setIsCapturingPage] = useState(false);
+  const [isStoringFavicon, setIsStoringFavicon] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -388,6 +389,38 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     }
 
     return result.faviconUrl;
+  }
+
+  async function saveFaviconToStorage() {
+    setMessage("");
+    setErrorMessage("");
+
+    if (!values.faviconUrl.trim() || !isValidUrl(values.faviconUrl.trim())) {
+      setErrors((current) => ({
+        ...current,
+        faviconUrl: "저장할 http:// 또는 https:// 파비콘 URL을 입력해주세요.",
+      }));
+      return;
+    }
+
+    setIsStoringFavicon(true);
+
+    try {
+      const storedFaviconUrl = await storeFaviconUrl(values.faviconUrl);
+      setValues((current) => ({
+        ...current,
+        faviconUrl: storedFaviconUrl,
+      }));
+      setMessage("파비콘을 저장소에 복사했습니다.");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "파비콘 파일을 저장소에 복사하지 못했습니다.",
+      );
+    } finally {
+      setIsStoringFavicon(false);
+    }
   }
 
   async function fetchSiteMetadata() {
@@ -910,6 +943,19 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
               successMessage="파비콘 이미지가 업로드되었습니다."
               description="자동 메타정보가 차단된 경우 파비콘 파일을 직접 업로드하거나 URL을 입력할 수 있습니다. PNG, JPG, WEBP, ICO 형식을 지원합니다."
             />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={saveFaviconToStorage}
+                disabled={isStoringFavicon || !values.faviconUrl.trim()}
+                className="h-10 rounded-md border border-line px-4 text-sm font-semibold transition hover:bg-background disabled:opacity-50"
+              >
+                {isStoringFavicon ? "저장 중..." : "파비콘 저장"}
+              </button>
+              <span className="text-xs text-muted">
+                URL로 보이는 파비콘을 내 저장소 URL로 바꿉니다.
+              </span>
+            </div>
             {errors.faviconUrl ? (
               <span className="text-xs text-red-700">{errors.faviconUrl}</span>
             ) : null}
