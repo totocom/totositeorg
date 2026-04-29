@@ -42,6 +42,15 @@ export type ReviewTarget = {
   dnsCheckedAt?: string | null;
   domainSearchText?: string;
   oldestDomainCreationDate?: string;
+  trustScore?: SiteTrustScore;
+};
+
+export type SiteTrustScore = {
+  total: number;
+  scamRisk: number;
+  domainAge: number;
+  userExperience: number;
+  summary: string;
 };
 
 export type SiteReview = {
@@ -102,6 +111,126 @@ export const issueTypeLabels: Record<IssueType, string> = {
 export function formatRatingScore(rating: number) {
   const score = Math.round(rating * 20);
   return `${score}/100`;
+}
+
+export function formatTrustScore(score: SiteTrustScore | undefined) {
+  return `${score?.total ?? 0}/100`;
+}
+
+function getDomainAgeMonths(oldestDomainCreationDate?: string) {
+  if (!oldestDomainCreationDate) return null;
+
+  const createdAt = new Date(oldestDomainCreationDate);
+  const now = new Date();
+
+  if (!Number.isFinite(createdAt.getTime()) || createdAt > now) {
+    return null;
+  }
+
+  return (
+    (now.getFullYear() - createdAt.getFullYear()) * 12 +
+    now.getMonth() -
+    createdAt.getMonth()
+  );
+}
+
+function calculateScamRiskScore(
+  scamReportCount = 0,
+  scamDamageAmount = 0,
+  scamDamageAmountUnknownCount = 0,
+) {
+  let score = 50;
+
+  if (scamReportCount >= 4) {
+    score = 5;
+  } else if (scamReportCount >= 2) {
+    score = 20;
+  } else if (scamReportCount === 1) {
+    score = 35;
+  }
+
+  if (scamDamageAmount >= 10_000_000) {
+    score -= 15;
+  } else if (scamDamageAmount >= 5_000_000) {
+    score -= 10;
+  } else if (scamDamageAmount >= 1_000_000) {
+    score -= 5;
+  }
+
+  if (scamDamageAmountUnknownCount > 0) {
+    score -= 3;
+  }
+
+  return Math.max(0, Math.round(score));
+}
+
+function calculateDomainAgeScore(oldestDomainCreationDate?: string) {
+  const ageMonths = getDomainAgeMonths(oldestDomainCreationDate);
+
+  if (ageMonths === null) return 6;
+  if (ageMonths >= 60) return 25;
+  if (ageMonths >= 36) return 20;
+  if (ageMonths >= 12) return 14;
+  if (ageMonths >= 6) return 8;
+  return 4;
+}
+
+function calculateUserExperienceScore(averageRating = 0, reviewCount = 0) {
+  if (reviewCount <= 0) return 10;
+
+  const base = Math.max(0, Math.min(5, averageRating)) * 5;
+  const reviewWeight = reviewCount >= 5 ? 1 : reviewCount >= 2 ? 0.85 : 0.7;
+
+  return Math.round(base * reviewWeight);
+}
+
+function getTrustScoreSummary(
+  scamReportCount: number,
+  oldestDomainCreationDate: string | undefined,
+  reviewCount: number,
+) {
+  const parts = [
+    scamReportCount > 0 ? `먹튀 ${scamReportCount}건 반영` : "먹튀 제보 없음",
+    oldestDomainCreationDate ? "도메인 이력 반영" : "도메인 이력 확인 불가",
+    reviewCount > 0 ? `이용자 평가 ${reviewCount}건 반영` : "이용자 평가 대기",
+  ];
+
+  return parts.join(" · ");
+}
+
+export function calculateSiteTrustScore(params: {
+  averageRating: number;
+  reviewCount: number;
+  scamReportCount?: number;
+  scamDamageAmount?: number;
+  scamDamageAmountUnknownCount?: number;
+  oldestDomainCreationDate?: string;
+}): SiteTrustScore {
+  const scamReportCount = params.scamReportCount ?? 0;
+  const scamDamageAmount = params.scamDamageAmount ?? 0;
+  const scamDamageAmountUnknownCount = params.scamDamageAmountUnknownCount ?? 0;
+  const scamRisk = calculateScamRiskScore(
+    scamReportCount,
+    scamDamageAmount,
+    scamDamageAmountUnknownCount,
+  );
+  const domainAge = calculateDomainAgeScore(params.oldestDomainCreationDate);
+  const userExperience = calculateUserExperienceScore(
+    params.averageRating,
+    params.reviewCount,
+  );
+
+  return {
+    total: Math.max(0, Math.min(100, scamRisk + domainAge + userExperience)),
+    scamRisk,
+    domainAge,
+    userExperience,
+    summary: getTrustScoreSummary(
+      scamReportCount,
+      params.oldestDomainCreationDate,
+      params.reviewCount,
+    ),
+  };
 }
 
 export const responsibleUseNotice = [

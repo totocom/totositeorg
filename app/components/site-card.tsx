@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { type ReviewTarget } from "@/app/data/sites";
+import {
+  calculateSiteTrustScore,
+  formatTrustScore,
+  type ReviewTarget,
+} from "@/app/data/sites";
 
 type SiteCardProps = {
   site: ReviewTarget;
@@ -21,17 +25,6 @@ function getDomainAge(value: string): string {
   return `${years}년 ${months}개월`;
 }
 
-function Stars({ rating }: { rating: number }) {
-  const filled = Math.round(Math.max(1, Math.min(5, rating)));
-  return (
-    <span aria-label={`${filled}점`} className="text-lg leading-none">
-      {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} className={i < filled ? "neon-star text-accent" : "text-line"}>★</span>
-      ))}
-    </span>
-  );
-}
-
 function formatDamageAmount(amount: number, unknownCount: number) {
   const formattedAmount = `${amount.toLocaleString("ko-KR")}원`;
 
@@ -50,6 +43,16 @@ export function SiteCard({ site }: SiteCardProps) {
   const scamReportCount = site.scamReportCount ?? 0;
   const scamDamageAmount = site.scamDamageAmount ?? 0;
   const scamDamageAmountUnknownCount = site.scamDamageAmountUnknownCount ?? 0;
+  const trustScore =
+    site.trustScore ??
+    calculateSiteTrustScore({
+      averageRating: site.averageRating,
+      reviewCount: site.reviewCount,
+      scamReportCount,
+      scamDamageAmount,
+      scamDamageAmountUnknownCount,
+      oldestDomainCreationDate: site.oldestDomainCreationDate,
+    });
   const faviconAlt = `${site.siteName} 토토사이트 파비콘`;
   const fallbackInitial = site.siteName.trim().charAt(0) || "?";
 
@@ -81,10 +84,10 @@ export function SiteCard({ site }: SiteCardProps) {
           </h2>
           <p className="mt-0.5 break-all text-xs text-muted">{site.siteUrl}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <div className="flex items-center gap-1.5">
-              <Stars rating={site.averageRating} />
-              <span className="text-xs text-muted">리뷰 {site.reviewCount}건</span>
-            </div>
+            <span className="neon-star text-sm font-black text-accent">
+              신뢰 점수 {formatTrustScore(trustScore)}
+            </span>
+            <span className="text-xs text-muted">리뷰 {site.reviewCount}건</span>
             {site.oldestDomainCreationDate ? (
               <span className="text-xs text-muted">
                 운영 이력 최소 <span className="neon-star font-bold text-accent">{getDomainAge(site.oldestDomainCreationDate)}</span>
@@ -112,6 +115,9 @@ export function SiteCard({ site }: SiteCardProps) {
           <span className="text-xs font-semibold text-accent">✓ 먹튀 신고 없음</span>
         </div>
       )}
+      <p className="mt-2 text-xs leading-5 text-muted">
+        {trustScore.summary}
+      </p>
     </Link>
   );
 }

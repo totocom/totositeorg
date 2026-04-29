@@ -10,7 +10,12 @@ import { SiteAuthorActions } from "@/app/components/site-author-actions";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
 import { getPublicWhoisInfo } from "@/app/data/domain-whois";
 import { getPublicSiteDetail, getPublicSites } from "@/app/data/public-sites";
-import { formatRatingScore, type ReviewTarget } from "@/app/data/sites";
+import {
+  calculateSiteTrustScore,
+  formatRatingScore,
+  formatTrustScore,
+  type ReviewTarget,
+} from "@/app/data/sites";
 
 function Stars({ rating }: { rating: number }) {
   const filled = Math.round(Math.max(1, Math.min(5, rating)));
@@ -133,6 +138,43 @@ async function getSameIpSites(site: ReviewTarget, currentIps: Set<string>) {
   return matches.filter((match): match is SameIpSite => Boolean(match)).slice(0, 8);
 }
 
+function TrustScoreMetric({
+  label,
+  value,
+  max,
+  tone = "neutral",
+}: {
+  label: string;
+  value: number;
+  max: number;
+  tone?: "neutral" | "safe" | "danger";
+}) {
+  const percentage = Math.max(0, Math.min(100, (value / max) * 100));
+  const barClass =
+    tone === "danger"
+      ? "bg-red-500"
+      : tone === "safe"
+        ? "bg-accent"
+        : "bg-foreground";
+
+  return (
+    <div className="rounded-lg border border-line bg-background p-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold text-muted">{label}</span>
+        <span className="text-sm font-black text-foreground">
+          {value}/{max}
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
+        <div
+          className={`h-full rounded-full ${barClass}`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export async function generateMetadata({
   params,
 }: SiteDetailPageProps): Promise<Metadata> {
@@ -144,7 +186,7 @@ export async function generateMetadata({
   }
 
   const title = `${site.siteName} 토토사이트 리뷰`;
-  const description = `${site.siteName} 실제 이용 후기 ${site.reviewCount}건. 평균 평점 ${formatRatingScore(site.averageRating)}. ${site.shortDescription}`;
+  const description = `${site.siteName} 신뢰 점수 ${formatTrustScore(site.trustScore)}. 먹튀 리스크, 도메인 운영 이력, 이용자 경험을 종합해 확인하세요. ${site.shortDescription}`;
   const pageUrl = `${siteUrl}/sites/${slug}`;
 
   return {
@@ -271,6 +313,14 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const scamDamageAmountUnknownCount = scamReports.filter(
     (report) => report.damageAmountUnknown,
   ).length;
+  const trustScore = calculateSiteTrustScore({
+    averageRating: site.averageRating,
+    reviewCount: site.reviewCount,
+    scamReportCount,
+    scamDamageAmount,
+    scamDamageAmountUnknownCount,
+    oldestDomainCreationDate: oldestDomainCreationDate ?? undefined,
+  });
   const screenshotPreviewUrl = site.screenshotThumbUrl || site.screenshotUrl;
   const logoAlt = `${site.siteName} 토토사이트 로고`;
 
@@ -338,11 +388,11 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             {/* 오른쪽: 평점 + 먹튀 */}
             <div className="flex shrink-0 flex-row gap-3">
               <div className="neon-safe flex-1 rounded-xl border border-line bg-accent-soft px-4 py-3 text-center sm:flex-none">
-                <Stars rating={site.averageRating} />
-                <p className="mt-1 text-sm font-bold text-accent">
-                  {formatRatingScore(site.averageRating)}
+                <p className="text-xs font-semibold text-accent/80">신뢰 점수</p>
+                <p className="mt-1 text-xl font-black text-accent">
+                  {formatTrustScore(trustScore)}
                 </p>
-                <p className="text-xs text-accent/80">리뷰 {site.reviewCount}건</p>
+                <p className="mt-1 text-xs text-accent/80">먹튀 50 · 도메인 25 · 경험 25</p>
               </div>
               {scamReportCount > 0 ? (
                 <div className="neon-scam flex-1 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center dark:border-red-900 dark:bg-red-950/40 sm:flex-none">
@@ -379,6 +429,33 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </div>
             </div>
           ) : null}
+
+          <div className="border-t border-line px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+              신뢰 점수 산정
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <TrustScoreMetric
+                label="먹튀 리스크"
+                value={trustScore.scamRisk}
+                max={50}
+                tone={scamReportCount > 0 ? "danger" : "safe"}
+              />
+              <TrustScoreMetric
+                label="도메인 운영 이력"
+                value={trustScore.domainAge}
+                max={25}
+              />
+              <TrustScoreMetric
+                label="이용자 경험"
+                value={trustScore.userExperience}
+                max={25}
+              />
+            </div>
+            <p className="mt-3 text-xs leading-5 text-muted">
+              {trustScore.summary}
+            </p>
+          </div>
 
           {/* 사이트 개요 */}
           {site.shortDescription ? (

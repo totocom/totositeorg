@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { SiteCard } from "@/app/components/site-card";
-import type { ReviewTarget } from "@/app/data/sites";
+import { calculateSiteTrustScore, type ReviewTarget } from "@/app/data/sites";
 
 type SortOption =
   | "latest"
   | "domain_age"
-  | "rating"
+  | "trust_score"
   | "reviews"
   | "scam_amount"
   | "scam_count"
@@ -26,6 +26,19 @@ function getDomainAgeTime(site: ReviewTarget) {
 
   const time = new Date(site.oldestDomainCreationDate).getTime();
   return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
+}
+
+function getTrustScoreTotal(site: ReviewTarget) {
+  if (site.trustScore) return site.trustScore.total;
+
+  return calculateSiteTrustScore({
+    averageRating: site.averageRating,
+    reviewCount: site.reviewCount,
+    scamReportCount: site.scamReportCount,
+    scamDamageAmount: site.scamDamageAmount,
+    scamDamageAmountUnknownCount: site.scamDamageAmountUnknownCount,
+    oldestDomainCreationDate: site.oldestDomainCreationDate,
+  }).total;
 }
 
 export function SiteBrowser({ sites, initialQuery = "" }: SiteBrowserProps) {
@@ -61,8 +74,8 @@ export function SiteBrowser({ sites, initialQuery = "" }: SiteBrowserProps) {
         return getDomainAgeTime(first) - getDomainAgeTime(second);
       }
 
-      if (sortOption === "rating") {
-        return second.averageRating - first.averageRating;
+      if (sortOption === "trust_score") {
+        return getTrustScoreTotal(second) - getTrustScoreTotal(first);
       }
 
       if (sortOption === "reviews") {
@@ -128,7 +141,7 @@ export function SiteBrowser({ sites, initialQuery = "" }: SiteBrowserProps) {
             <option value="name">이름순</option>
             <option value="name_desc">이름 역순</option>
             <option value="reviews">리뷰 많은순</option>
-            <option value="rating">평점 높은순</option>
+            <option value="trust_score">신뢰 점수 높은순</option>
             <option value="scam_amount">먹튀 금액 높은순</option>
             <option value="scam_count">먹튀 건수 많은순</option>
           </select>

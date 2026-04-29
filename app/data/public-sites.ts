@@ -1,4 +1,5 @@
 import {
+  calculateSiteTrustScore,
   getApprovedReviewsBySiteId,
   getApprovedSites,
   type IssueType,
@@ -177,6 +178,17 @@ function mapSiteRow(
   const scamDamageAmountUnknownCount = scamReports.filter(
     (report) => report.damage_amount_unknown,
   ).length;
+  const averageRating = calculateAverageRating(reviews);
+  const reviewCount = reviews.length;
+  const scamReportCount = scamReports.length;
+  const trustScore = calculateSiteTrustScore({
+    averageRating,
+    reviewCount,
+    scamReportCount,
+    scamDamageAmount,
+    scamDamageAmountUnknownCount,
+    oldestDomainCreationDate,
+  });
 
   return {
     id: site.id,
@@ -195,14 +207,15 @@ function mapSiteRow(
     status: "운영 중",
     moderationStatus: "approved",
     shortDescription: site.description,
-    averageRating: calculateAverageRating(reviews),
-    reviewCount: reviews.length,
-    scamReportCount: scamReports.length,
+    averageRating,
+    reviewCount,
+    scamReportCount,
     scamDamageAmount,
     scamDamageAmountUnknownCount,
     resolvedIps: site.resolved_ips ?? [],
     dnsCheckedAt: site.dns_checked_at ?? null,
     oldestDomainCreationDate,
+    trustScore,
   } satisfies ReviewTarget;
 }
 
@@ -482,7 +495,7 @@ export async function getPublicSiteDetail(
   ]);
 
   return {
-    site: mapSiteRow(siteResult.data as PublicSiteRow, reviewRows),
+    site: mapSiteRow(siteResult.data as PublicSiteRow, reviewRows, scamReportRows),
     reviews: reviewRows.map((review) => mapReviewRow(review, nicknameMap)),
     scamReports: scamReportRows.map((report) =>
       mapScamReportRow(report, nicknameMap),
