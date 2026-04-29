@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/app/components/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 
@@ -28,6 +29,8 @@ function isValidUrl(value: string) {
 export function SiteDomainSubmissionForm({
   siteId,
 }: SiteDomainSubmissionFormProps) {
+  const pathname = usePathname();
+  const router = useRouter();
   const { user } = useAuth();
   const [domainUrl, setDomainUrl] = useState("");
   const [message, setMessage] = useState("");
@@ -42,7 +45,7 @@ export function SiteDomainSubmissionForm({
     setDuplicateSites([]);
 
     if (!user) {
-      setErrorMessage("로그인 후 도메인 추가 요청을 보낼 수 있습니다.");
+      router.push(`/login?redirectTo=${encodeURIComponent(pathname)}`);
       return;
     }
 
@@ -111,10 +114,10 @@ export function SiteDomainSubmissionForm({
         />
         <button
           type="submit"
-          disabled={!user || isSubmitting}
+          disabled={isSubmitting}
           className="h-10 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50"
         >
-          {isSubmitting ? "요청 중..." : "도메인 추가"}
+          {isSubmitting ? "요청 중..." : user ? "도메인 추가" : "로그인 후 추가"}
         </button>
       </div>
       {message ? (
