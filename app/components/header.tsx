@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { AuthNav } from "@/app/components/auth-nav";
@@ -21,8 +22,15 @@ export function Header() {
       <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2 text-lg font-bold text-white sm:text-xl">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="로고" className="neon-logo h-7 w-7 shrink-0" />
+            <Image
+              src="/android-chrome-192x192.png"
+              alt="토토사이트 추천 로고"
+              width={56}
+              height={56}
+              sizes="28px"
+              priority
+              className="neon-logo h-7 w-7 shrink-0"
+            />
             토토사이트 추천
           </Link>
 
