@@ -429,38 +429,47 @@ export async function getWhoisInfoForDomain(
   return whoisInfo;
 }
 
-async function getBatchDomainCreationDatesUncached(
+async function getBatchDomainCreationDateEntriesUncached(
   domains: string[],
-): Promise<Map<string, string>> {
-  if (domains.length === 0) return new Map();
+): Promise<Array<[string, string]>> {
+  if (domains.length === 0) return [];
 
   const supabase = getCacheClient();
-  if (!supabase) return new Map();
+  if (!supabase) return [];
 
   const { data, error } = await supabase
     .from("domain_whois_cache")
     .select("domain, payload")
     .in("domain", domains);
 
-  if (error || !data) return new Map();
+  if (error || !data) return [];
 
-  const result = new Map<string, string>();
+  const result: Array<[string, string]> = [];
   for (const row of data) {
     if (isPublicWhoisInfo(row.payload) && row.payload.creationDate) {
-      result.set(row.domain as string, row.payload.creationDate);
+      result.push([row.domain as string, row.payload.creationDate]);
     }
   }
   return result;
 }
 
-export const getBatchDomainCreationDates = unstable_cache(
-  getBatchDomainCreationDatesUncached,
+const getCachedBatchDomainCreationDateEntries = unstable_cache(
+  getBatchDomainCreationDateEntriesUncached,
   ["batch-domain-creation-dates"],
   {
     revalidate: 300,
     tags: ["public-sites"],
   },
 );
+
+export async function getBatchDomainCreationDates(
+  domains: string[],
+): Promise<Map<string, string>> {
+  const uniqueDomains = Array.from(new Set(domains)).sort();
+  const entries = await getCachedBatchDomainCreationDateEntries(uniqueDomains);
+
+  return new Map(entries);
+}
 
 export async function getPublicWhoisInfo(
   siteUrl: string,
