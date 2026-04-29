@@ -187,7 +187,7 @@ function TrustScoreMetric({
           {value}/100
         </span>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
+      <div className={`${toneClasses.neon} mt-2 h-1.5 overflow-hidden rounded-full bg-line`}>
         <div
           className={`${toneClasses.neon} h-full rounded-full ${toneClasses.bar}`}
           style={{ width: `${percentage}%` }}
