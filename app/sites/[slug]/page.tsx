@@ -179,7 +179,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     });
 
     return (
-      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
         <Link href="/sites" className="text-sm font-semibold text-accent">
           사이트 목록으로 돌아가기
         </Link>
@@ -272,101 +272,111 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
         />
       )}
-      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
-        <Link href="/sites" className="text-sm font-semibold text-accent">
-          사이트 목록으로 돌아가기
-        </Link>
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
 
-        <article className="mt-5 rounded-xl border border-line bg-surface p-5 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-start gap-3">
-                {site.faviconUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={site.faviconUrl}
-                    alt={logoAlt}
-                    className="mt-1 h-14 w-14 shrink-0 rounded-lg border border-line bg-white object-contain p-1 dark:bg-surface"
-                  />
-                ) : null}
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold uppercase text-accent">
-                    등록 검토 완료
-                  </p>
-                  <h1 className="mt-2 break-keep text-3xl font-bold">
-                    {site.siteName}
-                  </h1>
+        {/* 브레드크럼 */}
+        <nav className="flex items-center gap-1.5 text-xs text-muted">
+          <Link href="/" className="hover:text-foreground transition">홈</Link>
+          <span>/</span>
+          <Link href="/sites" className="hover:text-foreground transition">사이트 목록</Link>
+          <span>/</span>
+          <span className="text-foreground">{site.siteName}</span>
+        </nav>
+
+        {/* 메인 정보 카드 */}
+        <article className="mt-4 rounded-xl border border-line bg-surface shadow-sm">
+          {/* 상단: 로고 + 이름 + 뱃지 */}
+          <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between">
+            {/* 왼쪽 */}
+            <div className="flex min-w-0 items-start gap-4">
+              {site.faviconUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={site.faviconUrl}
+                  alt={logoAlt}
+                  className="h-16 w-16 shrink-0 rounded-xl border border-line bg-white object-contain p-1.5 dark:bg-surface"
+                />
+              ) : (
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-line bg-background text-xl font-bold text-accent">
+                  {site.siteName.trim().charAt(0)}
                 </div>
+              )}
+              <div className="min-w-0 pt-0.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-accent">
+                  ✓ 등록 검토 완료
+                </p>
+                <h1 className="mt-1.5 break-keep text-2xl font-bold sm:text-3xl">
+                  {site.siteName}
+                </h1>
+                <p className="mt-1 break-all text-sm text-muted">
+                  {formatDisplayUrl(site.siteUrl)}
+                </p>
               </div>
-              <p className="mt-4 text-xs font-semibold uppercase text-muted">
-                대표 URL
-              </p>
-              <p className="mt-1 break-all text-sm text-muted">
-                {formatDisplayUrl(site.siteUrl)}
-              </p>
-              {site.domains.length > 1 ? (
-                <div className="mt-3">
-                  <p className="text-xs font-semibold uppercase text-muted">
-                    등록 도메인
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {site.domains.map((domain) => (
-                      <span
-                        key={domain}
-                        className="rounded-full bg-background px-3 py-1 text-xs font-semibold text-muted"
-                      >
-                        {formatDisplayUrl(domain)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </div>
-            <div className="flex shrink-0 flex-col gap-3 sm:items-end">
-              <AdminSiteDetailActions siteId={site.id} />
-              <SiteAuthorActions siteId={site.id} />
-              <div className="flex flex-col gap-3">
-                <div className="neon-safe rounded-xl border border-line bg-accent-soft px-4 py-3 text-center">
-                  <Stars rating={site.averageRating} />
-                  <p className="mt-1 text-sm font-bold text-accent">
-                    {formatRatingScore(site.averageRating)}
-                  </p>
-                  <p className="text-xs text-accent">리뷰 {site.reviewCount}건</p>
-                </div>
-                {scamReportCount > 0 ? (
-                  <div className="neon-scam rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center dark:border-red-900 dark:bg-red-950/40">
-                    <p className="text-sm font-bold text-red-600 dark:text-red-400">⚠ 먹튀 {scamReportCount}건</p>
-                    <p className="mt-0.5 text-xs text-red-500 dark:text-red-400/70">
-                      {formatDamageAmount(scamDamageAmount, scamDamageAmountUnknownCount)}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="neon-safe rounded-xl border border-accent/20 bg-accent-soft px-4 py-3 text-center">
-                    <p className="text-sm font-bold text-accent">✓ 먹튀 신고 없음</p>
-                  </div>
-                )}
+
+            {/* 오른쪽: 평점 + 먹튀 */}
+            <div className="flex shrink-0 flex-row gap-3 sm:flex-col">
+              <div className="neon-safe flex-1 rounded-xl border border-line bg-accent-soft px-4 py-3 text-center sm:flex-none">
+                <Stars rating={site.averageRating} />
+                <p className="mt-1 text-sm font-bold text-accent">
+                  {formatRatingScore(site.averageRating)}
+                </p>
+                <p className="text-xs text-accent/80">리뷰 {site.reviewCount}건</p>
               </div>
+              {scamReportCount > 0 ? (
+                <div className="neon-scam flex-1 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center dark:border-red-900 dark:bg-red-950/40 sm:flex-none">
+                  <p className="text-sm font-bold text-red-600 dark:text-red-400">⚠ 먹튀 {scamReportCount}건</p>
+                  <p className="mt-0.5 text-xs text-red-500 dark:text-red-400/70">
+                    {formatDamageAmount(scamDamageAmount, scamDamageAmountUnknownCount)}
+                  </p>
+                </div>
+              ) : (
+                <div className="neon-safe flex-1 rounded-xl border border-accent/20 bg-accent-soft px-4 py-3 text-center sm:flex-none">
+                  <p className="text-sm font-bold text-accent">✓ 먹튀 없음</p>
+                  <p className="mt-0.5 text-xs text-accent/70">신고 이력 없음</p>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="mt-6 rounded-md bg-background p-4">
-            <h2 className="text-sm font-semibold uppercase text-muted">
-              사이트 개요
-            </h2>
-            <p className="mt-2 leading-7 text-foreground">
-              {site.shortDescription}
-            </p>
-          </div>
+          {/* 등록 도메인 */}
+          {site.domains.length > 1 ? (
+            <div className="border-t border-line px-5 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">등록 도메인</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {site.domains.map((domain) => (
+                  <span
+                    key={domain}
+                    className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted"
+                  >
+                    {formatDisplayUrl(domain)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
+          {/* 사이트 개요 */}
+          {site.shortDescription ? (
+            <div className="border-t border-line px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">사이트 개요</p>
+              <p className="mt-2 text-sm leading-7 text-foreground">{site.shortDescription}</p>
+            </div>
+          ) : null}
+
+          {/* 관리 액션 */}
+          <div className="flex flex-wrap gap-2 border-t border-line px-5 py-3">
+            <AdminSiteDetailActions siteId={site.id} />
+            <SiteAuthorActions siteId={site.id} />
+          </div>
         </article>
 
+        {/* 스크린샷 */}
         {site.screenshotUrl && screenshotPreviewUrl ? (
-          <section className="mt-6 overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
-            <div className="border-b border-line px-5 py-4">
-              <p className="text-sm font-semibold uppercase text-accent">
-                페이지 캡처
-              </p>
-              <h2 className="mt-1 text-xl font-bold">사이트 화면 미리보기</h2>
+          <section className="mt-5 overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+            <div className="border-b border-line px-5 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent">페이지 캡처</p>
+              <h2 className="mt-1 text-base font-bold">사이트 화면 미리보기</h2>
             </div>
             <Link
               href={site.screenshotUrl}
@@ -376,55 +386,50 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               aria-label={`${site.siteName} 원본 캡처 이미지 보기`}
             >
               <div className="relative aspect-video w-full bg-background">
-              <Image
-                src={screenshotPreviewUrl}
-                alt={`${site.siteName} 토토사이트 상세 메인 페이지`}
-                fill
-                sizes="(min-width: 1024px) 1024px, (min-width: 640px) calc(100vw - 48px), calc(100vw - 32px)"
-                className="object-cover transition duration-200 group-hover:scale-[1.01]"
-              />
+                <Image
+                  src={screenshotPreviewUrl}
+                  alt={`${site.siteName} 토토사이트 상세 메인 페이지`}
+                  fill
+                  sizes="(min-width: 1024px) 896px, (min-width: 640px) calc(100vw - 48px), calc(100vw - 32px)"
+                  className="object-cover transition duration-200 group-hover:scale-[1.01]"
+                />
               </div>
             </Link>
           </section>
         ) : null}
 
+        {/* 도메인 & DNS */}
         <DomainInfoTabs items={domainInfoTabs} />
 
+        {/* 동일 IP 사이트 */}
         {sameIpSites.length > 0 ? (
-          <section className="mt-6 rounded-xl border border-line bg-surface p-5 shadow-sm">
-            <div>
-              <p className="text-sm font-semibold uppercase text-accent">
-                동일 IP 연결
-              </p>
-              <h2 className="mt-1 text-2xl font-bold">
-                같은 IP를 사용하는 사이트
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                현재 사이트의 DNS A/AAAA 레코드와 겹치는 공개 사이트만 간추려
-                표시합니다.
+          <section className="mt-5 rounded-xl border border-line bg-surface shadow-sm">
+            <div className="border-b border-line px-5 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent">동일 IP 연결</p>
+              <h2 className="mt-1 text-base font-bold">같은 IP를 사용하는 사이트</h2>
+              <p className="mt-1 text-xs text-muted">
+                현재 사이트의 DNS A/AAAA 레코드와 겹치는 공개 사이트만 표시합니다.
               </p>
             </div>
-            <div className="mt-4 grid gap-3">
+            <div className="grid gap-2 p-4">
               {sameIpSites.map((match) => (
                 <Link
                   key={match.site.id}
                   href={`/sites/${match.site.slug}`}
-                  className="rounded-md border border-line bg-background p-4 transition hover:border-accent"
+                  className="rounded-lg border border-line bg-background p-4 transition hover:border-accent/50"
                 >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
-                      <p className="text-base font-semibold text-foreground">
-                        {match.site.siteName}
-                      </p>
-                      <p className="mt-1 break-all text-sm text-muted">
+                      <p className="text-sm font-semibold text-foreground">{match.site.siteName}</p>
+                      <p className="mt-0.5 break-all text-xs text-muted">
                         {formatDisplayUrl(match.matchedDomains[0] ?? match.site.siteUrl)}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                    <div className="flex flex-wrap gap-1.5 sm:justify-end">
                       {match.matchedIps.map((ip) => (
                         <span
                           key={ip}
-                          className="rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent"
+                          className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold text-accent"
                         >
                           {ip}
                         </span>
@@ -437,24 +442,18 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           </section>
         ) : null}
 
-        <section
-          id="scam-reports"
-          className="mt-6 scroll-mt-24 rounded-xl border border-line bg-surface p-5 shadow-sm"
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase text-accent">
-                먹튀 피해 이력
-              </p>
-              <h2 className="mt-1 text-2xl font-bold">승인된 피해 제보</h2>
-            </div>
+        {/* 먹튀 피해 이력 */}
+        <section id="scam-reports" className="mt-5 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-5 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력</p>
+            <h2 className="mt-1 text-base font-bold">승인된 피해 제보</h2>
           </div>
           {scamReports.length > 0 ? (
-            <div className="mt-4 grid gap-3">
+            <div className="grid gap-3 p-4">
               {scamReports.map((report) => (
                 <article
                   key={report.id}
-                  className="rounded-md border border-line bg-background p-4"
+                  className="rounded-lg border border-line bg-background p-4"
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -462,79 +461,69 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                         {report.damageTypes.join(", ")}
                       </p>
                       <p className="mt-1 text-xs text-muted">
-                        발생일 {report.incidentDate} · 이용 기간{" "}
-                        {report.usagePeriod} · 작성자{" "}
+                        발생일 {report.incidentDate} · 이용 기간 {report.usagePeriod} · 작성자{" "}
                         {report.authorNickname ?? "익명"}
                       </p>
                     </div>
-                    <p className="rounded-md bg-surface px-3 py-1 text-sm font-semibold">
+                    <span className="shrink-0 rounded-md bg-surface px-3 py-1 text-xs font-semibold text-foreground">
                       {report.damageAmountUnknown || report.damageAmount === null
                         ? "피해 금액 미확인"
                         : `${report.damageAmount.toLocaleString("ko-KR")}원`}
-                    </p>
+                    </span>
                   </div>
                   <ScamReportDetails report={report} siteName={site.siteName} />
                 </article>
               ))}
             </div>
           ) : (
-            <p className="mt-3 rounded-md bg-background p-4 text-sm text-muted">
-              승인되어 공개된 먹튀 피해 이력이 아직 없습니다.
-            </p>
+            <p className="p-5 text-sm text-muted">승인되어 공개된 먹튀 피해 이력이 아직 없습니다.</p>
           )}
         </section>
 
         {errorMessage ? (
-          <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+          <section className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
             {errorMessage}
           </section>
         ) : null}
 
         {source === "fallback" ? (
-          <p className="mt-6 text-sm text-muted">
-            현재 개발용 더미 데이터가 표시되고 있습니다.
-          </p>
+          <p className="mt-4 text-sm text-muted">현재 개발용 더미 데이터가 표시되고 있습니다.</p>
         ) : null}
 
-        <section id="reviews" className="mt-6 grid scroll-mt-24 gap-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase text-accent">
-                커뮤니티 리뷰
-              </p>
-              <h2 className="mt-1 text-2xl font-bold">최근 이용 경험</h2>
-            </div>
+        {/* 커뮤니티 리뷰 */}
+        <section id="reviews" className="mt-5 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-5 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-accent">커뮤니티 리뷰</p>
+            <h2 className="mt-1 text-base font-bold">최근 이용 경험</h2>
           </div>
-
           {reviews.length > 0 ? (
-            reviews.map((review) => (
-              <article
-                key={review.id}
-                className="rounded-xl border border-line bg-surface p-5 shadow-sm transition hover:border-accent/30"
-              >
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-accent">
-                    이용자 만족도 평가
-                  </p>
-                  <h3 className="mt-1 text-lg font-bold text-foreground">
-                    {review.title}
-                  </h3>
-                  <div className="mt-2 flex items-center gap-3">
-                    <Stars rating={review.rating} />
-                    <span className="text-xs text-muted">
-                      {formatRatingScore(review.rating)}
-                    </span>
+            <div className="grid gap-3 p-4">
+              {reviews.map((review) => (
+                <article
+                  key={review.id}
+                  className="rounded-lg border border-line bg-background p-4 transition hover:border-accent/40"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Stars rating={review.rating} />
+                        <span className="text-xs font-semibold text-accent">
+                          {formatRatingScore(review.rating)}
+                        </span>
+                      </div>
+                      <h3 className="mt-1.5 font-bold text-foreground">{review.title}</h3>
+                    </div>
+                    <p className="shrink-0 text-xs text-muted">
+                      {review.authorNickname ?? "익명"} · {review.createdAt}
+                    </p>
                   </div>
-                </div>
-                <ReviewSummary siteName={site.siteName} experience={review.experience} />
-                <p className="mt-3 text-xs text-muted">
-                  작성자 {review.authorNickname ?? "익명"} · {review.createdAt}
-                </p>
-              </article>
-            ))
+                  <ReviewSummary siteName={site.siteName} experience={review.experience} />
+                </article>
+              ))}
+            </div>
           ) : (
-            <div className="rounded-xl border border-line bg-surface p-8 text-center">
-              <p className="text-2xl">📝</p>
+            <div className="p-10 text-center">
+              <p className="text-3xl">📝</p>
               <h3 className="mt-3 font-bold">아직 승인된 리뷰가 없습니다</h3>
               <p className="mt-2 text-sm text-muted">
                 이 사이트에 대한 이용 경험은 관리자 검토 후 공개됩니다.
@@ -542,6 +531,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </div>
           )}
         </section>
+
       </main>
     </>
   );
