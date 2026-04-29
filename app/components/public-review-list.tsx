@@ -11,7 +11,7 @@ function Stars({ rating }: { rating: number }) {
   return (
     <span aria-label={`${filled}점`} className="text-base leading-none">
       {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} className={i < filled ? "neon-star text-accent" : "text-line"}>★</span>
+        <span key={i} className={i < filled ? "text-accent" : "text-line"}>★</span>
       ))}
     </span>
   );

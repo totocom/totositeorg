@@ -99,13 +99,13 @@ export function SiteCard({ site }: SiteCardProps) {
           </h2>
           <p className="mt-0.5 break-all text-xs text-muted">{site.siteUrl}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className={`neon-star text-sm font-black ${getTrustToneClasses(trustScore.total)}`}>
+            <span className={`text-sm font-black ${getTrustToneClasses(trustScore.total)}`}>
               신뢰 점수 {formatTrustScore(trustScore)}
             </span>
             <span className="text-xs text-muted">리뷰 {site.reviewCount}건</span>
             {site.oldestDomainCreationDate ? (
               <span className="text-xs text-muted">
-                운영 이력 최소 <span className="neon-star font-bold text-accent">{getDomainAge(site.oldestDomainCreationDate)}</span>
+                운영 이력 최소 <span className="font-bold text-accent">{getDomainAge(site.oldestDomainCreationDate)}</span>
               </span>
             ) : null}
           </div>

@@ -23,7 +23,7 @@ function Stars({ rating }: { rating: number }) {
   return (
     <span aria-label={`${filled}점`} className="text-xl leading-none">
       {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} className={i < filled ? "neon-star text-accent" : "text-line"}>★</span>
+        <span key={i} className={i < filled ? "text-accent" : "text-line"}>★</span>
       ))}
     </span>
   );
@@ -387,7 +387,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                     {oldestDomainCreationDate ? (
                       <>
                         운영 이력 최소{" "}
-                        <span className="neon-star font-bold text-accent">
+                        <span className="font-bold text-accent">
                           {getDomainAge(oldestDomainCreationDate)}
                         </span>
                       </>
