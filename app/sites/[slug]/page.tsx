@@ -262,6 +262,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     (report) => report.damageAmountUnknown,
   ).length;
   const screenshotPreviewUrl = site.screenshotThumbUrl || site.screenshotUrl;
+  const logoAlt = `${site.siteName} 토토사이트 로고`;
 
   return (
     <>
@@ -278,12 +279,26 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
         <article className="mt-5 rounded-xl border border-line bg-surface p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase text-accent">
-                등록 검토 완료
-              </p>
-              <h1 className="mt-2 text-3xl font-bold">{site.siteName}</h1>
-              <p className="mt-2 text-xs font-semibold uppercase text-muted">
+            <div className="min-w-0">
+              <div className="flex items-start gap-3">
+                {site.faviconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={site.faviconUrl}
+                    alt={logoAlt}
+                    className="mt-1 h-14 w-14 shrink-0 rounded-lg border border-line bg-white object-contain p-1"
+                  />
+                ) : null}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold uppercase text-accent">
+                    등록 검토 완료
+                  </p>
+                  <h1 className="mt-2 break-keep text-3xl font-bold">
+                    {site.siteName}
+                  </h1>
+                </div>
+              </div>
+              <p className="mt-4 text-xs font-semibold uppercase text-muted">
                 대표 URL
               </p>
               <p className="mt-1 break-all text-sm text-muted">
