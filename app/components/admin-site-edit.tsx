@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
 import { ScreenshotUploadControl } from "@/app/components/screenshot-upload-control";
 import { supabase } from "@/lib/supabase/client";
@@ -17,6 +17,7 @@ type SiteRow = {
   domains: string[] | null;
   screenshot_url: string | null;
   favicon_url: string | null;
+  status: "pending" | "approved" | "rejected";
   description: string;
 };
 
@@ -44,6 +45,12 @@ const initialValues: EditValues = {
   screenshotUrl: "",
   faviconUrl: "",
   description: "",
+};
+
+const statusLabels = {
+  pending: "검토 중",
+  approved: "승인됨",
+  rejected: "거절됨",
 };
 
 type SiteMetadata = {
@@ -251,6 +258,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   const [values, setValues] = useState<EditValues>(initialValues);
   const [errors, setErrors] = useState<EditErrors>({});
   const [siteSlug, setSiteSlug] = useState("");
+  const [siteStatus, setSiteStatus] = useState<SiteRow["status"]>("pending");
   const [isLoadingSite, setIsLoadingSite] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
@@ -279,7 +287,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
       const { data, error } = await supabase
         .from("sites")
-        .select("id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, description")
+        .select("id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, status, description")
         .eq("id", siteId)
         .single();
 
@@ -296,6 +304,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       const site = data as SiteRow;
       setValues(valuesFromSite(site));
       setSiteSlug(site.slug);
+      setSiteStatus(site.status);
       setIsLoadingSite(false);
     }
 
@@ -639,9 +648,34 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     );
   }
 
-  async function saveSite(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function sendSiteApprovalNotification() {
+    const token = await getAdminToken();
 
+    if (!token) {
+      return "사이트는 승인됐지만 텔레그램 알림은 로그인 세션을 확인하지 못해 전송되지 않았습니다.";
+    }
+
+    const response = await fetch("/api/admin/telegram/site-approved", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ siteId }),
+    });
+
+    if (response.ok) return "";
+
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+
+    return `사이트는 승인됐지만 텔레그램 알림 전송에 실패했습니다. ${
+      body?.error ?? "봇 연결 상태와 환경변수를 확인해주세요."
+    }`;
+  }
+
+  async function saveSite(nextStatus?: SiteRow["status"]) {
     const nextErrors = validate();
     setErrors(nextErrors);
 
@@ -677,6 +711,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         domains: getDomainList(values),
         screenshot_url: values.screenshotUrl.trim() || null,
         favicon_url: faviconUrl || null,
+        ...(nextStatus ? { status: nextStatus } : {}),
         description: values.description.trim(),
       })
       .eq("id", siteId);
@@ -698,6 +733,10 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       return;
     }
 
+    if (nextStatus) {
+      setSiteStatus(nextStatus);
+    }
+
     const token = await getAdminToken();
 
     if (token) {
@@ -711,8 +750,28 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       }).catch(() => null);
     }
 
-    setMessage("사이트 정보가 수정되었습니다. 저장된 사이트로 이동합니다.");
-    router.push(siteSlug ? `/sites/${siteSlug}` : "/admin");
+    let notificationError = "";
+
+    if (nextStatus === "approved") {
+      notificationError = await sendSiteApprovalNotification();
+    }
+
+    if (notificationError) {
+      setErrorMessage(notificationError);
+      setMessage("사이트 정보가 저장되고 승인되었습니다.");
+      return;
+    }
+
+    setMessage(
+      nextStatus === "approved"
+        ? "사이트 정보가 저장되고 승인되었습니다."
+        : "사이트 정보가 수정되었습니다.",
+    );
+    router.push(
+      nextStatus === "approved"
+        ? "/admin/sites#approved-sites"
+        : "/admin/sites",
+    );
   }
 
   if (isLoading || isLoadingSite) {
@@ -757,6 +816,9 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
           {siteSlug ? (
             <p className="mt-2 text-sm text-muted">현재 slug: {siteSlug}</p>
           ) : null}
+          <p className="mt-1 text-sm font-semibold text-muted">
+            현재 상태: {statusLabels[siteStatus]}
+          </p>
         </div>
 
         {message ? (
@@ -771,7 +833,14 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
           </div>
         ) : null}
 
-        <form onSubmit={saveSite} className="grid gap-4" noValidate>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveSite();
+          }}
+          className="grid gap-4"
+          noValidate
+        >
           <label className="grid gap-1 text-sm font-medium">
             사이트 한글 이름
             <input
@@ -1009,13 +1078,25 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
             ) : null}
           </label>
 
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="h-11 w-fit rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {isSaving ? "저장 중..." : "수정 저장"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {isSaving ? "저장 중..." : "수정 저장"}
+            </button>
+            {siteStatus !== "approved" ? (
+              <button
+                type="button"
+                onClick={() => void saveSite("approved")}
+                disabled={isSaving}
+                className="h-11 rounded-md border border-accent px-4 text-sm font-semibold text-accent transition hover:bg-accent-soft disabled:opacity-50"
+              >
+                {isSaving ? "승인 중..." : "저장 후 승인"}
+              </button>
+            ) : null}
+          </div>
         </form>
       </section>
     </main>
