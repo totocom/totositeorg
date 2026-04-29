@@ -7,6 +7,7 @@ import {
   type SiteReview,
 } from "@/app/data/sites";
 import type { PublicDnsInfo } from "@/app/data/domain-dns";
+import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
 import { supabase } from "@/lib/supabase/client";
 
 type PublicSiteRow = {
@@ -138,10 +139,31 @@ function getDisplayName(site: PublicSiteRow) {
   return ko || en || site.name;
 }
 
+function getSiteDomains(site: PublicSiteRow): string[] {
+  return Array.isArray(site.domains) && site.domains.length > 0
+    ? site.domains
+    : [site.url];
+}
+
+function getOldestCreationDate(
+  site: PublicSiteRow,
+  creationDates: Map<string, string>,
+): string | undefined {
+  const dates = getSiteDomains(site)
+    .map((d) => extractDomain(d))
+    .filter(Boolean)
+    .map((d) => creationDates.get(d))
+    .filter((d): d is string => typeof d === "string" && Number.isFinite(new Date(d).getTime()));
+
+  if (dates.length === 0) return undefined;
+  return dates.reduce((oldest, date) => (date < oldest ? date : oldest));
+}
+
 function mapSiteRow(
   site: PublicSiteRow,
   reviews: PublicReviewRow[],
   scamReports: PublicScamReportRow[] = [],
+  oldestDomainCreationDate?: string,
 ) {
   const domains =
     Array.isArray(site.domains) && site.domains.length > 0
@@ -178,6 +200,7 @@ function mapSiteRow(
     scamDamageAmountUnknownCount,
     resolvedIps: site.resolved_ips ?? [],
     dnsCheckedAt: site.dns_checked_at ?? null,
+    oldestDomainCreationDate,
   } satisfies ReviewTarget;
 }
 
@@ -343,11 +366,21 @@ export async function getPublicSites(): Promise<PublicSitesResult> {
     ? []
     : ((scamReportsResult.data ?? []) as PublicScamReportRow[]);
 
+  const allDomains = Array.from(
+    new Set(
+      siteRows.flatMap((site) =>
+        getSiteDomains(site).map((d) => extractDomain(d)).filter(Boolean),
+      ),
+    ),
+  );
+  const creationDates = await getBatchDomainCreationDates(allDomains);
+
   const sites = siteRows.map((site) =>
     mapSiteRow(
       site,
       reviewRows.filter((review) => review.site_id === site.id),
       scamReportRows.filter((report) => report.site_id === site.id),
+      getOldestCreationDate(site, creationDates),
     ),
   );
   const { categories, states } = getDerivedFilters(sites);

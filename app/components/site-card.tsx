@@ -5,6 +5,22 @@ type SiteCardProps = {
   site: ReviewTarget;
 };
 
+function getDomainAge(value: string): string {
+  const createdAt = new Date(value);
+  const now = new Date();
+  const monthDiff =
+    (now.getFullYear() - createdAt.getFullYear()) * 12 +
+    now.getMonth() -
+    createdAt.getMonth();
+
+  if (!Number.isFinite(monthDiff) || monthDiff < 0) return "";
+  const years = Math.floor(monthDiff / 12);
+  const months = monthDiff % 12;
+  if (years <= 0) return `${months}개월`;
+  if (months === 0) return `${years}년`;
+  return `${years}년 ${months}개월`;
+}
+
 function Stars({ rating }: { rating: number }) {
   const filled = Math.round(Math.max(1, Math.min(5, rating)));
   return (
@@ -64,11 +80,16 @@ export function SiteCard({ site }: SiteCardProps) {
             {site.siteName}
           </h2>
           <p className="mt-0.5 break-all text-xs text-muted">{site.siteUrl}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <Stars rating={site.averageRating} />
-            <span className="text-xs text-muted">
-              리뷰 {site.reviewCount}건
-            </span>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="flex items-center gap-1.5">
+              <Stars rating={site.averageRating} />
+              <span className="text-xs text-muted">리뷰 {site.reviewCount}건</span>
+            </div>
+            {site.oldestDomainCreationDate ? (
+              <span className="text-xs text-muted">
+                운영 이력 <span className="font-semibold text-foreground">{getDomainAge(site.oldestDomainCreationDate)}</span>
+              </span>
+            ) : null}
           </div>
         </div>
       </div>

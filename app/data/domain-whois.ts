@@ -428,6 +428,30 @@ export async function getWhoisInfoForDomain(
   return whoisInfo;
 }
 
+export async function getBatchDomainCreationDates(
+  domains: string[],
+): Promise<Map<string, string>> {
+  if (domains.length === 0) return new Map();
+
+  const supabase = getCacheClient();
+  if (!supabase) return new Map();
+
+  const { data, error } = await supabase
+    .from("domain_whois_cache")
+    .select("domain, payload")
+    .in("domain", domains);
+
+  if (error || !data) return new Map();
+
+  const result = new Map<string, string>();
+  for (const row of data) {
+    if (isPublicWhoisInfo(row.payload) && row.payload.creationDate) {
+      result.set(row.domain as string, row.payload.creationDate);
+    }
+  }
+  return result;
+}
+
 export async function getPublicWhoisInfo(
   siteUrl: string,
 ): Promise<PublicWhoisInfo | null> {
