@@ -123,20 +123,42 @@ async function uploadStoredFavicon(
   contentType: string,
 ) {
   const supabase = createClient(storageEnv.supabaseUrl, storageEnv.serviceRoleKey);
-  const filePath = `favicons/${randomUUID()}.${extension}`;
-  const { error } = await supabase.storage
-    .from(storageEnv.bucket)
-    .upload(filePath, bytes, {
-      contentType,
-      upsert: false,
-    });
+  const contentTypes =
+    extension === "ico"
+      ? Array.from(
+          new Set([
+            contentType,
+            "image/vnd.microsoft.icon",
+            "image/x-icon",
+          ]),
+        )
+      : [contentType];
+  const errors: string[] = [];
 
-  if (error) {
-    throw new Error(`Storage 업로드에 실패했습니다. ${error.message}`);
+  for (const uploadContentType of contentTypes) {
+    const filePath = `favicons/${randomUUID()}.${extension}`;
+    const { error } = await supabase.storage
+      .from(storageEnv.bucket)
+      .upload(filePath, bytes, {
+        contentType: uploadContentType,
+        upsert: false,
+      });
+
+    if (!error) {
+      const { data } = supabase.storage.from(storageEnv.bucket).getPublicUrl(filePath);
+      return data.publicUrl;
+    }
+
+    errors.push(error.message);
   }
 
-  const { data } = supabase.storage.from(storageEnv.bucket).getPublicUrl(filePath);
-  return data.publicUrl;
+  if (extension === "ico" && errors.some((message) => message.includes("mime type"))) {
+    throw new Error(
+      "Storage 버킷 허용 MIME 타입에 image/x-icon 또는 image/vnd.microsoft.icon을 추가해주세요.",
+    );
+  }
+
+  throw new Error(`Storage 업로드에 실패했습니다. ${errors[0] ?? "알 수 없는 오류"}`);
 }
 
 async function storeFaviconUrl(faviconUrl: string) {

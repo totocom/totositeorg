@@ -311,18 +311,33 @@ async function uploadStoredFavicon(
   contentType: string,
 ) {
   const supabase = createClient(storageEnv.supabaseUrl, storageEnv.serviceRoleKey);
-  const filePath = `favicons/${randomUUID()}.${extension}`;
-  const { error } = await supabase.storage
-    .from(storageEnv.bucket)
-    .upload(filePath, bytes, {
-      contentType,
-      upsert: false,
-    });
+  const contentTypes =
+    extension === "ico"
+      ? Array.from(
+          new Set([
+            contentType,
+            "image/vnd.microsoft.icon",
+            "image/x-icon",
+          ]),
+        )
+      : [contentType];
 
-  if (error) return "";
+  for (const uploadContentType of contentTypes) {
+    const filePath = `favicons/${randomUUID()}.${extension}`;
+    const { error } = await supabase.storage
+      .from(storageEnv.bucket)
+      .upload(filePath, bytes, {
+        contentType: uploadContentType,
+        upsert: false,
+      });
 
-  const { data } = supabase.storage.from(storageEnv.bucket).getPublicUrl(filePath);
-  return data.publicUrl;
+    if (!error) {
+      const { data } = supabase.storage.from(storageEnv.bucket).getPublicUrl(filePath);
+      return data.publicUrl;
+    }
+  }
+
+  return "";
 }
 
 async function storeFaviconUrl(faviconUrl: string) {
