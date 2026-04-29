@@ -9,7 +9,7 @@ import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
 import { SameIpSitesSection } from "@/app/components/same-ip-sites-section";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
-import { getPublicWhoisInfo } from "@/app/data/domain-whois";
+import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
 import {
   calculateSiteTrustScore,
@@ -190,7 +190,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     type: typeof slug,
   });
 
-  const { site, reviews, scamReports, dnsRecords, errorMessage, source } =
+  const { site, reviews, scamReports, errorMessage, source } =
     await getPublicSiteDetail(slug);
 
   if (!site) {
@@ -249,22 +249,11 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const domainTargets = Array.from(
     new Set((site.domains.length > 0 ? site.domains : [site.siteUrl]).filter(Boolean)),
   ).slice(0, 6);
-  const dnsRecordMap = new Map(
-    dnsRecords.map((record) => [record.domainUrl, record.dnsInfo]),
+  const domainCreationDates = await getBatchDomainCreationDates(
+    domainTargets.map((domainUrl) => extractDomain(domainUrl)).filter(Boolean),
   );
-  const domainInfos = await Promise.all(
-    domainTargets.map(async (domainUrl) => {
-      const whoisInfo = await getPublicWhoisInfo(domainUrl);
-
-      return {
-        domainUrl,
-        whoisInfo,
-        dnsInfo: dnsRecordMap.get(domainUrl) ?? null,
-      };
-    }),
-  );
-  const oldestDomainCreationDate = domainInfos
-    .map(({ whoisInfo }) => whoisInfo?.creationDate)
+  const oldestDomainCreationDate = domainTargets
+    .map((domainUrl) => domainCreationDates.get(extractDomain(domainUrl)))
     .filter((date): date is string =>
       typeof date === "string" && Number.isFinite(new Date(date).getTime()),
     )
@@ -272,16 +261,19 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
       (oldest, date) => (oldest === null || date < oldest ? date : oldest),
       null,
     );
-  const domainInfoTabs = domainInfos.map(({ domainUrl, whoisInfo, dnsInfo }) => ({
-    siteId: site.id,
-    domainUrl,
-    displayDomain: formatDisplayDomain(
-      whoisInfo?.domain || dnsInfo?.domain || domainUrl,
-    ),
-    domainAge: whoisInfo ? getDomainAge(whoisInfo.creationDate) : "확인 불가",
-    whoisInfo,
-    dnsInfo,
-  }));
+  const domainInfoTabs = domainTargets.map((domainUrl) => {
+    const creationDate = domainCreationDates.get(extractDomain(domainUrl));
+
+    return {
+      siteId: site.id,
+      domainUrl,
+      displayDomain: formatDisplayDomain(domainUrl),
+      domainAge: creationDate ? getDomainAge(creationDate) : "확인 불가",
+      whoisInfo: null,
+      dnsInfo: null,
+      isLoaded: false,
+    };
+  });
   const currentIps = Array.from(new Set(site.resolvedIps ?? [])).sort();
   const scamReportCount = scamReports.length;
   const scamDamageAmount = scamReports.reduce(

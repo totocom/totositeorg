@@ -80,20 +80,6 @@ type PublicContentListResult<T> = {
   source: "supabase" | "fallback";
 };
 
-type PublicSiteDnsRecordRow = {
-  domain_url: string;
-  domain: string;
-  a_records: string[] | null;
-  aaaa_records: string[] | null;
-  cname_records: string[] | null;
-  mx_records: string[] | null;
-  ns_records: string[] | null;
-  txt_records: string[] | null;
-  soa_record: string | null;
-  error_message: string | null;
-  checked_at: string;
-};
-
 type PublicScamReportRow = {
   id: string;
   site_id: string;
@@ -218,24 +204,6 @@ function mapSiteRow(
     oldestDomainCreationDate,
     trustScore,
   } satisfies ReviewTarget;
-}
-
-function mapDnsRecordRow(row: PublicSiteDnsRecordRow): PublicSiteDnsRecord {
-  return {
-    domainUrl: row.domain_url,
-    checkedAt: row.checked_at,
-    dnsInfo: {
-      domain: row.domain,
-      a: row.a_records ?? [],
-      aaaa: row.aaaa_records ?? [],
-      cname: row.cname_records ?? [],
-      mx: row.mx_records ?? [],
-      ns: row.ns_records ?? [],
-      txt: row.txt_records ?? [],
-      soa: row.soa_record ?? "",
-      errorMessage: row.error_message ?? "",
-    },
-  };
 }
 
 async function getPublicNicknameMap(userIds: Array<string | null | undefined>) {
@@ -475,21 +443,10 @@ async function getPublicSiteDetailUncached(
     };
   }
 
-  const dnsRecordsResult = await supabase
-    .from("site_dns_records")
-    .select(
-      "domain_url, domain, a_records, aaaa_records, cname_records, mx_records, ns_records, txt_records, soa_record, error_message, checked_at",
-    )
-    .eq("site_id", siteResult.data.id)
-    .order("domain", { ascending: true });
-
   const reviewRows = (reviewsResult.data ?? []) as PublicReviewRow[];
   const scamReportRows = scamReportsResult.error
     ? []
     : ((scamReportsResult.data ?? []) as PublicScamReportRow[]);
-  const dnsRecordRows = dnsRecordsResult.error
-    ? []
-    : ((dnsRecordsResult.data ?? []) as PublicSiteDnsRecordRow[]);
   const nicknameMap = await getPublicNicknameMap([
     ...reviewRows.map((review) => review.user_id),
     ...scamReportRows.map((report) => report.user_id),
@@ -501,7 +458,7 @@ async function getPublicSiteDetailUncached(
     scamReports: scamReportRows.map((report) =>
       mapScamReportRow(report, nicknameMap),
     ),
-    dnsRecords: dnsRecordRows.map(mapDnsRecordRow),
+    dnsRecords: [],
     errorMessage: "",
     source: "supabase",
   };
