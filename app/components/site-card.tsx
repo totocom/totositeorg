@@ -87,7 +87,7 @@ export function SiteCard({ site }: SiteCardProps) {
             </div>
             {site.oldestDomainCreationDate ? (
               <span className="text-xs text-muted">
-                운영 이력 <span className="font-semibold text-foreground">{getDomainAge(site.oldestDomainCreationDate)}</span>
+                운영 이력 최소 <span className="font-semibold text-foreground">{getDomainAge(site.oldestDomainCreationDate)}</span>
               </span>
             ) : null}
           </div>
