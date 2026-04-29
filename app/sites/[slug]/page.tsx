@@ -288,8 +288,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           {/* 상단: 로고 + 이름 + 뱃지 */}
           <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between">
             {/* 왼쪽 */}
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-start gap-4">
+            <div className="w-full min-w-0 flex-1">
+              <div className="flex w-full min-w-0 items-start gap-4">
                 {site.faviconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -302,7 +302,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                     {site.siteName.trim().charAt(0)}
                   </div>
                 )}
-                <div className="min-w-0 pt-0.5">
+                <div className="min-w-0 flex-1 pt-0.5">
                   <p className="text-xs font-semibold uppercase tracking-wider text-accent">
                     ✓ 등록 검토 완료
                   </p>
@@ -316,11 +316,11 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </div>
 
               {site.domains.length > 1 ? (
-                <div className="mt-4 min-w-0">
+                <div className="mt-4 w-full min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted">
                     등록 도메인
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div className="mt-2 flex w-full flex-wrap items-center gap-1.5">
                     {site.domains.map((domain) => (
                       <span
                         key={domain}
