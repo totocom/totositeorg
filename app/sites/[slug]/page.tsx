@@ -316,7 +316,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </div>
 
               {site.domains.length > 1 ? (
-                <div className="mt-4 min-w-0 sm:pl-20">
+                <div className="mt-4 min-w-0 sm:pl-10">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted">
                     등록 도메인
                   </p>
