@@ -18,6 +18,14 @@ type AuthorContentState = {
 const actionButtonClassName =
   "inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95";
 
+function getActionHref(targetHref: string, isLoggedIn: boolean) {
+  if (isLoggedIn) {
+    return targetHref;
+  }
+
+  return `/login?redirectTo=${encodeURIComponent(targetHref)}`;
+}
+
 export function SiteAuthorActions({
   siteId,
   kind = "all",
@@ -75,12 +83,15 @@ export function SiteAuthorActions({
 
   const showReview = kind === "all" || kind === "review";
   const showScamReport = kind === "all" || kind === "scam-report";
+  const isLoggedIn = Boolean(user);
+  const reviewHref = `/submit-review?siteId=${siteId}`;
+  const scamReportHref = `/submit-scam-report?siteId=${siteId}`;
 
   return (
     <div className="flex flex-wrap gap-2 sm:justify-end">
       {showReview ? (
         <Link
-          href={`/submit-review?siteId=${siteId}`}
+          href={getActionHref(reviewHref, isLoggedIn)}
           className={actionButtonClassName}
         >
           {user && contentState.hasReview ? "내 만족도 평가 수정" : "만족도 평가"}
@@ -88,7 +99,7 @@ export function SiteAuthorActions({
       ) : null}
       {showScamReport ? (
         <Link
-          href={`/submit-scam-report?siteId=${siteId}`}
+          href={getActionHref(scamReportHref, isLoggedIn)}
           className={actionButtonClassName}
         >
           {user && contentState.hasScamReport ? "내 먹튀 제보 수정" : "먹튀 제보하기"}
