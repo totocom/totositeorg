@@ -314,24 +314,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   </p>
                 </div>
               </div>
-
-              {site.domains.length > 1 ? (
-                <div className="mt-4 w-full min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                    등록 도메인
-                  </p>
-                  <div className="mt-2 flex w-full flex-wrap items-center gap-1.5">
-                    {site.domains.map((domain) => (
-                      <span
-                        key={domain}
-                        className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted"
-                      >
-                        {formatDisplayUrl(domain)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </div>
 
             {/* 오른쪽: 평점 + 먹튀 */}
@@ -358,6 +340,25 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               )}
             </div>
           </div>
+
+          {/* 등록 도메인 */}
+          {site.domains.length > 1 ? (
+            <div className="border-t border-line px-5 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                등록 도메인
+              </p>
+              <div className="mt-2 flex w-full flex-wrap items-center gap-2">
+                {site.domains.map((domain) => (
+                  <span
+                    key={domain}
+                    className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted"
+                  >
+                    {formatDisplayUrl(domain)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {/* 사이트 개요 */}
           {site.shortDescription ? (
