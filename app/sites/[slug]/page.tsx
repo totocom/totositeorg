@@ -286,7 +286,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   <img
                     src={site.faviconUrl}
                     alt={logoAlt}
-                    className="mt-1 h-14 w-14 shrink-0 rounded-lg border border-line bg-white object-contain p-1"
+                    className="mt-1 h-14 w-14 shrink-0 rounded-lg border border-line bg-white object-contain p-1 dark:bg-surface"
                   />
                 ) : null}
                 <div className="min-w-0">
