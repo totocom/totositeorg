@@ -15,6 +15,9 @@ type AuthorContentState = {
   hasScamReport: boolean;
 };
 
+const actionButtonClassName =
+  "inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95";
+
 export function SiteAuthorActions({
   siteId,
   kind = "all",
@@ -78,7 +81,7 @@ export function SiteAuthorActions({
       {showReview ? (
         <Link
           href={`/submit-review?siteId=${siteId}`}
-          className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
+          className={actionButtonClassName}
         >
           {user && contentState.hasReview ? "내 만족도 평가 수정" : "만족도 평가"}
         </Link>
@@ -86,7 +89,7 @@ export function SiteAuthorActions({
       {showScamReport ? (
         <Link
           href={`/submit-scam-report?siteId=${siteId}`}
-          className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
+          className={actionButtonClassName}
         >
           {user && contentState.hasScamReport ? "내 먹튀 제보 수정" : "먹튀 제보하기"}
         </Link>
