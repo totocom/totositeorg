@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase/client";
 
 type SiteAuthorActionsProps = {
   siteId: string;
+  kind?: "all" | "review" | "scam-report";
 };
 
 type AuthorContentState = {
@@ -14,7 +15,10 @@ type AuthorContentState = {
   hasScamReport: boolean;
 };
 
-export function SiteAuthorActions({ siteId }: SiteAuthorActionsProps) {
+export function SiteAuthorActions({
+  siteId,
+  kind = "all",
+}: SiteAuthorActionsProps) {
   const { user, isLoading } = useAuth();
   const [contentState, setContentState] = useState<AuthorContentState>({
     hasReview: false,
@@ -66,20 +70,27 @@ export function SiteAuthorActions({ siteId }: SiteAuthorActionsProps) {
     return null;
   }
 
+  const showReview = kind === "all" || kind === "review";
+  const showScamReport = kind === "all" || kind === "scam-report";
+
   return (
     <div className="flex flex-wrap gap-2 sm:justify-end">
-      <Link
-        href={`/submit-review?siteId=${siteId}`}
-        className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
-      >
-        {user && contentState.hasReview ? "내 만족도 평가 수정" : "만족도 평가"}
-      </Link>
-      <Link
-        href={`/submit-scam-report?siteId=${siteId}`}
-        className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
-      >
-        {user && contentState.hasScamReport ? "내 먹튀 제보 수정" : "먹튀 제보하기"}
-      </Link>
+      {showReview ? (
+        <Link
+          href={`/submit-review?siteId=${siteId}`}
+          className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
+        >
+          {user && contentState.hasReview ? "내 만족도 평가 수정" : "만족도 평가"}
+        </Link>
+      ) : null}
+      {showScamReport ? (
+        <Link
+          href={`/submit-scam-report?siteId=${siteId}`}
+          className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
+        >
+          {user && contentState.hasScamReport ? "내 먹튀 제보 수정" : "먹튀 제보하기"}
+        </Link>
+      ) : null}
     </div>
   );
 }

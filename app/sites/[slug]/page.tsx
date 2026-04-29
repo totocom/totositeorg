@@ -356,6 +356,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   <p className="mt-0.5 text-xs text-accent/70">신고 이력 없음</p>
                 </div>
               )}
+              <AdminSiteDetailActions siteId={site.id} />
             </div>
           </div>
 
@@ -386,11 +387,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </div>
           ) : null}
 
-          {/* 관리 액션 */}
-          <div className="flex flex-wrap gap-2 border-t border-line px-5 py-3">
-            <AdminSiteDetailActions siteId={site.id} />
-            <SiteAuthorActions siteId={site.id} />
-          </div>
         </article>
 
         {/* 스크린샷 */}
@@ -468,9 +464,12 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
         {/* 먹튀 피해 이력 */}
         <section id="scam-reports" className="mt-5 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
-          <div className="border-b border-line px-5 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력</p>
-            <h2 className="mt-1 text-base font-bold">승인된 피해 제보</h2>
+          <div className="flex flex-col gap-3 border-b border-line px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력</p>
+              <h2 className="mt-1 text-base font-bold">승인된 피해 제보</h2>
+            </div>
+            <SiteAuthorActions siteId={site.id} kind="scam-report" />
           </div>
           {scamReports.length > 0 ? (
             <div className="grid gap-3 p-4">
@@ -522,9 +521,12 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
         {/* 커뮤니티 리뷰 */}
         <section id="reviews" className="mt-5 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
-          <div className="border-b border-line px-5 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-accent">커뮤니티 리뷰</p>
-            <h2 className="mt-1 text-base font-bold">최근 이용 경험</h2>
+          <div className="flex flex-col gap-3 border-b border-line px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent">커뮤니티 리뷰</p>
+              <h2 className="mt-1 text-base font-bold">최근 이용 경험</h2>
+            </div>
+            <SiteAuthorActions siteId={site.id} kind="review" />
           </div>
           {reviews.length > 0 ? (
             <div className="grid gap-3 p-4">
