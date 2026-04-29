@@ -16,6 +16,7 @@ type SortOption =
 
 type SiteBrowserProps = {
   sites: ReviewTarget[];
+  initialQuery?: string;
 };
 
 const pageSize = 12;
@@ -27,8 +28,8 @@ function getDomainAgeTime(site: ReviewTarget) {
   return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
 }
 
-export function SiteBrowser({ sites }: SiteBrowserProps) {
-  const [query, setQuery] = useState("");
+export function SiteBrowser({ sites, initialQuery = "" }: SiteBrowserProps) {
+  const [query, setQuery] = useState(initialQuery);
   const [sortOption, setSortOption] = useState<SortOption>("latest");
   const [visibleCount, setVisibleCount] = useState(pageSize);
 
@@ -45,6 +46,7 @@ export function SiteBrowser({ sites }: SiteBrowserProps) {
           site.category,
           site.shortDescription,
           site.licenseInfo,
+          ...(site.resolvedIps ?? []),
           site.domainSearchText ?? "",
         ]
           .join(" ")

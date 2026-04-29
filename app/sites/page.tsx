@@ -50,7 +50,21 @@ function buildDomainSearchText(site: ReviewTarget) {
   };
 }
 
-export default async function SitesPage() {
+type SitesPageProps = {
+  searchParams?: Promise<{
+    search?: string | string[];
+    q?: string | string[];
+  }>;
+};
+
+function firstSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+export default async function SitesPage({ searchParams }: SitesPageProps) {
+  const params = searchParams ? await searchParams : {};
+  const initialQuery =
+    firstSearchParam(params.search) || firstSearchParam(params.q);
   const { sites, errorMessage, source } = await getPublicSites();
   const searchableSites = sites.map(buildDomainSearchText);
 
@@ -100,7 +114,7 @@ export default async function SitesPage() {
         </p>
       ) : null}
 
-      <SiteBrowser sites={searchableSites} />
+      <SiteBrowser sites={searchableSites} initialQuery={initialQuery} />
     </main>
   );
 }

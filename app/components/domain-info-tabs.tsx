@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { PublicDnsInfo } from "@/app/data/domain-dns";
 import type { PublicWhoisInfo } from "@/app/data/domain-whois";
@@ -36,11 +37,34 @@ function CompactInfo({ label, value }: { label: string; value: string }) {
 }
 
 function DnsRecord({ label, values }: { label: string; values: string[] }) {
+  const canSearchByIp = label === "A" || label === "AAAA";
+
   return (
     <div className="rounded-md bg-background p-3">
       <dt className="text-xs font-semibold uppercase text-muted">{label}</dt>
       <dd className="mt-1 break-all text-sm leading-6 text-foreground">
-        {values.length > 0 ? values.join(", ") : "없음"}
+        {values.length > 0 ? (
+          <span className="grid gap-2">
+            {values.map((value) => (
+              <span
+                key={value}
+                className="flex flex-wrap items-center gap-x-2 gap-y-1"
+              >
+                <span>{value}</span>
+                {canSearchByIp ? (
+                  <Link
+                    href={`/sites?search=${encodeURIComponent(value)}`}
+                    className="inline-flex h-7 items-center rounded-md border border-line bg-white px-2 text-xs font-semibold text-foreground transition hover:border-accent hover:text-accent"
+                  >
+                    아이피로 검색
+                  </Link>
+                ) : null}
+              </span>
+            ))}
+          </span>
+        ) : (
+          "없음"
+        )}
       </dd>
     </div>
   );
