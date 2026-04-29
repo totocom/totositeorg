@@ -500,7 +500,13 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               ))}
             </div>
           ) : (
-            <p className="p-5 text-sm text-muted">승인되어 공개된 먹튀 피해 이력이 아직 없습니다.</p>
+            <div className="p-10 text-center">
+              <p className="text-3xl">🛡️</p>
+              <h3 className="mt-3 font-bold">아직 승인된 피해 제보가 없습니다</h3>
+              <p className="mt-2 text-sm text-muted">
+                이 사이트에 대한 먹튀 피해 이력은 관리자 검토 후 공개됩니다.
+              </p>
+            </div>
           )}
         </section>
 
