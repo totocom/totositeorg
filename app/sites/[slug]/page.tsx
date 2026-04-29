@@ -335,7 +335,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </div>
 
             {/* 오른쪽: 평점 + 먹튀 */}
-            <div className="flex shrink-0 flex-row gap-3 sm:flex-col">
+            <div className="flex shrink-0 flex-row gap-3">
               <div className="neon-safe flex-1 rounded-xl border border-line bg-accent-soft px-4 py-3 text-center sm:flex-none">
                 <Stars rating={site.averageRating} />
                 <p className="mt-1 text-sm font-bold text-accent">
