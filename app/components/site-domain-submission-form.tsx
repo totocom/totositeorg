@@ -115,7 +115,7 @@ export function SiteDomainSubmissionForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="h-10 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50"
+          className="h-10 rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95 disabled:opacity-50"
         >
           {isSubmitting ? "요청 중..." : user ? "도메인 추가" : "로그인 후 추가"}
         </button>
