@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 
 export type ActiveWhoisProvider = "api-ninjas" | "apilayer";
 export type WhoisProvider = ActiveWhoisProvider | "auto";
@@ -428,7 +429,7 @@ export async function getWhoisInfoForDomain(
   return whoisInfo;
 }
 
-export async function getBatchDomainCreationDates(
+async function getBatchDomainCreationDatesUncached(
   domains: string[],
 ): Promise<Map<string, string>> {
   if (domains.length === 0) return new Map();
@@ -451,6 +452,15 @@ export async function getBatchDomainCreationDates(
   }
   return result;
 }
+
+export const getBatchDomainCreationDates = unstable_cache(
+  getBatchDomainCreationDatesUncached,
+  ["batch-domain-creation-dates"],
+  {
+    revalidate: 300,
+    tags: ["public-sites"],
+  },
+);
 
 export async function getPublicWhoisInfo(
   siteUrl: string,
