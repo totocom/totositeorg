@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 
 export const runtime = "nodejs";
@@ -64,7 +64,7 @@ function isIconType(contentType: string) {
 }
 
 async function getUploadImage(file: File) {
-  const imageBytes = new Uint8Array(await file.arrayBuffer());
+  const imageBytes = Buffer.from(await file.arrayBuffer());
 
   if (isIconType(file.type)) {
     return {
@@ -77,6 +77,28 @@ async function getUploadImage(file: File) {
     bytes: await sharp(imageBytes).webp({ quality: 82 }).toBuffer(),
     contentType: "image/webp",
   };
+}
+
+async function uploadImage(
+  supabase: SupabaseClient,
+  bucket: string,
+  filePath: string,
+  bytes: Uint8Array | Buffer,
+  contentType: string,
+) {
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(filePath, bytes, {
+      contentType,
+      upsert: false,
+    });
+
+  if (error) {
+    throw new Error(`Supabase Storage 업로드 실패: ${error.message}`);
+  }
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+  return data.publicUrl;
 }
 
 export async function POST(request: Request) {
@@ -116,27 +138,34 @@ export async function POST(request: Request) {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const extension = getExtension(file.type);
     const filePath = `manual/${randomUUID()}.${extension}`;
-    const uploadImage = await getUploadImage(file);
-
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, uploadImage.bytes, {
-        contentType: uploadImage.contentType,
-        upsert: false,
-      });
-
-    if (error) {
-      return NextResponse.json(
-        { error: `Supabase Storage 업로드 실패: ${error.message}` },
-        { status: 400 },
-      );
-    }
-
-    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    const uploadImageData = await getUploadImage(file);
+    const screenshotUrl = await uploadImage(
+      supabase,
+      bucket,
+      filePath,
+      uploadImageData.bytes,
+      uploadImageData.contentType,
+    );
+    const screenshotThumbUrl = isIconType(file.type)
+      ? screenshotUrl
+      : await uploadImage(
+          supabase,
+          bucket,
+          `manual-thumbs/${randomUUID()}.webp`,
+          await sharp(uploadImageData.bytes)
+            .resize(480, 270, {
+              fit: "cover",
+              withoutEnlargement: true,
+            })
+            .webp({ quality: 74 })
+            .toBuffer(),
+          "image/webp",
+        );
 
     return NextResponse.json({
       ok: true,
-      screenshotUrl: data.publicUrl,
+      screenshotUrl,
+      screenshotThumbUrl,
     });
   } catch (error) {
     return NextResponse.json(

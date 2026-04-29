@@ -32,6 +32,7 @@ type SiteRow = {
   url: string;
   domains: string[] | null;
   screenshot_url: string | null;
+  screenshot_thumb_url: string | null;
   favicon_url: string | null;
   category: string;
   available_states: string[];
@@ -75,6 +76,7 @@ type ScamReportRow = {
     name: string;
     url: string;
     screenshot_url: string | null;
+    screenshot_thumb_url: string | null;
   }[] | null;
 };
 
@@ -306,7 +308,7 @@ async function fetchAdminData(): Promise<AdminDataResult> {
     supabase
       .from("sites")
       .select(
-        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, category, available_states, license_info, status, description, contact_telegram, created_at",
+        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, category, available_states, license_info, status, description, contact_telegram, created_at",
       )
       .in("status", ["pending", "approved", "rejected"])
       .order("created_at", { ascending: false }),
@@ -320,7 +322,7 @@ async function fetchAdminData(): Promise<AdminDataResult> {
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, incident_date, usage_period, main_category, damage_types, damage_amount, damage_amount_unknown, situation_description, review_status, is_published, created_at, sites(name, url, screenshot_url)",
+        "id, site_id, incident_date, usage_period, main_category, damage_types, damage_amount, damage_amount_unknown, situation_description, review_status, is_published, created_at, sites(name, url, screenshot_url, screenshot_thumb_url)",
       )
       .in("review_status", ["pending", "approved", "rejected"])
       .order("created_at", { ascending: false }),
@@ -396,7 +398,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
   const [dnsMessage, setDnsMessage] = useState("");
   const [dnsErrorMessage, setDnsErrorMessage] = useState("");
   const [pageCaptureUrl, setPageCaptureUrl] = useState("");
+  const [pageCaptureThumbUrl, setPageCaptureThumbUrl] = useState("");
   const [pendingPageCaptureUrl, setPendingPageCaptureUrl] = useState("");
+  const [pendingPageCaptureThumbUrl, setPendingPageCaptureThumbUrl] = useState("");
   const [isCapturingPage, setIsCapturingPage] = useState(false);
   const [isStoringFavicon, setIsStoringFavicon] = useState(false);
   const [pageCaptureMessage, setPageCaptureMessage] = useState("");
@@ -1176,6 +1180,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       | {
           ok?: boolean;
           screenshotUrl?: string;
+          screenshotThumbUrl?: string;
           source?: "lightsail" | "mshots";
           error?: string;
         }
@@ -1191,7 +1196,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     }
 
     setPendingPageCaptureUrl(result.screenshotUrl);
+    setPendingPageCaptureThumbUrl(result.screenshotThumbUrl ?? "");
     setPageCaptureUrl("");
+    setPageCaptureThumbUrl("");
     setPageCaptureMessage(
       result.source === "mshots"
         ? "Lightsail 캡처가 실패해 fallback 이미지가 생성되었습니다. 미리보기를 확인한 뒤 저장 여부를 선택해주세요."
@@ -1203,7 +1210,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     if (!pendingPageCaptureUrl) return;
 
     setPageCaptureUrl(pendingPageCaptureUrl);
+    setPageCaptureThumbUrl(pendingPageCaptureThumbUrl);
     setPendingPageCaptureUrl("");
+    setPendingPageCaptureThumbUrl("");
     setPageCaptureMessage(
       "캡처 이미지가 선택되었습니다. 사이트 등록을 완료하면 사이트 목록과 상세 화면에 표시됩니다.",
     );
@@ -1212,7 +1221,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
 
   function cancelPageCapturePreview() {
     setPendingPageCaptureUrl("");
+    setPendingPageCaptureThumbUrl("");
     setPageCaptureUrl("");
+    setPageCaptureThumbUrl("");
     setPageCaptureMessage("캡처 이미지 선택을 취소했습니다.");
     setPageCaptureErrorMessage("");
   }
@@ -1261,6 +1272,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
         url: siteFormValues.url.trim(),
         domains: getDomainList(siteFormValues),
         screenshot_url: pageCaptureUrl.trim() || null,
+        screenshot_thumb_url: pageCaptureThumbUrl.trim() || null,
         favicon_url: faviconUrl || null,
         category: defaultSiteCategory,
         available_states: ["전체"],
@@ -1322,7 +1334,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setDnsMessage("");
     setDnsErrorMessage("");
     setPageCaptureUrl("");
+    setPageCaptureThumbUrl("");
     setPendingPageCaptureUrl("");
+    setPendingPageCaptureThumbUrl("");
     setPageCaptureMessage("");
     setPageCaptureErrorMessage("");
     setSiteFormMessage("사이트가 등록되었습니다.");
@@ -1651,9 +1665,11 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
             수동 캡처 이미지
             <ScreenshotUploadControl
               value={pageCaptureUrl}
-              onChange={(url) => {
+              onChange={(url, thumbUrl) => {
                 setPageCaptureUrl(url);
+                setPageCaptureThumbUrl(thumbUrl ?? "");
                 setPendingPageCaptureUrl("");
+                setPendingPageCaptureThumbUrl("");
                 setPageCaptureErrorMessage("");
               }}
               onMessage={setPageCaptureMessage}
@@ -1673,7 +1689,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={pendingPageCaptureUrl}
+                src={pendingPageCaptureThumbUrl || pendingPageCaptureUrl}
                 alt="입력한 사이트의 페이지 캡처 미리보기"
                 className="aspect-video w-full rounded-md border border-line bg-white object-cover"
               />
@@ -1708,7 +1724,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={pageCaptureUrl}
+                src={pageCaptureThumbUrl || pageCaptureUrl}
                 alt="저장할 사이트 캡처 이미지"
                 className="aspect-video w-full rounded-md border border-line bg-white object-cover"
               />

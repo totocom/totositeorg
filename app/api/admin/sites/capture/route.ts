@@ -2,7 +2,7 @@ import { lookup } from "node:dns/promises";
 import net from "node:net";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { buildSiteScreenshotUrl } from "@/app/data/site-screenshot";
 
@@ -169,17 +169,16 @@ async function downloadImage(imageUrl: string) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-async function uploadScreenshot(imageBytes: Uint8Array) {
-  const { supabaseUrl, serviceRoleKey, bucket } = getStorageEnv();
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const webpBytes = await sharp(imageBytes)
-    .webp({ quality: 82 })
-    .toBuffer();
-  const filePath = `captures/${randomUUID()}.webp`;
-
+async function uploadImage(
+  supabase: SupabaseClient,
+  bucket: string,
+  bytes: Buffer,
+  pathPrefix: "captures" | "capture-thumbs",
+) {
+  const filePath = `${pathPrefix}/${randomUUID()}.webp`;
   const { error } = await supabase.storage
     .from(bucket)
-    .upload(filePath, webpBytes, {
+    .upload(filePath, bytes, {
       contentType: "image/webp",
       upsert: false,
     });
@@ -190,6 +189,30 @@ async function uploadScreenshot(imageBytes: Uint8Array) {
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
   return data.publicUrl;
+}
+
+async function uploadScreenshot(imageBytes: Uint8Array) {
+  const { supabaseUrl, serviceRoleKey, bucket } = getStorageEnv();
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const webpBytes = await sharp(imageBytes)
+    .webp({ quality: 82 })
+    .toBuffer();
+  const thumbBytes = await sharp(imageBytes)
+    .resize(480, 270, {
+      fit: "cover",
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 74 })
+    .toBuffer();
+  const screenshotUrl = await uploadImage(supabase, bucket, webpBytes, "captures");
+  const screenshotThumbUrl = await uploadImage(
+    supabase,
+    bucket,
+    thumbBytes,
+    "capture-thumbs",
+  );
+
+  return { screenshotUrl, screenshotThumbUrl };
 }
 
 export async function POST(request: Request) {
@@ -224,11 +247,12 @@ export async function POST(request: Request) {
     }
 
     const imageBytes = await downloadImage(temporaryImageUrl);
-    const screenshotUrl = await uploadScreenshot(imageBytes);
+    const { screenshotUrl, screenshotThumbUrl } = await uploadScreenshot(imageBytes);
 
     return NextResponse.json({
       ok: true,
       screenshotUrl,
+      screenshotThumbUrl,
       source,
     });
   } catch (error) {

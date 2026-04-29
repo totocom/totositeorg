@@ -21,6 +21,7 @@ create table if not exists public.sites (
   url text not null,
   domains text[] not null default '{}',
   screenshot_url text null,
+  screenshot_thumb_url text null,
   favicon_url text null,
   -- TODO: category is no longer exposed in the site registration UI.
   -- Keep the column temporarily for existing data compatibility.
@@ -174,6 +175,9 @@ alter table public.sites
 
 alter table public.sites
   add column if not exists screenshot_url text null;
+
+alter table public.sites
+  add column if not exists screenshot_thumb_url text null;
 
 alter table public.sites
   add column if not exists favicon_url text null;

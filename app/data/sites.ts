@@ -25,6 +25,7 @@ export type ReviewTarget = {
   siteUrl: string;
   domains: string[];
   screenshotUrl: string | null;
+  screenshotThumbUrl?: string | null;
   faviconUrl?: string | null;
   category: string;
   availableStates: string[];

@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase/client";
 
 type ScreenshotUploadControlProps = {
   value: string;
-  onChange: (url: string) => void;
+  onChange: (url: string, thumbUrl?: string) => void;
   onMessage?: (message: string) => void;
   onError?: (message: string) => void;
   accept?: string;
@@ -73,6 +73,7 @@ export function ScreenshotUploadControl({
       | {
           ok?: boolean;
           screenshotUrl?: string;
+          screenshotThumbUrl?: string;
           error?: string;
         }
       | null;
@@ -84,7 +85,7 @@ export function ScreenshotUploadControl({
       return;
     }
 
-    onChange(result.screenshotUrl);
+    onChange(result.screenshotUrl, result.screenshotThumbUrl);
     onMessage?.(successMessage);
   }
 

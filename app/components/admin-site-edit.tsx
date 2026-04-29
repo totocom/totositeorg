@@ -16,6 +16,7 @@ type SiteRow = {
   url: string;
   domains: string[] | null;
   screenshot_url: string | null;
+  screenshot_thumb_url: string | null;
   favicon_url: string | null;
   status: "pending" | "approved" | "rejected";
   description: string;
@@ -27,6 +28,7 @@ type EditValues = {
   url: string;
   domainsText: string;
   screenshotUrl: string;
+  screenshotThumbUrl: string;
   faviconUrl: string;
   description: string;
 };
@@ -43,6 +45,7 @@ const initialValues: EditValues = {
   url: "",
   domainsText: "",
   screenshotUrl: "",
+  screenshotThumbUrl: "",
   faviconUrl: "",
   description: "",
 };
@@ -155,6 +158,7 @@ function valuesFromSite(site: SiteRow): EditValues {
     url: site.url,
     domainsText: extraDomains.join("\n"),
     screenshotUrl: site.screenshot_url ?? "",
+    screenshotThumbUrl: site.screenshot_thumb_url ?? "",
     faviconUrl: site.favicon_url ?? "",
     description: site.description,
   };
@@ -287,7 +291,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
       const { data, error } = await supabase
         .from("sites")
-        .select("id, slug, name, name_ko, name_en, url, domains, screenshot_url, favicon_url, status, description")
+        .select("id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, status, description")
         .eq("id", siteId)
         .single();
 
@@ -623,6 +627,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       | {
           ok?: boolean;
           screenshotUrl?: string;
+          screenshotThumbUrl?: string;
           source?: "lightsail" | "mshots";
           error?: string;
         }
@@ -640,6 +645,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     setValues((current) => ({
       ...current,
       screenshotUrl: result.screenshotUrl ?? "",
+      screenshotThumbUrl: result.screenshotThumbUrl ?? "",
     }));
     setMessage(
       result.source === "mshots"
@@ -710,6 +716,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         url: values.url.trim(),
         domains: getDomainList(values),
         screenshot_url: values.screenshotUrl.trim() || null,
+        screenshot_thumb_url: values.screenshotThumbUrl.trim() || null,
         favicon_url: faviconUrl || null,
         ...(nextStatus ? { status: nextStatus } : {}),
         description: values.description.trim(),
@@ -1046,7 +1053,10 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
             캡처 이미지 URL
             <ScreenshotUploadControl
               value={values.screenshotUrl}
-              onChange={(url) => updateField("screenshotUrl", url)}
+              onChange={(url, thumbUrl) => {
+                updateField("screenshotUrl", url);
+                updateField("screenshotThumbUrl", thumbUrl ?? "");
+              }}
               onMessage={setMessage}
               onError={setErrorMessage}
             />

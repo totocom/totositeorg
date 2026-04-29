@@ -261,6 +261,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const scamDamageAmountUnknownCount = scamReports.filter(
     (report) => report.damageAmountUnknown,
   ).length;
+  const screenshotPreviewUrl = site.screenshotThumbUrl || site.screenshotUrl;
 
   return (
     <>
@@ -344,7 +345,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
         </article>
 
-        {site.screenshotUrl ? (
+        {site.screenshotUrl && screenshotPreviewUrl ? (
           <section className="mt-6 overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
             <div className="border-b border-line px-5 py-4">
               <p className="text-sm font-semibold uppercase text-accent">
@@ -352,15 +353,23 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </p>
               <h2 className="mt-1 text-xl font-bold">사이트 화면 미리보기</h2>
             </div>
-            <div className="relative aspect-video w-full bg-background">
+            <Link
+              href={site.screenshotUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group block"
+              aria-label={`${site.siteName} 원본 캡처 이미지 보기`}
+            >
+              <div className="relative aspect-video w-full bg-background">
               <Image
-                src={site.screenshotUrl}
+                src={screenshotPreviewUrl}
                 alt={`${site.siteName} 토토사이트 상세 메인 페이지`}
                 fill
                 sizes="(min-width: 1024px) 1024px, (min-width: 640px) calc(100vw - 48px), calc(100vw - 32px)"
-                className="object-cover"
+                className="object-cover transition duration-200 group-hover:scale-[1.01]"
               />
-            </div>
+              </div>
+            </Link>
           </section>
         ) : null}
 
