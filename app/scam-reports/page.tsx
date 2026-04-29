@@ -4,7 +4,7 @@ import { PublicScamReportList } from "@/app/components/public-scam-report-list";
 import { getPublicScamReportList } from "@/app/data/public-sites";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "먹튀 피해 제보",

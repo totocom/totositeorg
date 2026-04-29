@@ -7,15 +7,15 @@ import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
+import { SameIpSitesSection } from "@/app/components/same-ip-sites-section";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
 import { getPublicWhoisInfo } from "@/app/data/domain-whois";
-import { getPublicSiteDetail, getPublicSites } from "@/app/data/public-sites";
+import { getPublicSiteDetail } from "@/app/data/public-sites";
 import {
   calculateSiteTrustScore,
   formatRatingScore,
   formatTrustScore,
   getTrustScoreTone,
-  type ReviewTarget,
 } from "@/app/data/sites";
 
 function Stars({ rating }: { rating: number }) {
@@ -36,15 +36,8 @@ type SiteDetailPageProps = {
   }>;
 };
 
-type SameIpSite = {
-  site: ReviewTarget;
-  matchedDomains: string[];
-  matchedIps: string[];
-};
-
-export const dynamic = "force-dynamic";
 export const dynamicParams = true;
-export const revalidate = 0;
+export const revalidate = 300;
 
 function formatDisplayDomain(value: string) {
   if (!value) return "";
@@ -101,42 +94,6 @@ function formatDamageAmount(amount: number, unknownCount: number) {
   }
 
   return formattedAmount;
-}
-
-function getUniqueSiteDomains(site: ReviewTarget) {
-  return Array.from(
-    new Set((site.domains.length > 0 ? site.domains : [site.siteUrl]).filter(Boolean)),
-  );
-}
-
-async function getSameIpSites(site: ReviewTarget, currentIps: Set<string>) {
-  if (currentIps.size === 0) {
-    return [];
-  }
-
-  const { sites } = await getPublicSites();
-  const candidates = sites
-    .filter((candidate) => candidate.id !== site.id)
-    .slice(0, 80);
-
-  const matches = await Promise.all(
-    candidates.map(async (candidate): Promise<SameIpSite | null> => {
-      const candidateIps = candidate.resolvedIps ?? [];
-      const matchedIps = candidateIps.filter((ip) => currentIps.has(ip)).sort();
-
-      if (matchedIps.length === 0) {
-        return null;
-      }
-
-      return {
-        site: candidate,
-        matchedDomains: getUniqueSiteDomains(candidate).slice(0, 1),
-        matchedIps,
-      };
-    }),
-  );
-
-  return matches.filter((match): match is SameIpSite => Boolean(match)).slice(0, 8);
 }
 
 function getTrustToneClasses(tone: string) {
@@ -325,8 +282,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     whoisInfo,
     dnsInfo,
   }));
-  const currentIps = new Set(site.resolvedIps ?? []);
-  const sameIpSites = await getSameIpSites(site, currentIps);
+  const currentIps = Array.from(new Set(site.resolvedIps ?? [])).sort();
   const scamReportCount = scamReports.length;
   const scamDamageAmount = scamReports.reduce(
     (total, report) => total + Number(report.damageAmount ?? 0),
@@ -520,45 +476,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
         <DomainInfoTabs items={domainInfoTabs} />
 
         {/* 동일 IP 사이트 */}
-        {sameIpSites.length > 0 ? (
-          <section className="mt-5 rounded-xl border border-line bg-surface shadow-sm">
-            <div className="border-b border-line px-5 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-accent">동일 IP 연결</p>
-              <h2 className="mt-1 text-base font-bold">같은 IP를 사용하는 사이트</h2>
-              <p className="mt-1 text-xs text-muted">
-                현재 사이트의 DNS A/AAAA 레코드와 겹치는 공개 사이트만 표시합니다.
-              </p>
-            </div>
-            <div className="grid gap-2 p-4">
-              {sameIpSites.map((match) => (
-                <Link
-                  key={match.site.id}
-                  href={`/sites/${match.site.slug}`}
-                  className="rounded-lg border border-line bg-background p-4 transition hover:border-accent/50"
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground">{match.site.siteName}</p>
-                      <p className="mt-0.5 break-all text-xs text-muted">
-                        {formatDisplayUrl(match.matchedDomains[0] ?? match.site.siteUrl)}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 sm:justify-end">
-                      {match.matchedIps.map((ip) => (
-                        <span
-                          key={ip}
-                          className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold text-accent"
-                        >
-                          {ip}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <SameIpSitesSection siteId={site.id} currentIps={currentIps} />
 
         {/* 먹튀 피해 이력 */}
         <section id="scam-reports" className="mt-5 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">

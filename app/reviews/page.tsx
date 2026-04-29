@@ -4,7 +4,7 @@ import { PublicReviewList } from "@/app/components/public-review-list";
 import { getPublicReviewList } from "@/app/data/public-sites";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "이용자 만족도 평가",

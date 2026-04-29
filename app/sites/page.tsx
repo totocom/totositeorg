@@ -6,7 +6,7 @@ import { getPublicSites } from "@/app/data/public-sites";
 import type { ReviewTarget } from "@/app/data/sites";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "사이트 목록",

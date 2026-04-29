@@ -10,6 +10,7 @@ import {
 import type { PublicDnsInfo } from "@/app/data/domain-dns";
 import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
 import { supabase } from "@/lib/supabase/client";
+import { unstable_cache } from "next/cache";
 
 type PublicSiteRow = {
   id: string;
@@ -346,7 +347,7 @@ function getFallbackSitesResult(errorMessage: string): PublicSitesResult {
   };
 }
 
-export async function getPublicSites(): Promise<PublicSitesResult> {
+async function getPublicSitesUncached(): Promise<PublicSitesResult> {
   const [sitesResult, reviewsResult, scamReportsResult] = await Promise.all([
     supabase
       .from("sites")
@@ -409,7 +410,7 @@ export async function getPublicSites(): Promise<PublicSitesResult> {
   };
 }
 
-export async function getPublicSiteDetail(
+async function getPublicSiteDetailUncached(
   slug: string,
 ): Promise<PublicSiteDetailResult> {
   const siteResult = await supabase
@@ -506,7 +507,7 @@ export async function getPublicSiteDetail(
   };
 }
 
-export async function getPublicReviewList(): Promise<
+async function getPublicReviewListUncached(): Promise<
   PublicContentListResult<PublicReviewListItem>
 > {
   const [sitesResult, reviewsResult, scamReportsResult] = await Promise.all([
@@ -577,7 +578,7 @@ export async function getPublicReviewList(): Promise<
   };
 }
 
-export async function getPublicScamReportList(): Promise<
+async function getPublicScamReportListUncached(): Promise<
   PublicContentListResult<PublicScamReportListItem>
 > {
   const [sitesResult, reviewsResult, scamReportsResult] = await Promise.all([
@@ -638,3 +639,39 @@ export async function getPublicScamReportList(): Promise<
     source: "supabase",
   };
 }
+
+export const getPublicSites = unstable_cache(
+  getPublicSitesUncached,
+  ["public-sites"],
+  {
+    revalidate: 300,
+    tags: ["public-sites"],
+  },
+);
+
+export const getPublicSiteDetail = unstable_cache(
+  getPublicSiteDetailUncached,
+  ["public-site-detail"],
+  {
+    revalidate: 300,
+    tags: ["public-sites"],
+  },
+);
+
+export const getPublicReviewList = unstable_cache(
+  getPublicReviewListUncached,
+  ["public-review-list"],
+  {
+    revalidate: 300,
+    tags: ["public-sites"],
+  },
+);
+
+export const getPublicScamReportList = unstable_cache(
+  getPublicScamReportListUncached,
+  ["public-scam-report-list"],
+  {
+    revalidate: 300,
+    tags: ["public-sites"],
+  },
+);
