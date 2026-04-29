@@ -92,7 +92,11 @@ export default async function Home() {
             <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl text-accent">★★★★★</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" className="neon-logo h-8 w-8 shrink-0" aria-hidden="true">
+                    <path d="M16 2 L28 7 L28 17 Q28 25 16 30 Q4 25 4 17 L4 7 Z" fill="#00b67a"/>
+                    <circle cx="16" cy="14" r="4" fill="#0d0d0d"/>
+                    <path d="M16 18 Q16 18 12 24 Q14 26 16 26 Q18 26 20 24 Q16 18 16 18 Z" fill="#0d0d0d"/>
+                  </svg>
                   <span className="text-sm font-semibold text-white/60">검증된 토토사이트 정보</span>
                 </div>
                 <h1 className="mt-4 text-4xl font-extrabold leading-tight text-white sm:text-5xl">

@@ -21,7 +21,19 @@ export function Header() {
       <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2 text-lg font-bold text-white sm:text-xl">
-            <span className="neon-logo text-accent">★</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 32 32"
+              className="neon-logo h-7 w-7 shrink-0"
+              aria-hidden="true"
+            >
+              <path
+                d="M16 2 L28 7 L28 17 Q28 25 16 30 Q4 25 4 17 L4 7 Z"
+                fill="#00b67a"
+              />
+              <circle cx="16" cy="14" r="4" fill="#0d0d0d"/>
+              <path d="M16 18 Q16 18 12 24 Q14 26 16 26 Q18 26 20 24 Q16 18 16 18 Z" fill="#0d0d0d"/>
+            </svg>
             토토사이트 추천
           </Link>
 
