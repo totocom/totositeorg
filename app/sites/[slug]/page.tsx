@@ -195,7 +195,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             slug, status, RLS 정책을 확인해주세요.
           </p>
           {errorMessage ? (
-            <p className="mt-4 rounded-md bg-red-50 p-3 text-sm font-semibold text-red-700">
+            <p className="mt-4 rounded-md bg-red-50 p-3 text-sm font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-400">
               {errorMessage}
             </p>
           ) : null}
@@ -317,9 +317,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   <p className="text-xs text-accent">리뷰 {site.reviewCount}건</p>
                 </div>
                 {scamReportCount > 0 ? (
-                  <div className="neon-scam rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center">
-                    <p className="text-sm font-bold text-red-600">⚠ 먹튀 {scamReportCount}건</p>
-                    <p className="mt-0.5 text-xs text-red-500">
+                  <div className="neon-scam rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center dark:border-red-900 dark:bg-red-950/40">
+                    <p className="text-sm font-bold text-red-600 dark:text-red-400">⚠ 먹튀 {scamReportCount}건</p>
+                    <p className="mt-0.5 text-xs text-red-500 dark:text-red-400/70">
                       {formatDamageAmount(scamDamageAmount, scamDamageAmountUnknownCount)}
                     </p>
                   </div>
@@ -457,7 +457,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
         </section>
 
         {errorMessage ? (
-          <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
             {errorMessage}
           </section>
         ) : null}
