@@ -296,6 +296,35 @@ async function fetchWithTimeout(
   }
 }
 
+function isLikelyIco(contentType: string, url: URL) {
+  return (
+    contentType.includes("image/x-icon") ||
+    contentType.includes("image/vnd.microsoft.icon") ||
+    url.pathname.toLowerCase().endsWith(".ico")
+  );
+}
+
+async function uploadStoredFavicon(
+  storageEnv: NonNullable<ReturnType<typeof getStorageEnv>>,
+  bytes: Uint8Array | Buffer,
+  extension: "webp" | "ico",
+  contentType: string,
+) {
+  const supabase = createClient(storageEnv.supabaseUrl, storageEnv.serviceRoleKey);
+  const filePath = `favicons/${randomUUID()}.${extension}`;
+  const { error } = await supabase.storage
+    .from(storageEnv.bucket)
+    .upload(filePath, bytes, {
+      contentType,
+      upsert: false,
+    });
+
+  if (error) return "";
+
+  const { data } = supabase.storage.from(storageEnv.bucket).getPublicUrl(filePath);
+  return data.publicUrl;
+}
+
 async function storeFaviconUrl(faviconUrl: string) {
   const storageEnv = getStorageEnv();
   const parsedUrl = normalizeUrl(faviconUrl);
@@ -330,27 +359,34 @@ async function storeFaviconUrl(faviconUrl: string) {
       return "";
     }
 
-    const webpBytes = await sharp(imageBytes)
-      .resize(96, 96, {
-        fit: "contain",
-        background: { r: 255, g: 255, b: 255, alpha: 0 },
-        withoutEnlargement: true,
-      })
-      .webp({ quality: 82 })
-      .toBuffer();
-    const supabase = createClient(storageEnv.supabaseUrl, storageEnv.serviceRoleKey);
-    const filePath = `favicons/${randomUUID()}.webp`;
-    const { error } = await supabase.storage
-      .from(storageEnv.bucket)
-      .upload(filePath, webpBytes, {
-        contentType: "image/webp",
-        upsert: false,
-      });
+    try {
+      const webpBytes = await sharp(imageBytes)
+        .resize(96, 96, {
+          fit: "contain",
+          background: { r: 255, g: 255, b: 255, alpha: 0 },
+          withoutEnlargement: true,
+        })
+        .webp({ quality: 82 })
+        .toBuffer();
 
-    if (error) return "";
+      return await uploadStoredFavicon(
+        storageEnv,
+        webpBytes,
+        "webp",
+        "image/webp",
+      );
+    } catch {
+      if (!isLikelyIco(contentType, parsedUrl)) {
+        return "";
+      }
 
-    const { data } = supabase.storage.from(storageEnv.bucket).getPublicUrl(filePath);
-    return data.publicUrl;
+      return await uploadStoredFavicon(
+        storageEnv,
+        imageBytes,
+        "ico",
+        contentType.includes("image") ? contentType : "image/x-icon",
+      );
+    }
   } catch {
     return "";
   }
