@@ -131,7 +131,9 @@ async function uploadStoredFavicon(
       upsert: false,
     });
 
-  if (error) return "";
+  if (error) {
+    throw new Error(`Storage 업로드에 실패했습니다. ${error.message}`);
+  }
 
   const { data } = supabase.storage.from(storageEnv.bucket).getPublicUrl(filePath);
   return data.publicUrl;
@@ -141,67 +143,80 @@ async function storeFaviconUrl(faviconUrl: string) {
   const storageEnv = getStorageEnv();
   const parsedUrl = normalizeUrl(faviconUrl);
 
-  if (!storageEnv || !parsedUrl) return "";
+  if (!storageEnv) {
+    throw new Error("Storage 저장 환경변수(SUPABASE_SERVICE_ROLE_KEY)를 확인해주세요.");
+  }
+
+  if (!parsedUrl) {
+    throw new Error("http:// 또는 https:// 파비콘 URL을 입력해주세요.");
+  }
+
   if (isStoredFaviconUrl(parsedUrl)) return parsedUrl.toString();
 
-  try {
-    await assertPublicHost(parsedUrl);
+  await assertPublicHost(parsedUrl);
 
-    const response = await fetchWithTimeout(
-      parsedUrl.toString(),
-      {
-        headers: {
-          accept: "image/avif,image/webp,image/png,image/jpeg,image/svg+xml,image/x-icon,image/*,*/*;q=0.8",
-          "user-agent": "Mozilla/5.0 favicon-fetcher",
-        },
+  const response = await fetchWithTimeout(
+    parsedUrl.toString(),
+    {
+      redirect: "follow",
+      headers: {
+        accept: "image/avif,image/webp,image/png,image/jpeg,image/svg+xml,image/x-icon,image/*,*/*;q=0.8",
+        "accept-language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+        referer: `${parsedUrl.origin}/`,
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
       },
-      10_000,
+    },
+    10_000,
+  );
+
+  if (!response.ok) {
+    throw new Error(`파비콘 URL이 ${response.status} 응답을 반환했습니다.`);
+  }
+
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+
+  if (!contentType.includes("image") && !contentType.includes("octet-stream")) {
+    throw new Error(`파비콘 URL이 이미지가 아닌 응답(${contentType || "unknown"})을 반환했습니다.`);
+  }
+
+  const imageBytes = new Uint8Array(await response.arrayBuffer());
+
+  if (imageBytes.byteLength === 0) {
+    throw new Error("파비콘 파일이 비어 있습니다.");
+  }
+
+  if (imageBytes.byteLength > 2 * 1024 * 1024) {
+    throw new Error("파비콘 파일 용량이 2MB를 초과했습니다.");
+  }
+
+  try {
+    const webpBytes = await sharp(imageBytes)
+      .resize(96, 96, {
+        fit: "contain",
+        background: { r: 255, g: 255, b: 255, alpha: 0 },
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 82 })
+      .toBuffer();
+
+    return await uploadStoredFavicon(
+      storageEnv,
+      webpBytes,
+      "webp",
+      "image/webp",
     );
-
-    if (!response.ok) return "";
-
-    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-
-    if (!contentType.includes("image") && !contentType.includes("octet-stream")) {
-      return "";
-    }
-
-    const imageBytes = new Uint8Array(await response.arrayBuffer());
-
-    if (imageBytes.byteLength === 0 || imageBytes.byteLength > 2 * 1024 * 1024) {
-      return "";
-    }
-
-    try {
-      const webpBytes = await sharp(imageBytes)
-        .resize(96, 96, {
-          fit: "contain",
-          background: { r: 255, g: 255, b: 255, alpha: 0 },
-          withoutEnlargement: true,
-        })
-        .webp({ quality: 82 })
-        .toBuffer();
-
-      return await uploadStoredFavicon(
-        storageEnv,
-        webpBytes,
-        "webp",
-        "image/webp",
-      );
-    } catch {
-      if (!isLikelyIco(contentType, parsedUrl)) {
-        return "";
-      }
-
-      return await uploadStoredFavicon(
-        storageEnv,
-        imageBytes,
-        "ico",
-        contentType.includes("image") ? contentType : "image/x-icon",
-      );
-    }
   } catch {
-    return "";
+    if (!isLikelyIco(contentType, parsedUrl)) {
+      throw new Error("파비콘 이미지를 WebP로 변환하지 못했습니다.");
+    }
+
+    return await uploadStoredFavicon(
+      storageEnv,
+      imageBytes,
+      "ico",
+      contentType.includes("image") ? contentType : "image/x-icon",
+    );
   }
 }
 
@@ -253,14 +268,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const storedFaviconUrl = await storeFaviconUrl(faviconUrl);
-
-  if (!storedFaviconUrl) {
+  try {
+    const storedFaviconUrl = await storeFaviconUrl(faviconUrl);
+    return NextResponse.json({ faviconUrl: storedFaviconUrl }, { status: 200 });
+  } catch (error) {
     return NextResponse.json(
-      { error: "파비콘 파일을 저장소에 복사하지 못했습니다." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "파비콘 파일을 저장소에 복사하지 못했습니다.",
+      },
       { status: 400 },
     );
   }
-
-  return NextResponse.json({ faviconUrl: storedFaviconUrl }, { status: 200 });
 }
