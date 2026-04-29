@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { domainToUnicode } from "node:url";
 import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actions";
@@ -351,12 +352,15 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </p>
               <h2 className="mt-1 text-xl font-bold">사이트 화면 미리보기</h2>
             </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={site.screenshotUrl}
-              alt={`${site.siteName} 토토사이트 상세 메인 페이지`}
-              className="aspect-video w-full bg-background object-cover"
-            />
+            <div className="relative aspect-video w-full bg-background">
+              <Image
+                src={site.screenshotUrl}
+                alt={`${site.siteName} 토토사이트 상세 메인 페이지`}
+                fill
+                sizes="(min-width: 1024px) 1024px, (min-width: 640px) calc(100vw - 48px), calc(100vw - 32px)"
+                className="object-cover"
+              />
+            </div>
           </section>
         ) : null}
 
