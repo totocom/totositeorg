@@ -474,8 +474,8 @@ create index if not exists reviews_user_id_idx
   on public.reviews (user_id);
 
 -- Existing projects may already contain duplicate user/site review rows
--- from before the unique ownership rule was added. Keep the newest row
--- editable by the user and preserve older rows as historical public/admin data.
+-- from before the unique ownership rule was added. Keep the newest row and
+-- remove older duplicates so each user can own one review per site.
 with ranked_duplicate_reviews as (
   select
     id,
@@ -486,9 +486,8 @@ with ranked_duplicate_reviews as (
   from public.reviews
   where user_id is not null
 )
-update public.reviews
-set user_id = null
-from ranked_duplicate_reviews
+delete from public.reviews
+using ranked_duplicate_reviews
 where reviews.id = ranked_duplicate_reviews.id
   and ranked_duplicate_reviews.duplicate_rank > 1;
 
@@ -512,8 +511,8 @@ create index if not exists scam_reports_user_id_idx
   on public.scam_reports (user_id);
 
 -- Existing projects may already contain duplicate user/site scam report rows.
--- Keep the newest row editable by the user and preserve older rows as
--- historical public/admin data so the unique index can be created safely.
+-- Keep the newest row and remove older duplicates so each user can own one
+-- scam report per site.
 with ranked_duplicate_scam_reports as (
   select
     id,
@@ -524,9 +523,8 @@ with ranked_duplicate_scam_reports as (
   from public.scam_reports
   where user_id is not null
 )
-update public.scam_reports
-set user_id = null
-from ranked_duplicate_scam_reports
+delete from public.scam_reports
+using ranked_duplicate_scam_reports
 where scam_reports.id = ranked_duplicate_scam_reports.id
   and ranked_duplicate_scam_reports.duplicate_rank > 1;
 
