@@ -101,9 +101,9 @@ export function SiteCard({ site }: SiteCardProps) {
       ) : null}
 
       {scamReportCount > 0 ? (
-        <div className="neon-scam mt-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2">
-          <span className="text-sm font-bold text-red-600">⚠ 먹튀 {scamReportCount}건</span>
-          <span className="text-xs text-red-500">
+        <div className="neon-scam mt-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 dark:bg-red-950/40">
+          <span className="text-sm font-bold text-red-600 dark:text-red-400">⚠ 먹튀 {scamReportCount}건</span>
+          <span className="text-xs text-red-500 dark:text-red-400/70">
             피해 금액 {formatDamageAmount(scamDamageAmount, scamDamageAmountUnknownCount)}
           </span>
         </div>
