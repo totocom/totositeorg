@@ -241,6 +241,15 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
       };
     }),
   );
+  const oldestDomainCreationDate = domainInfos
+    .map(({ whoisInfo }) => whoisInfo?.creationDate)
+    .filter((date): date is string =>
+      typeof date === "string" && Number.isFinite(new Date(date).getTime()),
+    )
+    .reduce<string | null>(
+      (oldest, date) => (oldest === null || date < oldest ? date : oldest),
+      null,
+    );
   const domainInfoTabs = domainInfos.map(({ domainUrl, whoisInfo, dnsInfo }) => ({
     siteId: site.id,
     domainUrl,
@@ -303,8 +312,17 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   </div>
                 )}
                 <div className="min-w-0 flex-1 pt-0.5">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-                    ✓ 등록 검토 완료
+                  <p className="text-xs text-muted">
+                    {oldestDomainCreationDate ? (
+                      <>
+                        운영 이력 최소{" "}
+                        <span className="neon-star font-bold text-accent">
+                          {getDomainAge(oldestDomainCreationDate)}
+                        </span>
+                      </>
+                    ) : (
+                      "운영 이력 확인 불가"
+                    )}
                   </p>
                   <h1 className="mt-1.5 break-keep text-2xl font-bold sm:text-3xl">
                     {site.siteName}
