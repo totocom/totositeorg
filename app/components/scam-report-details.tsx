@@ -92,11 +92,11 @@ export function ScamReportDetails({ report, siteName }: ScamReportDetailsProps) 
         <HighlightItem label="피해 유형" value={damageTypes} />
       </div>
 
-      <blockquote className="rounded-md border border-line bg-white px-3 py-2 text-sm leading-6 text-muted">
+      <blockquote className="rounded-md border border-line bg-surface px-3 py-2 text-sm leading-6 text-muted">
         상황 설명: {report.situationDescription}
       </blockquote>
 
-      <details className="rounded-md border border-line bg-white p-3">
+      <details className="rounded-md border border-line bg-surface p-3">
         <summary className="cursor-pointer font-semibold text-foreground">
           상세 제보 응답 보기
         </summary>

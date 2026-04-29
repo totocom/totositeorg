@@ -9,6 +9,17 @@ import { SiteAuthorActions } from "@/app/components/site-author-actions";
 import { getPublicWhoisInfo } from "@/app/data/domain-whois";
 import { getPublicSiteDetail, getPublicSites } from "@/app/data/public-sites";
 import { formatRatingScore, type ReviewTarget } from "@/app/data/sites";
+
+function Stars({ rating }: { rating: number }) {
+  const filled = Math.round(Math.max(1, Math.min(5, rating)));
+  return (
+    <span aria-label={`${filled}점`} className="text-xl leading-none">
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={i < filled ? "neon-star text-accent" : "text-line"}>★</span>
+      ))}
+    </span>
+  );
+}
 import { siteUrl } from "@/lib/config";
 
 type SiteDetailPageProps = {
@@ -263,7 +274,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           사이트 목록으로 돌아가기
         </Link>
 
-        <article className="mt-5 rounded-lg border border-line bg-surface p-5 shadow-sm">
+        <article className="mt-5 rounded-xl border border-line bg-surface p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase text-accent">
@@ -297,30 +308,26 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             <div className="flex shrink-0 flex-col gap-3 sm:items-end">
               <AdminSiteDetailActions siteId={site.id} />
               <SiteAuthorActions siteId={site.id} />
-              <div className="flex gap-2">
-                <div className="min-w-20 rounded-md bg-accent-soft px-3 py-2 text-center">
-                  <p className="text-sm font-bold text-accent">
-                    리뷰 {site.reviewCount}건
+              <div className="flex flex-col gap-3">
+                <div className="neon-safe rounded-xl border border-line bg-accent-soft px-4 py-3 text-center">
+                  <Stars rating={site.averageRating} />
+                  <p className="mt-1 text-sm font-bold text-accent">
+                    {formatRatingScore(site.averageRating)}
                   </p>
-                  <p className="mt-0.5 text-xs text-accent">
-                    평점{" "}
-                    <span className="font-bold">
-                      {formatRatingScore(site.averageRating)}
-                    </span>
-                  </p>
+                  <p className="text-xs text-accent">리뷰 {site.reviewCount}건</p>
                 </div>
-                <div className="min-w-24 rounded-md bg-red-50 px-3 py-2 text-center">
-                  <p className="text-sm font-bold text-red-700">
-                    먹튀 {scamReportCount}건
-                  </p>
-                  <p className="mt-0.5 text-xs text-red-700">
-                    금액{" "}
-                    {formatDamageAmount(
-                      scamDamageAmount,
-                      scamDamageAmountUnknownCount,
-                    )}
-                  </p>
-                </div>
+                {scamReportCount > 0 ? (
+                  <div className="neon-scam rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center">
+                    <p className="text-sm font-bold text-red-600">⚠ 먹튀 {scamReportCount}건</p>
+                    <p className="mt-0.5 text-xs text-red-500">
+                      {formatDamageAmount(scamDamageAmount, scamDamageAmountUnknownCount)}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="neon-safe rounded-xl border border-accent/20 bg-accent-soft px-4 py-3 text-center">
+                    <p className="text-sm font-bold text-accent">✓ 먹튀 신고 없음</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -337,7 +344,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
         </article>
 
         {site.screenshotUrl ? (
-          <section className="mt-6 overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
+          <section className="mt-6 overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
             <div className="border-b border-line px-5 py-4">
               <p className="text-sm font-semibold uppercase text-accent">
                 페이지 캡처
@@ -356,7 +363,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
         <DomainInfoTabs items={domainInfoTabs} />
 
         {sameIpSites.length > 0 ? (
-          <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">
+          <section className="mt-6 rounded-xl border border-line bg-surface p-5 shadow-sm">
             <div>
               <p className="text-sm font-semibold uppercase text-accent">
                 동일 IP 연결
@@ -404,7 +411,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
         <section
           id="scam-reports"
-          className="mt-6 scroll-mt-24 rounded-lg border border-line bg-surface p-5 shadow-sm"
+          className="mt-6 scroll-mt-24 rounded-xl border border-line bg-surface p-5 shadow-sm"
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -475,20 +482,21 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             reviews.map((review) => (
               <article
                 key={review.id}
-                className="rounded-lg border border-line bg-surface p-4 shadow-sm"
+                className="rounded-xl border border-line bg-surface p-5 shadow-sm transition hover:border-accent/30"
               >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-accent">
-                      이용자 만족도 평가
-                    </p>
-                    <h3 className="mt-1 text-lg font-semibold">
-                      {review.title}
-                    </h3>
-                  </div>
-                  <p className="rounded-md bg-background px-3 py-1 text-sm font-semibold">
-                    {formatRatingScore(review.rating)}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-accent">
+                    이용자 만족도 평가
                   </p>
+                  <h3 className="mt-1 text-lg font-bold text-foreground">
+                    {review.title}
+                  </h3>
+                  <div className="mt-2 flex items-center gap-3">
+                    <Stars rating={review.rating} />
+                    <span className="text-xs text-muted">
+                      {formatRatingScore(review.rating)}
+                    </span>
+                  </div>
                 </div>
                 <ReviewSummary siteName={site.siteName} experience={review.experience} />
                 <p className="mt-3 text-xs text-muted">
@@ -497,8 +505,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </article>
             ))
           ) : (
-            <div className="rounded-lg border border-line bg-surface p-6 text-center">
-              <h3 className="font-semibold">아직 승인된 리뷰가 없습니다</h3>
+            <div className="rounded-xl border border-line bg-surface p-8 text-center">
+              <p className="text-2xl">📝</p>
+              <h3 className="mt-3 font-bold">아직 승인된 리뷰가 없습니다</h3>
               <p className="mt-2 text-sm text-muted">
                 이 사이트에 대한 이용 경험은 관리자 검토 후 공개됩니다.
               </p>

@@ -4,7 +4,18 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ReviewSummary } from "@/app/components/review-summary";
 import type { PublicReviewListItem } from "@/app/data/public-sites";
-import { formatRatingScore, issueTypeLabels } from "@/app/data/sites";
+import { issueTypeLabels } from "@/app/data/sites";
+
+function Stars({ rating }: { rating: number }) {
+  const filled = Math.round(Math.max(1, Math.min(5, rating)));
+  return (
+    <span aria-label={`${filled}점`} className="text-base leading-none">
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={i < filled ? "neon-star text-accent" : "text-line"}>★</span>
+      ))}
+    </span>
+  );
+}
 
 type ReviewSortOption = "latest" | "rating_high" | "rating_low" | "site_name";
 type RatingFilter = "all" | "5" | "4" | "3" | "2" | "1";
@@ -85,24 +96,24 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
 
   return (
     <div className="grid gap-6">
-      <section className="grid gap-3 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1.7fr_1fr_auto] lg:items-end">
-        <label className="grid gap-1 text-sm font-medium text-foreground">
+      <section className="grid gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[1.7fr_1fr_auto] lg:items-end">
+        <label className="grid gap-1.5 text-sm font-semibold text-foreground">
           검색
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-11 rounded-md border border-line bg-white px-3 text-sm text-foreground"
+            className="h-11 rounded-lg border border-line bg-background px-3 text-sm text-foreground transition focus:border-accent focus:outline-none"
             placeholder="사이트명, 도메인, 작성자 닉네임으로 검색"
           />
         </label>
-        <label className="grid gap-1 text-sm font-medium text-foreground">
+        <label className="grid gap-1.5 text-sm font-semibold text-foreground">
           정렬
           <select
             value={sortOption}
             onChange={(event) =>
               setSortOption(event.target.value as ReviewSortOption)
             }
-            className="h-11 rounded-md border border-line bg-white px-3 text-sm text-muted"
+            className="h-11 rounded-lg border border-line bg-background px-3 text-sm text-foreground transition focus:border-accent focus:outline-none"
           >
             <option value="latest">최신순</option>
             <option value="rating_high">평점 높은순</option>
@@ -114,7 +125,7 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
           type="button"
           onClick={resetFilters}
           disabled={!hasActiveFilters}
-          className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
+          className="h-11 rounded-lg border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-40"
         >
           초기화
         </button>
@@ -128,8 +139,8 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
             onClick={() => setRatingFilter(filter.value)}
             className={
               ratingFilter === filter.value
-                ? "rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white"
-                : "rounded-md border border-line bg-surface px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-background"
+                ? "rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white"
+                : "rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-foreground transition hover:border-accent/40 hover:text-accent"
             }
           >
             {filter.label}
@@ -146,28 +157,24 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
           {filteredItems.map((review) => (
             <article
               key={review.id}
-              className="rounded-lg border border-line bg-surface p-4 shadow-sm"
+              className="rounded-xl border border-line bg-surface p-5 shadow-sm transition hover:border-accent/30"
             >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <Link
-                    href={`/sites/${review.site.slug}#reviews`}
-                    className="text-sm font-semibold text-accent transition hover:text-foreground"
-                  >
-                    {review.site.siteName}
-                  </Link>
-                  <h2 className="mt-1 text-xl font-bold text-foreground">
-                    {review.title}
-                  </h2>
-                  <p className="mt-1 text-xs text-muted">
-                    {issueTypeLabels[review.issueType]} · 작성자{" "}
-                    {review.authorNickname ?? "익명"} ·{" "}
-                    {formatDate(review.createdAt)}
-                  </p>
+              <div className="min-w-0">
+                <Link
+                  href={`/sites/${review.site.slug}#reviews`}
+                  className="text-xs font-bold uppercase tracking-wide text-accent transition hover:text-accent/80"
+                >
+                  {review.site.siteName}
+                </Link>
+                <h2 className="mt-1 text-lg font-bold text-foreground">
+                  {review.title}
+                </h2>
+                <div className="mt-2 flex items-center gap-3">
+                  <Stars rating={review.rating} />
+                  <span className="text-xs text-muted">
+                    {issueTypeLabels[review.issueType]} · {review.authorNickname ?? "익명"} · {formatDate(review.createdAt)}
+                  </span>
                 </div>
-                <p className="w-fit rounded-md bg-background px-3 py-1 text-sm font-semibold">
-                  {formatRatingScore(review.rating)}
-                </p>
               </div>
               <ReviewSummary
                 siteName={review.site.siteName}
@@ -176,17 +183,18 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
               <div className="mt-4">
                 <Link
                   href={`/sites/${review.site.slug}#reviews`}
-                  className="text-sm font-semibold text-accent transition hover:text-foreground"
+                  className="text-sm font-semibold text-accent transition hover:text-accent/80"
                 >
-                  해당 게시물 보기
+                  해당 게시물 보기 →
                 </Link>
               </div>
             </article>
           ))}
         </section>
       ) : (
-        <section className="rounded-lg border border-line bg-surface p-8 text-center shadow-sm">
-          <h2 className="text-lg font-semibold">검색 결과가 없습니다</h2>
+        <section className="rounded-xl border border-line bg-surface p-10 text-center shadow-sm">
+          <p className="text-2xl">🔍</p>
+          <h2 className="mt-3 text-lg font-bold">검색 결과가 없습니다</h2>
           <p className="mt-2 text-sm leading-6 text-muted">
             사이트명 또는 평가 제목을 다르게 입력해보세요.
           </p>

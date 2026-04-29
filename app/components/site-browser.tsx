@@ -100,28 +100,28 @@ export function SiteBrowser({ sites, initialQuery = "" }: SiteBrowserProps) {
 
   return (
     <div className="grid gap-6">
-      <section className="grid gap-3 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1.7fr_1fr_auto] lg:items-end">
-        <label className="grid gap-1 text-sm font-medium text-foreground">
-          검색
+      <section className="grid gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[1.7fr_1fr_auto] lg:items-end">
+        <label className="grid gap-1.5 text-sm font-semibold text-foreground">
+          사이트 검색
           <input
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
               setVisibleCount(pageSize);
             }}
-            className="h-11 rounded-md border border-line bg-white px-3 text-sm text-foreground"
-            placeholder="사이트명, 도메인, IP, 네임서버, 등록자, 등록기관으로 검색"
+            className="h-11 rounded-lg border border-line bg-background px-3 text-sm text-foreground transition focus:border-accent focus:outline-none"
+            placeholder="사이트명, 도메인, IP, 네임서버로 검색"
           />
         </label>
-        <label className="grid gap-1 text-sm font-medium text-foreground">
-          정렬
+        <label className="grid gap-1.5 text-sm font-semibold text-foreground">
+          정렬 기준
           <select
             value={sortOption}
             onChange={(event) => {
               setSortOption(event.target.value as SortOption);
               setVisibleCount(pageSize);
             }}
-            className="h-11 rounded-md border border-line bg-white px-3 text-sm text-muted"
+            className="h-11 rounded-lg border border-line bg-background px-3 text-sm text-foreground transition focus:border-accent focus:outline-none"
           >
             <option value="latest">최신 등록순</option>
             <option value="domain_age">운영이력 오래된순</option>
@@ -137,14 +137,15 @@ export function SiteBrowser({ sites, initialQuery = "" }: SiteBrowserProps) {
           type="button"
           onClick={resetFilters}
           disabled={!hasActiveFilters}
-          className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
+          className="h-11 rounded-lg border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-40"
         >
           초기화
         </button>
       </section>
 
       <p className="text-sm text-muted">
-        승인된 사이트 {sites.length}개 중 {visibleSites.length}개 표시
+        승인된 사이트 <span className="font-semibold text-foreground">{sites.length}개</span> 중{" "}
+        <span className="font-semibold text-foreground">{visibleSites.length}개</span> 표시
         {filteredSites.length !== visibleSites.length
           ? ` / 검색 결과 ${filteredSites.length}개`
           : ""}
@@ -165,15 +166,16 @@ export function SiteBrowser({ sites, initialQuery = "" }: SiteBrowserProps) {
                   Math.min(current + pageSize, filteredSites.length),
                 )
               }
-              className="mx-auto h-11 rounded-md border border-line px-5 text-sm font-semibold text-foreground transition hover:bg-surface"
+              className="mx-auto h-11 rounded-xl border border-line bg-surface px-6 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
             >
-              더 보기
+              더 보기 ({filteredSites.length - visibleCount}개 남음)
             </button>
           ) : null}
         </>
       ) : (
-        <section className="rounded-lg border border-line bg-surface p-8 text-center">
-          <h2 className="text-lg font-semibold">검색 결과가 없습니다</h2>
+        <section className="rounded-xl border border-line bg-surface p-10 text-center">
+          <p className="text-2xl">🔍</p>
+          <h2 className="mt-3 text-lg font-bold">검색 결과가 없습니다</h2>
           <p className="mt-2 text-sm text-muted">
             다른 검색어 또는 카테고리로 다시 확인해보세요.
           </p>

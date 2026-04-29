@@ -17,10 +17,11 @@ export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#111111]">
       <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3">
-          <Link href="/" className="text-lg font-bold text-foreground sm:text-xl">
+          <Link href="/" className="flex items-center gap-2 text-lg font-bold text-white sm:text-xl">
+            <span className="neon-logo text-accent">★</span>
             토토사이트 추천
           </Link>
 
@@ -30,7 +31,7 @@ export function Header() {
             aria-expanded={isMenuOpen}
             aria-controls="mobile-navigation"
             aria-label={isMenuOpen ? "메뉴 닫기" : "메뉴 열기"}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line text-foreground transition hover:bg-background md:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-white/20 text-white transition hover:bg-white/10 md:hidden"
           >
             <span className="grid gap-1.5" aria-hidden="true">
               <span
@@ -56,13 +57,15 @@ export function Header() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-md px-3 py-2 text-sm font-semibold text-muted transition hover:bg-background hover:text-foreground"
+                className="rounded-md px-3 py-2 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
               >
                 {item.label}
               </Link>
             ))}
-            <AuthNav />
-            <ThemeToggle />
+            <div className="ml-1 flex items-center gap-1 [&_a]:text-white/70 [&_a:hover]:text-white [&_button]:text-white/70 [&_button:hover]:text-white">
+              <AuthNav />
+              <ThemeToggle />
+            </div>
           </nav>
         </div>
 
@@ -70,7 +73,7 @@ export function Header() {
           id="mobile-navigation"
           className={`md:hidden ${
             isMenuOpen ? "grid" : "hidden"
-          } mt-3 gap-2 rounded-lg border border-line bg-background p-3 shadow-sm [&_a]:flex [&_a]:min-h-11 [&_a]:items-center [&_a]:rounded-md [&_a]:px-3 [&_a]:py-2 [&_button]:flex [&_button]:min-h-11 [&_button]:items-center [&_button]:rounded-md [&_button]:px-3 [&_button]:py-2`}
+          } mt-3 gap-2 rounded-lg border border-white/10 bg-[#1a1a1a] p-3 [&_a]:flex [&_a]:min-h-11 [&_a]:items-center [&_a]:rounded-md [&_a]:px-3 [&_a]:py-2 [&_button]:flex [&_button]:min-h-11 [&_button]:items-center [&_button]:rounded-md [&_button]:px-3 [&_button]:py-2`}
         >
           <div className="grid gap-1">
             {navItems.map((item) => (
@@ -78,13 +81,13 @@ export function Header() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setIsMenuOpen(false)}
-                className="text-sm font-semibold text-foreground transition hover:bg-surface"
+                className="text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
               >
                 {item.label}
               </Link>
             ))}
           </div>
-          <div className="grid gap-1 border-t border-line pt-2">
+          <div className="grid gap-1 border-t border-white/10 pt-2 [&_a]:text-white/70 [&_a:hover]:text-white [&_button]:text-white/70 [&_button:hover]:text-white">
             <AuthNav />
             <ThemeToggle />
           </div>

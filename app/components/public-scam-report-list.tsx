@@ -117,24 +117,24 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
 
   return (
     <div className="grid gap-6">
-      <section className="grid gap-3 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1.7fr_1fr_auto] lg:items-end">
-        <label className="grid gap-1 text-sm font-medium text-foreground">
+      <section className="grid gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[1.7fr_1fr_auto] lg:items-end">
+        <label className="grid gap-1.5 text-sm font-semibold text-foreground">
           검색
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-11 rounded-md border border-line bg-white px-3 text-sm text-foreground"
+            className="h-11 rounded-lg border border-line bg-background px-3 text-sm text-foreground transition focus:border-accent focus:outline-none"
             placeholder="사이트명, 도메인, 작성자 닉네임으로 검색"
           />
         </label>
-        <label className="grid gap-1 text-sm font-medium text-foreground">
+        <label className="grid gap-1.5 text-sm font-semibold text-foreground">
           정렬
           <select
             value={sortOption}
             onChange={(event) =>
               setSortOption(event.target.value as ScamReportSortOption)
             }
-            className="h-11 rounded-md border border-line bg-white px-3 text-sm text-muted"
+            className="h-11 rounded-lg border border-line bg-background px-3 text-sm text-foreground transition focus:border-accent focus:outline-none"
           >
             <option value="latest">접수 최신순</option>
             <option value="incident_latest">발생일 최신순</option>
@@ -146,7 +146,7 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
           type="button"
           onClick={resetFilters}
           disabled={!hasActiveFilters}
-          className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
+          className="h-11 rounded-lg border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-40"
         >
           초기화
         </button>

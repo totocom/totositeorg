@@ -1,9 +1,20 @@
 import Link from "next/link";
-import { formatRatingScore, type ReviewTarget } from "@/app/data/sites";
+import { type ReviewTarget } from "@/app/data/sites";
 
 type SiteCardProps = {
   site: ReviewTarget;
 };
+
+function Stars({ rating }: { rating: number }) {
+  const filled = Math.round(Math.max(1, Math.min(5, rating)));
+  return (
+    <span aria-label={`${filled}점`} className="text-lg leading-none">
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={i < filled ? "neon-star text-accent" : "text-line"}>★</span>
+      ))}
+    </span>
+  );
+}
 
 function formatDamageAmount(amount: number, unknownCount: number) {
   const formattedAmount = `${amount.toLocaleString("ko-KR")}원`;
@@ -29,62 +40,57 @@ export function SiteCard({ site }: SiteCardProps) {
   return (
     <Link
       href={`/sites/${site.slug}`}
-      className="block rounded-lg border border-line bg-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className="group block rounded-xl border border-line bg-surface p-5 shadow-sm transition hover:border-accent/40 hover:neon-card"
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-background">
-            {site.faviconUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={site.faviconUrl}
-                alt={faviconAlt}
-                loading="lazy"
-                decoding="async"
-                className="h-8 w-8 object-contain"
-              />
-            ) : (
-              <span className="text-lg font-bold text-accent">
-                {fallbackInitial}
-              </span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-xl font-semibold text-foreground">
-              {site.siteName}
-            </h2>
-            <p className="mt-1 break-all text-sm text-muted">{site.siteUrl}</p>
-          </div>
+      <div className="flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-background">
+          {site.faviconUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={site.faviconUrl}
+              alt={faviconAlt}
+              loading="lazy"
+              decoding="async"
+              className="h-8 w-8 object-contain"
+            />
+          ) : (
+            <span className="text-lg font-bold text-accent">
+              {fallbackInitial}
+            </span>
+          )}
         </div>
-        <div className="flex shrink-0 gap-2">
-          <div className="min-w-20 rounded-md bg-accent-soft px-3 py-2 text-center">
-            <p className="text-sm font-bold text-accent">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-bold text-foreground group-hover:text-accent transition-colors">
+            {site.siteName}
+          </h2>
+          <p className="mt-0.5 break-all text-xs text-muted">{site.siteUrl}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <Stars rating={site.averageRating} />
+            <span className="text-xs text-muted">
               리뷰 {site.reviewCount}건
-            </p>
-            <p className="mt-0.5 text-xs text-accent">
-              평점{" "}
-              <span className="font-bold">
-                {formatRatingScore(site.averageRating)}
-              </span>
-            </p>
-          </div>
-          <div className="min-w-24 rounded-md bg-red-50 px-3 py-2 text-center">
-            <p className="text-sm font-bold text-red-700">
-              먹튀 {scamReportCount}건
-            </p>
-            <p className="mt-0.5 text-xs text-red-700">
-              금액{" "}
-              {formatDamageAmount(
-                scamDamageAmount,
-                scamDamageAmountUnknownCount,
-              )}
-            </p>
+            </span>
           </div>
         </div>
       </div>
-      <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted">
-        {site.shortDescription}
-      </p>
+
+      {site.shortDescription ? (
+        <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted">
+          {site.shortDescription}
+        </p>
+      ) : null}
+
+      {scamReportCount > 0 ? (
+        <div className="neon-scam mt-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2">
+          <span className="text-sm font-bold text-red-600">⚠ 먹튀 {scamReportCount}건</span>
+          <span className="text-xs text-red-500">
+            피해 금액 {formatDamageAmount(scamDamageAmount, scamDamageAmountUnknownCount)}
+          </span>
+        </div>
+      ) : (
+        <div className="neon-safe mt-3 flex items-center gap-2 rounded-lg bg-accent-soft px-3 py-2">
+          <span className="text-xs font-semibold text-accent">✓ 먹튀 신고 없음</span>
+        </div>
+      )}
     </Link>
   );
 }

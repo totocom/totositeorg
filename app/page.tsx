@@ -85,100 +85,109 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase text-accent">
-              한국 토토사이트 추천 및 리뷰
-            </p>
-            <h1 className="mt-2 text-3xl font-bold text-foreground">
-              안전한 토토사이트 순위와 실제 이용 경험을 확인하세요
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-              관리자가 등록한 사이트 목록을 확인하고, 사이트별 이용 경험과
-              만족도 평가를 참고할 수 있습니다.
-            </p>
+      <main className="flex w-full flex-col">
+        {/* Hero */}
+        <section className="bg-[#111111] px-4 py-14 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl text-accent">★★★★★</span>
+                  <span className="text-sm font-semibold text-white/60">검증된 토토사이트 정보</span>
+                </div>
+                <h1 className="mt-4 text-4xl font-extrabold leading-tight text-white sm:text-5xl">
+                  안전한 토토사이트,<br />
+                  <span className="text-accent">실제 후기로 확인하세요</span>
+                </h1>
+                <p className="mt-4 max-w-xl text-base leading-7 text-white/60">
+                  관리자가 직접 검증한 사이트 목록과 실이용자의 만족도 평가를 한곳에서 확인할 수 있습니다.
+                </p>
+              </div>
+              <form action="/sites" method="get" className="w-full max-w-md lg:shrink-0">
+                <div className="flex overflow-hidden rounded-lg border border-white/20 bg-white/10 focus-within:border-accent">
+                  <input
+                    name="q"
+                    type="search"
+                    placeholder="사이트명 또는 도메인 검색"
+                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="shrink-0 bg-accent px-5 py-3 text-sm font-bold text-white transition hover:bg-accent/90"
+                  >
+                    검색
+                  </button>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link href="/sites" className="text-sm font-semibold text-accent transition hover:text-accent/80">
+                    전체 사이트 목록 →
+                  </Link>
+                  <Link href="/reviews" className="text-sm font-semibold text-white/60 transition hover:text-white">
+                    만족도 평가 보기
+                  </Link>
+                  <Link href="/scam-reports" className="text-sm font-semibold text-white/60 transition hover:text-white">
+                    먹튀 제보 확인
+                  </Link>
+                </div>
+              </form>
+            </div>
           </div>
-          <Link
-            href="/sites"
-            className="inline-flex h-11 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
-          >
-            사이트 목록
-          </Link>
-        </header>
+        </section>
 
-        <section className="grid gap-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
-          <div>
-            <h2 className="text-xl font-bold text-foreground">
-              토토사이트란?
-            </h2>
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+          {/* 선택 기준 */}
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { icon: "🏛️", title: "공식 라이선스", desc: "MGA, UKGC 등 공신력 있는 기관 인증 사이트만" },
+              { icon: "💸", title: "빠른 입출금", desc: "출금 지연·거부 이력 없는 사이트" },
+              { icon: "💬", title: "한국어 지원", desc: "한국어 고객센터 운영 여부 확인" },
+              { icon: "🛡️", title: "먹튀 이력 없음", desc: "커뮤니티 신고 이력 검토 완료" },
+            ].map((item) => (
+              <div key={item.title} className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+                <span className="text-2xl">{item.icon}</span>
+                <h3 className="mt-3 text-sm font-bold text-foreground">{item.title}</h3>
+                <p className="mt-1 text-sm leading-6 text-muted">{item.desc}</p>
+              </div>
+            ))}
+          </section>
+
+          {/* 토토사이트 설명 */}
+          <section className="rounded-xl border border-line bg-surface p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-foreground">토토사이트란?</h2>
             <p className="mt-3 text-sm leading-7 text-muted">
               토토사이트는 스포츠 경기 결과를 예측해 베팅하는 온라인 플랫폼을 말합니다.
               국내 합법 스포츠토토 외에도 해외 라이선스 기반의 온라인 베팅 사이트들이
               다양하게 운영되고 있습니다. 안전한 토토사이트를 선택하려면 라이선스
               보유 여부, 입출금 처리 속도, 고객지원 품질 등을 꼼꼼히 확인해야 합니다.
             </p>
-          </div>
+          </section>
 
-          <div>
-            <h2 className="text-xl font-bold text-foreground">
-              안전한 토토사이트 선택 기준
-            </h2>
-            <ul className="mt-3 grid gap-2 text-sm leading-7 text-muted">
-              <li>
-                <span className="font-semibold text-foreground">공식 라이선스 확인</span> —
-                몰타(MGA), 퀴라소, 지브롤터, 영국(UKGC) 등 공신력 있는 기관의 라이선스
-                보유 여부를 확인하세요.
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">입출금 후기</span> —
-                출금 지연, 거부 사례가 없는지 실제 이용자 후기를 통해 확인하세요.
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">고객센터 응답</span> —
-                한국어 지원 여부와 응답 속도를 확인하세요.
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">먹튀 이력</span> —
-                커뮤니티에서 먹튀 신고 이력이 없는지 반드시 검토하세요.
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-line bg-surface p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-foreground">자주 묻는 질문</h2>
-          <dl className="mt-4 grid gap-5">
-            <div>
-              <dt className="text-sm font-semibold text-foreground">
-                먹튀 토토사이트를 어떻게 알아볼 수 있나요?
-              </dt>
-              <dd className="mt-1 text-sm leading-6 text-muted">
-                출금 지연·거부, 고객센터 연락 두절, 불명확한 보너스 약관,
-                라이선스 정보 미공개가 대표적인 먹튀 징후입니다. 이용 전 반드시
-                커뮤니티 후기를 확인하세요.
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm font-semibold text-foreground">
-                토토사이트 이용 가능한 나이는?
-              </dt>
-              <dd className="mt-1 text-sm leading-6 text-muted">
-                19세 이상만 이용 가능합니다. 미성년자는 이용이 금지되어 있습니다.
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm font-semibold text-foreground">
-                리뷰는 어떻게 작성하나요?
-              </dt>
-              <dd className="mt-1 text-sm leading-6 text-muted">
-                사이트 목록에서 특정 사이트를 선택한 뒤, 해당 사이트 상세
-                화면에서 이용 경험을 공유할 수 있습니다. 제출된 내용은 관리자
-                검토 후 공개됩니다.
-              </dd>
-            </div>
-          </dl>
-        </section>
+          {/* FAQ */}
+          <section className="rounded-xl border border-line bg-surface p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-foreground">자주 묻는 질문</h2>
+            <dl className="mt-5 grid gap-0 divide-y divide-line">
+              {[
+                {
+                  q: "먹튀 토토사이트를 어떻게 알아볼 수 있나요?",
+                  a: "출금 지연·거부, 고객센터 연락 두절, 불명확한 보너스 약관, 라이선스 정보 미공개가 대표적인 먹튀 징후입니다. 이용 전 반드시 커뮤니티 후기를 확인하세요.",
+                },
+                {
+                  q: "토토사이트 이용 가능한 나이는?",
+                  a: "19세 이상만 이용 가능합니다. 미성년자는 이용이 금지되어 있습니다.",
+                },
+                {
+                  q: "리뷰는 어떻게 작성하나요?",
+                  a: "사이트 목록에서 특정 사이트를 선택한 뒤, 해당 사이트 상세 화면에서 이용 경험을 공유할 수 있습니다. 제출된 내용은 관리자 검토 후 공개됩니다.",
+                },
+              ].map((item) => (
+                <div key={item.q} className="py-4">
+                  <dt className="text-sm font-semibold text-foreground">{item.q}</dt>
+                  <dd className="mt-1 text-sm leading-6 text-muted">{item.a}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
       </main>
     </>
   );
