@@ -143,7 +143,7 @@ export function SubmitReviewForm({
   selectedSiteId = "",
 }: SubmitReviewFormProps) {
   const normalizedSelectedSiteId = selectedSiteId.trim();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);
   const fallbackSites = sites.map((site) => ({
     id: site.id,
@@ -474,6 +474,31 @@ export function SubmitReviewForm({
     }`;
   }
 
+  if (isAuthLoading) {
+    return (
+      <section className="rounded-lg border border-line bg-surface p-5 text-sm text-muted shadow-sm">
+        로그인 상태를 확인하는 중입니다.
+      </section>
+    );
+  }
+
+  if (!user) {
+    return (
+      <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
+        <h2 className="text-lg font-semibold">로그인이 필요합니다</h2>
+        <p className="mt-2 text-sm leading-6 text-muted">
+          만족도 평가는 로그인한 회원만 작성할 수 있습니다.
+        </p>
+        <a
+          href="/login"
+          className="mt-4 inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
+        >
+          로그인하기
+        </a>
+      </section>
+    );
+  }
+
   if (formStatus === "loading-sites") {
     return (
       <section className="rounded-lg border border-line bg-surface p-5 text-sm text-muted shadow-sm">
@@ -514,12 +539,6 @@ export function SubmitReviewForm({
       {submitError ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {submitError}
-        </div>
-      ) : null}
-
-      {!user ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          만족도 평가는 로그인 사용자만 작성할 수 있습니다.
         </div>
       ) : null}
 

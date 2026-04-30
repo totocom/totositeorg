@@ -254,7 +254,7 @@ function isUuid(value: string) {
 
 export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
   const normalizedSelectedSiteId = selectedSiteId.trim();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const sectionRef = useRef<HTMLElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [siteOptions, setSiteOptions] = useState<ScamReportSiteOption[]>([]);
@@ -646,6 +646,31 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
     }`;
   }
 
+  if (isAuthLoading) {
+    return (
+      <section className="rounded-lg border border-line bg-surface p-5 text-sm text-muted shadow-sm">
+        로그인 상태를 확인하는 중입니다.
+      </section>
+    );
+  }
+
+  if (!user) {
+    return (
+      <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
+        <h2 className="text-lg font-semibold">로그인이 필요합니다</h2>
+        <p className="mt-2 text-sm leading-6 text-muted">
+          먹튀 피해 제보는 로그인한 회원만 작성할 수 있습니다.
+        </p>
+        <Link
+          href="/login"
+          className="mt-4 inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white"
+        >
+          로그인하기
+        </Link>
+      </section>
+    );
+  }
+
   if (isLoadingSites) {
     return (
       <section className="rounded-lg border border-line bg-surface p-5 text-sm text-muted shadow-sm">
@@ -801,12 +826,6 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
         className="mt-5 grid gap-5"
         noValidate
       >
-          {!user ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-              먹튀 피해 제보는 로그인 사용자만 작성할 수 있습니다.
-            </div>
-          ) : null}
-
           <div className="grid gap-4 sm:grid-cols-3">
             <label
               className="grid gap-1 text-sm font-medium"
