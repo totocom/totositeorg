@@ -73,6 +73,19 @@ const adminFeatures = [
   },
 ];
 
+function ApprovedChannelLink() {
+  return (
+    <Link
+      href="https://t.me/totosite_org"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-semibold text-accent underline-offset-4 hover:underline"
+    >
+      @totosite_org
+    </Link>
+  );
+}
+
 export default function TelegramGuidePage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
@@ -108,7 +121,15 @@ export default function TelegramGuidePage() {
                 {feature.title}
               </h3>
               <p className="mt-2 text-sm leading-6 text-muted">
-                {feature.description}
+                {feature.title === "승인 게시물 채널 업데이트" ? (
+                  <>
+                    관리자가 사이트, 만족도 평가, 먹튀 피해 제보를 승인하면 공개
+                    텔레그램 채널 <ApprovedChannelLink />에도 새 콘텐츠 안내가
+                    등록됩니다.
+                  </>
+                ) : (
+                  feature.description
+                )}
               </p>
             </article>
           ))}
@@ -185,6 +206,14 @@ export default function TelegramGuidePage() {
             className="inline-flex h-10 items-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-background"
           >
             사이트별 알림 구독하기
+          </Link>
+          <Link
+            href="https://t.me/totosite_org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-10 items-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-background"
+          >
+            @totosite_org 채널 보기
           </Link>
         </div>
       </section>
