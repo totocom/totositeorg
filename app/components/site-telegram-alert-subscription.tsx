@@ -20,6 +20,10 @@ type SiteSubscriptionRow = {
   id: string;
 };
 
+type SiteSubscriptionCountRow = {
+  subscriber_count: number | null;
+};
+
 const telegramBotUrl = process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? "";
 
 function getTelegramStartUrl(userId: string) {
@@ -43,6 +47,7 @@ export function SiteTelegramAlertSubscription({
   const pathname = usePathname();
   const [telegramConnected, setTelegramConnected] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -53,10 +58,27 @@ export function SiteTelegramAlertSubscription({
     [user],
   );
 
+  async function loadSubscriberCount() {
+    const { data, error } = await supabase
+      .from("site_telegram_subscription_counts")
+      .select("subscriber_count")
+      .eq("site_id", siteId)
+      .maybeSingle<SiteSubscriptionCountRow>();
+
+    if (!error && data) {
+      setSubscriberCount(Number(data.subscriber_count ?? 0));
+    } else {
+      setSubscriberCount(0);
+    }
+  }
+
   async function loadSubscription() {
     if (isAuthLoading) return;
 
     setMessage("");
+    setIsLoading(true);
+
+    await loadSubscriberCount();
 
     if (!user) {
       setTelegramConnected(false);
@@ -64,8 +86,6 @@ export function SiteTelegramAlertSubscription({
       setIsLoading(false);
       return;
     }
-
-    setIsLoading(true);
 
     const [telegramResult, siteSubscriptionResult] = await Promise.all([
       supabase
@@ -143,6 +163,7 @@ export function SiteTelegramAlertSubscription({
           ? "구독 완료 메시지를 텔레그램으로 보냈습니다."
           : "구독 해제 메시지를 텔레그램으로 보냈습니다.",
       );
+      await loadSubscriberCount();
     }
 
     setIsSaving(false);
@@ -158,6 +179,9 @@ export function SiteTelegramAlertSubscription({
           <h2 className="mt-1 text-base font-bold">텔레그램 알림 구독</h2>
           <p className="mt-1 text-sm leading-6 text-muted">
             {siteName}에 새 만족도 평가나 먹튀 피해 제보가 승인되면 알림을 받습니다.
+          </p>
+          <p className="mt-1 text-xs font-semibold text-muted">
+            현재 구독자 {subscriberCount.toLocaleString("ko-KR")}명
           </p>
         </div>
 

@@ -649,6 +649,15 @@ group by review_id;
 
 grant select on public.review_helpfulness_counts to anon, authenticated;
 
+create or replace view public.site_telegram_subscription_counts as
+select
+  site_id,
+  count(*)::integer as subscriber_count
+from public.site_telegram_subscriptions
+group by site_id;
+
+grant select on public.site_telegram_subscription_counts to anon, authenticated;
+
 update public.sites
 set slug = regexp_replace(
   trim(both '-' from lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'))),
