@@ -5,7 +5,7 @@ import { siteName, siteUrl } from "@/lib/config";
 export const metadata: Metadata = {
   title: "텔레그램 기능 안내",
   description:
-    "회원가입 텔레그램 인증, 사이트 및 게시물 제출 알림, 승인 알림 등 현재 적용된 텔레그램 기능을 안내합니다.",
+    "회원가입 텔레그램 인증, 사이트별 알림 구독, 사이트 및 게시물 제출 알림, 승인 알림 등 현재 적용된 텔레그램 기능을 안내합니다.",
   alternates: {
     canonical: `${siteUrl}/telegram-guide`,
   },
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     url: `${siteUrl}/telegram-guide`,
     title: `텔레그램 기능 안내 | ${siteName}`,
     description:
-      "현재 사이트에 적용된 텔레그램 인증과 알림 기능을 확인하세요.",
+      "현재 사이트에 적용된 텔레그램 인증, 사이트별 구독, 승인 알림 기능을 확인하세요.",
   },
 };
 
@@ -29,6 +29,16 @@ const userFeatures = [
       "회원이 사이트를 제보한 뒤 관리자가 승인하면, 연결된 텔레그램 대화로 승인 완료 안내와 공개 주소가 전송됩니다.",
   },
   {
+    title: "사이트별 알림 구독",
+    description:
+      "사이트 상세 페이지에서 텔레그램 알림을 구독하면 해당 사이트에 새 만족도 평가나 먹튀 피해 제보가 승인될 때 개인 대화로 알림을 받을 수 있습니다.",
+  },
+  {
+    title: "구독 해제 지원",
+    description:
+      "사이트 상세 페이지에서 구독을 해제할 수 있고, 텔레그램 봇 대화방에서 /stop 명령을 보내면 연결된 사이트 알림 구독을 한 번에 해제할 수 있습니다.",
+  },
+  {
     title: "만족도 평가 및 먹튀 제보 승인 알림",
     description:
       "작성한 만족도 평가나 먹튀 피해 제보가 승인되면, 해당 사이트 상세 페이지로 이동할 수 있는 바로가기와 함께 알림을 받습니다.",
@@ -36,7 +46,7 @@ const userFeatures = [
   {
     title: "승인 게시물 채널 업데이트",
     description:
-      "관리자가 만족도 평가나 먹튀 피해 제보를 승인하면 공개 텔레그램 채널 @totosite_org에도 새 게시물 안내가 등록됩니다.",
+      "관리자가 사이트, 만족도 평가, 먹튀 피해 제보를 승인하면 공개 텔레그램 채널 @totosite_org에도 새 콘텐츠 안내가 등록됩니다.",
   },
 ];
 
@@ -50,6 +60,11 @@ const adminFeatures = [
     title: "새 만족도 평가 및 먹튀 제보 접수 알림",
     description:
       "회원이 만족도 평가나 먹튀 피해 제보를 제출하면 운영자 텔레그램 채널로 검토가 필요한 새 게시물 정보가 전달됩니다.",
+  },
+  {
+    title: "구독자 승인 알림 발송",
+    description:
+      "관리자가 만족도 평가나 먹튀 피해 제보를 승인하면 작성자뿐 아니라 해당 사이트를 구독한 회원에게도 승인된 새 콘텐츠 알림이 전송됩니다.",
   },
   {
     title: "사이트 도메인 추가 요청 알림",
@@ -70,8 +85,9 @@ export default function TelegramGuidePage() {
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
           현재 사이트에는 회원 인증, 제출 접수, 관리자 검토, 승인 완료 흐름에
-          텔레그램 알림이 연결되어 있습니다. 알림은 계정에 연결된 텔레그램
-          대화 또는 운영자 알림 채널로 전송됩니다.
+          텔레그램 알림이 연결되어 있습니다. 사이트별 알림 구독을 켜면 관심
+          사이트에 새 승인 콘텐츠가 올라올 때 계정에 연결된 텔레그램 대화로
+          바로 안내를 받을 수 있습니다.
         </p>
       </header>
 
@@ -140,6 +156,16 @@ export default function TelegramGuidePage() {
             <span className="font-semibold text-foreground">3. 관리자 승인</span>
             이 완료되면 작성자에게 승인 완료 알림이 전송됩니다.
           </li>
+          <li>
+            <span className="font-semibold text-foreground">4. 사이트별 구독</span>
+            은 사이트 상세 페이지의 텔레그램 알림 구독 영역에서 켜거나 끌 수
+            있습니다.
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">5. 봇에서 해제</span>
+            가 필요하면 텔레그램 봇 대화방에 /stop을 보내 사이트별 알림
+            구독을 정리할 수 있습니다.
+          </li>
         </ol>
         <div className="mt-5 flex flex-wrap gap-2">
           <Link
@@ -153,6 +179,12 @@ export default function TelegramGuidePage() {
             className="inline-flex h-10 items-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-background"
           >
             사이트 제보하기
+          </Link>
+          <Link
+            href="/sites"
+            className="inline-flex h-10 items-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-background"
+          >
+            사이트별 알림 구독하기
           </Link>
         </div>
       </section>
