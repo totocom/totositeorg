@@ -92,14 +92,17 @@ export default async function Home() {
             <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
                 <div className="flex items-center gap-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/android-chrome-192x192.png"
-                    alt="토토사이트 추천 로고"
-                    width="64"
-                    height="64"
-                    className="neon-logo h-8 w-8 shrink-0"
-                  />
+                  <picture className="shrink-0">
+                    <source srcSet="/logo-96.avif" type="image/avif" />
+                    <source srcSet="/logo-96.webp" type="image/webp" />
+                    <img
+                      src="/logo-96.webp"
+                      alt="토토사이트 추천 로고"
+                      width="64"
+                      height="64"
+                      className="neon-logo h-8 w-8 shrink-0"
+                    />
+                  </picture>
                   <span className="text-sm font-semibold text-white/60">검증된 토토사이트 정보</span>
                 </div>
                 <h1 className="mt-4 text-4xl font-extrabold leading-tight text-white sm:text-5xl">

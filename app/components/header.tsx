@@ -21,14 +21,17 @@ export function Header() {
       <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2 text-lg font-bold text-white sm:text-xl">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/android-chrome-192x192.png"
-              alt="토토사이트 추천 로고"
-              width="56"
-              height="56"
-              className="neon-logo h-7 w-7 shrink-0"
-            />
+            <picture className="shrink-0">
+              <source srcSet="/logo-96.avif" type="image/avif" />
+              <source srcSet="/logo-96.webp" type="image/webp" />
+              <img
+                src="/logo-96.webp"
+                alt="토토사이트 추천 로고"
+                width="56"
+                height="56"
+                className="neon-logo h-7 w-7 shrink-0"
+              />
+            </picture>
             토토사이트 추천
           </Link>
 
