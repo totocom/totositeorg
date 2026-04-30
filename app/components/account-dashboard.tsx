@@ -53,25 +53,17 @@ type UserScamReport = {
   }[] | null;
 };
 
-type UserProfile = {
-  username: string;
-  nickname: string;
-  telegram_verified_at: string | null;
-};
-
 type AccountDataResult =
   | {
       sites: UserSite[];
       reviews: UserReview[];
       scamReports: UserScamReport[];
-      profile: UserProfile | null;
       errorMessage: "";
     }
   | {
       sites: [];
       reviews: [];
       scamReports: [];
-      profile: null;
       errorMessage: string;
     };
 
@@ -92,8 +84,7 @@ function getScamReportSiteName(report: UserScamReport) {
 }
 
 async function fetchAccountData(userId: string): Promise<AccountDataResult> {
-  const [sitesResult, reviewsResult, scamReportsResult, profileResult] =
-    await Promise.all([
+  const [sitesResult, reviewsResult, scamReportsResult] = await Promise.all([
     supabase
       .from("sites")
       .select("id, name, url, category, status, created_at")
@@ -111,24 +102,17 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
       )
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
-    supabase
-      .from("profiles")
-      .select("username, nickname, telegram_verified_at")
-      .eq("user_id", userId)
-      .maybeSingle(),
   ]);
 
   if (
     sitesResult.error ||
     reviewsResult.error ||
-    scamReportsResult.error ||
-    profileResult.error
+    scamReportsResult.error
   ) {
     return {
       sites: [],
       reviews: [],
       scamReports: [],
-      profile: null,
       errorMessage:
         "내 작성 내역을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
     };
@@ -138,7 +122,6 @@ async function fetchAccountData(userId: string): Promise<AccountDataResult> {
     sites: (sitesResult.data ?? []) as UserSite[],
     reviews: (reviewsResult.data ?? []) as UserReview[],
     scamReports: (scamReportsResult.data ?? []) as UserScamReport[],
-    profile: (profileResult.data as UserProfile | null) ?? null,
     errorMessage: "",
   };
 }
@@ -148,7 +131,6 @@ export function AccountDashboard() {
   const [sites, setSites] = useState<UserSite[]>([]);
   const [reviews, setReviews] = useState<UserReview[]>([]);
   const [scamReports, setScamReports] = useState<UserScamReport[]>([]);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -174,7 +156,6 @@ export function AccountDashboard() {
       setSites(result.sites);
       setReviews(result.reviews);
       setScamReports(result.scamReports);
-      setProfile(result.profile);
       setErrorMessage(result.errorMessage);
       setIsLoading(false);
     }
@@ -202,7 +183,7 @@ export function AccountDashboard() {
         <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
           <h1 className="text-2xl font-bold">로그인이 필요합니다</h1>
           <p className="mt-2 text-sm leading-6 text-muted">
-            내 계정 정보를 확인하려면 먼저 로그인해주세요.
+            내가 작성한 리뷰와 제보 내역을 확인하려면 먼저 로그인해주세요.
           </p>
           <Link
             href="/login?redirectTo=/account"
@@ -218,34 +199,17 @@ export function AccountDashboard() {
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
       <div className="mb-5">
-        <p className="text-sm font-semibold uppercase text-accent">내 계정</p>
-        <h1 className="mt-1 text-3xl font-bold">계정 정보</h1>
+        <p className="text-sm font-semibold uppercase text-accent">내 리뷰</p>
+        <h1 className="mt-1 text-3xl font-bold">내 작성 내역</h1>
       </div>
 
-      <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div>
-            <p className="text-sm text-muted">아이디</p>
-            <p className="mt-2 font-semibold">{profile?.username ?? "-"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted">닉네임</p>
-            <p className="mt-2 font-semibold">{profile?.nickname ?? "-"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted">내 이메일</p>
-            <p className="mt-2 break-all font-semibold">{user.email}</p>
-          </div>
-        </div>
-      </section>
-
       {errorMessage ? (
-        <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+        <div className="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {errorMessage}
         </div>
       ) : null}
 
-      <section className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
         <h2 className="text-lg font-semibold">내가 작성한 리뷰</h2>
         {reviews.length > 0 ? (
           <div className="mt-4 grid gap-3">
