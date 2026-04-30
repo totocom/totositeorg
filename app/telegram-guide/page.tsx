@@ -138,9 +138,9 @@ export default function TelegramGuidePage() {
 
       <section className="grid gap-4 rounded-lg border border-line bg-surface p-5 shadow-sm">
         <div>
-          <p className="text-sm font-semibold text-accent">운영자용 기능</p>
+          <p className="text-sm font-semibold text-accent">운영자 알람</p>
           <h2 className="mt-1 text-xl font-bold text-foreground">
-            검토가 필요한 내용을 빠르게 받는 알림
+            운영자는 회원이 제보한 내용을 텔레그램 알림을 받고 승인 및 거절을 합니다.
           </h2>
         </div>
         <div className="grid gap-3 md:grid-cols-3">
