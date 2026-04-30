@@ -672,11 +672,40 @@ create index if not exists review_helpfulness_votes_review_id_idx
 create index if not exists review_helpfulness_votes_user_id_idx
   on public.review_helpfulness_votes (user_id);
 
-create or replace view public.public_profile_nicknames as
+do $$
+begin
+  if exists (
+    select 1
+    from pg_class
+    join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+    where pg_namespace.nspname = 'public'
+      and pg_class.relname = 'public_profile_nicknames'
+      and pg_class.relkind = 'v'
+  ) then
+    drop view public.public_profile_nicknames;
+  end if;
+end $$;
+
+create table if not exists public.public_profile_nicknames (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  nickname text not null,
+  updated_at timestamptz not null default now(),
+
+  constraint public_profile_nicknames_nickname_not_blank check (
+    length(trim(nickname)) > 0
+  )
+);
+
+insert into public.public_profile_nicknames (user_id, nickname)
 select
-  user_id,
-  nickname
-from public.profiles;
+  profiles.user_id,
+  profiles.nickname
+from public.profiles
+where length(trim(profiles.nickname)) > 0
+on conflict (user_id) do update
+set
+  nickname = excluded.nickname,
+  updated_at = now();
 
 grant select on public.public_profile_nicknames to anon, authenticated;
 
@@ -706,12 +735,40 @@ where not exists (
   where review_helpfulness_votes.review_id = reviews.id
 );
 
-create or replace view public.site_telegram_subscription_counts as
+do $$
+begin
+  if exists (
+    select 1
+    from pg_class
+    join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+    where pg_namespace.nspname = 'public'
+      and pg_class.relname = 'site_telegram_subscription_counts'
+      and pg_class.relkind = 'v'
+  ) then
+    drop view public.site_telegram_subscription_counts;
+  end if;
+end $$;
+
+create table if not exists public.site_telegram_subscription_counts (
+  site_id uuid primary key references public.sites(id) on delete cascade,
+  subscriber_count integer not null default 0,
+  updated_at timestamptz not null default now(),
+
+  constraint site_telegram_subscription_counts_non_negative check (
+    subscriber_count >= 0
+  )
+);
+
+insert into public.site_telegram_subscription_counts (site_id, subscriber_count)
 select
   site_id,
   count(*)::integer as subscriber_count
 from public.site_telegram_subscriptions
-group by site_id;
+group by site_id
+on conflict (site_id) do update
+set
+  subscriber_count = excluded.subscriber_count,
+  updated_at = now();
 
 grant select on public.site_telegram_subscription_counts to anon, authenticated;
 
@@ -809,6 +866,130 @@ create trigger set_review_helpfulness_votes_updated_at
 before update on public.review_helpfulness_votes
 for each row
 execute function public.set_updated_at();
+
+drop trigger if exists set_public_profile_nicknames_updated_at
+  on public.public_profile_nicknames;
+create trigger set_public_profile_nicknames_updated_at
+before update on public.public_profile_nicknames
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_site_telegram_subscription_counts_updated_at
+  on public.site_telegram_subscription_counts;
+create trigger set_site_telegram_subscription_counts_updated_at
+before update on public.site_telegram_subscription_counts
+for each row
+execute function public.set_updated_at();
+
+create or replace function public.sync_public_profile_nickname()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'DELETE' then
+    delete from public.public_profile_nicknames
+    where user_id = old.user_id;
+
+    return old;
+  end if;
+
+  insert into public.public_profile_nicknames (
+    user_id,
+    nickname
+  )
+  values (
+    new.user_id,
+    new.nickname
+  )
+  on conflict (user_id) do update
+  set
+    nickname = excluded.nickname,
+    updated_at = now();
+
+  return new;
+end;
+$$;
+
+drop trigger if exists sync_public_profile_nickname_on_change
+  on public.profiles;
+create trigger sync_public_profile_nickname_on_change
+after insert or update or delete on public.profiles
+for each row
+execute function public.sync_public_profile_nickname();
+
+create or replace function public.update_site_telegram_subscription_count()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    insert into public.site_telegram_subscription_counts (
+      site_id,
+      subscriber_count
+    )
+    values (
+      new.site_id,
+      1
+    )
+    on conflict (site_id) do update
+    set
+      subscriber_count = public.site_telegram_subscription_counts.subscriber_count + 1,
+      updated_at = now();
+
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE' then
+    if old.site_id = new.site_id then
+      return new;
+    end if;
+
+    update public.site_telegram_subscription_counts
+    set
+      subscriber_count = greatest(0, subscriber_count - 1),
+      updated_at = now()
+    where site_id = old.site_id;
+
+    insert into public.site_telegram_subscription_counts (
+      site_id,
+      subscriber_count
+    )
+    values (
+      new.site_id,
+      1
+    )
+    on conflict (site_id) do update
+    set
+      subscriber_count = public.site_telegram_subscription_counts.subscriber_count + 1,
+      updated_at = now();
+
+    return new;
+  end if;
+
+  if tg_op = 'DELETE' then
+    update public.site_telegram_subscription_counts
+    set
+      subscriber_count = greatest(0, subscriber_count - 1),
+      updated_at = now()
+    where site_id = old.site_id;
+
+    return old;
+  end if;
+
+  return null;
+end;
+$$;
+
+drop trigger if exists update_site_telegram_subscription_count_on_change
+  on public.site_telegram_subscriptions;
+create trigger update_site_telegram_subscription_count_on_change
+after insert or update or delete on public.site_telegram_subscriptions
+for each row
+execute function public.update_site_telegram_subscription_count();
 
 create or replace function public.update_review_helpfulness_counts()
 returns trigger
@@ -1072,6 +1253,8 @@ alter table public.domain_whois_cache enable row level security;
 alter table public.site_dns_records enable row level security;
 alter table public.site_domain_submissions enable row level security;
 alter table public.review_helpfulness_votes enable row level security;
+alter table public.public_profile_nicknames enable row level security;
+alter table public.site_telegram_subscription_counts enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -1150,6 +1333,27 @@ using (
     select 1
     from public.sites
     where sites.id = site_dns_records.site_id
+      and sites.status = 'approved'
+  )
+);
+
+drop policy if exists "Public can read profile nicknames"
+  on public.public_profile_nicknames;
+create policy "Public can read profile nicknames"
+on public.public_profile_nicknames
+for select
+using (true);
+
+drop policy if exists "Public can read site telegram subscription counts"
+  on public.site_telegram_subscription_counts;
+create policy "Public can read site telegram subscription counts"
+on public.site_telegram_subscription_counts
+for select
+using (
+  exists (
+    select 1
+    from public.sites
+    where sites.id = site_telegram_subscription_counts.site_id
       and sites.status = 'approved'
   )
 );
