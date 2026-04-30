@@ -177,6 +177,7 @@ async function uploadStoredFavicon(
       .from(storageEnv.bucket)
       .upload(filePath, bytes, {
         contentType: uploadContentType,
+        cacheControl: "86400",
         upsert: false,
       });
 
