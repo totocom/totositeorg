@@ -63,6 +63,8 @@ export type SiteReview = {
   title: string;
   experience: string;
   issueType: IssueType;
+  helpfulCount?: number;
+  notHelpfulCount?: number;
   createdAt: string;
   status: ModerationStatus;
 };

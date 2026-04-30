@@ -71,6 +71,8 @@ create table if not exists public.reviews (
   reviewer_name text null,
   reviewer_email text null,
   status text not null default 'pending',
+  helpful_count integer not null default 0,
+  not_helpful_count integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
@@ -98,6 +100,12 @@ create table if not exists public.reviews (
   ),
   constraint reviews_status_allowed check (
     status in ('pending', 'approved', 'rejected')
+  ),
+  constraint reviews_helpful_count_non_negative check (
+    helpful_count >= 0
+  ),
+  constraint reviews_not_helpful_count_non_negative check (
+    not_helpful_count >= 0
   )
 );
 
@@ -261,6 +269,39 @@ end $$;
 alter table public.reviews
   add column if not exists user_id uuid null references auth.users(id)
   on delete set null;
+
+alter table public.reviews
+  add column if not exists helpful_count integer not null default 0;
+
+alter table public.reviews
+  add column if not exists not_helpful_count integer not null default 0;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'reviews_helpful_count_non_negative'
+      and conrelid = 'public.reviews'::regclass
+  ) then
+    alter table public.reviews
+      add constraint reviews_helpful_count_non_negative check (
+        helpful_count >= 0
+      );
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'reviews_not_helpful_count_non_negative'
+      and conrelid = 'public.reviews'::regclass
+  ) then
+    alter table public.reviews
+      add constraint reviews_not_helpful_count_non_negative check (
+        not_helpful_count >= 0
+      );
+  end if;
+end $$;
 
 alter table public.reviews
   drop constraint if exists reviews_state_used_not_blank;
@@ -639,15 +680,31 @@ from public.profiles;
 
 grant select on public.public_profile_nicknames to anon, authenticated;
 
-create or replace view public.review_helpfulness_counts as
-select
-  review_id,
-  count(*) filter (where vote = 1)::integer as helpful_count,
-  count(*) filter (where vote = -1)::integer as not_helpful_count
-from public.review_helpfulness_votes
-group by review_id;
+drop view if exists public.review_helpfulness_counts;
 
-grant select on public.review_helpfulness_counts to anon, authenticated;
+update public.reviews
+set
+  helpful_count = coalesce(votes.helpful_count, 0),
+  not_helpful_count = coalesce(votes.not_helpful_count, 0)
+from (
+  select
+    review_id,
+    count(*) filter (where vote = 1)::integer as helpful_count,
+    count(*) filter (where vote = -1)::integer as not_helpful_count
+  from public.review_helpfulness_votes
+  group by review_id
+) as votes
+where reviews.id = votes.review_id;
+
+update public.reviews
+set
+  helpful_count = 0,
+  not_helpful_count = 0
+where not exists (
+  select 1
+  from public.review_helpfulness_votes
+  where review_helpfulness_votes.review_id = reviews.id
+);
 
 create or replace view public.site_telegram_subscription_counts as
 select
@@ -752,6 +809,102 @@ create trigger set_review_helpfulness_votes_updated_at
 before update on public.review_helpfulness_votes
 for each row
 execute function public.set_updated_at();
+
+create or replace function public.update_review_helpfulness_counts()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    update public.reviews
+    set
+      helpful_count = greatest(
+        0,
+        helpful_count + case when new.vote = 1 then 1 else 0 end
+      ),
+      not_helpful_count = greatest(
+        0,
+        not_helpful_count + case when new.vote = -1 then 1 else 0 end
+      )
+    where id = new.review_id;
+
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE' then
+    if old.review_id = new.review_id then
+      update public.reviews
+      set
+        helpful_count = greatest(
+          0,
+          helpful_count
+            - case when old.vote = 1 then 1 else 0 end
+            + case when new.vote = 1 then 1 else 0 end
+        ),
+        not_helpful_count = greatest(
+          0,
+          not_helpful_count
+            - case when old.vote = -1 then 1 else 0 end
+            + case when new.vote = -1 then 1 else 0 end
+        )
+      where id = new.review_id;
+    else
+      update public.reviews
+      set
+        helpful_count = greatest(
+          0,
+          helpful_count - case when old.vote = 1 then 1 else 0 end
+        ),
+        not_helpful_count = greatest(
+          0,
+          not_helpful_count - case when old.vote = -1 then 1 else 0 end
+        )
+      where id = old.review_id;
+
+      update public.reviews
+      set
+        helpful_count = greatest(
+          0,
+          helpful_count + case when new.vote = 1 then 1 else 0 end
+        ),
+        not_helpful_count = greatest(
+          0,
+          not_helpful_count + case when new.vote = -1 then 1 else 0 end
+        )
+      where id = new.review_id;
+    end if;
+
+    return new;
+  end if;
+
+  if tg_op = 'DELETE' then
+    update public.reviews
+    set
+      helpful_count = greatest(
+        0,
+        helpful_count - case when old.vote = 1 then 1 else 0 end
+      ),
+      not_helpful_count = greatest(
+        0,
+        not_helpful_count - case when old.vote = -1 then 1 else 0 end
+      )
+    where id = old.review_id;
+
+    return old;
+  end if;
+
+  return null;
+end;
+$$;
+
+drop trigger if exists update_review_helpfulness_counts_on_change
+  on public.review_helpfulness_votes;
+create trigger update_review_helpfulness_counts_on_change
+after insert or update or delete on public.review_helpfulness_votes
+for each row
+execute function public.update_review_helpfulness_counts();
 
 create or replace function public.handle_new_user_profile()
 returns trigger

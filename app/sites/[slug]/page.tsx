@@ -557,6 +557,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   <ReviewHelpfulnessVote
                     reviewId={review.id}
                     authorUserId={review.authorUserId}
+                    initialHelpfulCount={review.helpfulCount ?? 0}
+                    initialNotHelpfulCount={review.notHelpfulCount ?? 0}
                   />
                 </article>
               ))}

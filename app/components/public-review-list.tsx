@@ -184,6 +184,8 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
               <ReviewHelpfulnessVote
                 reviewId={review.id}
                 authorUserId={review.authorUserId}
+                initialHelpfulCount={review.helpfulCount ?? 0}
+                initialNotHelpfulCount={review.notHelpfulCount ?? 0}
               />
               <div className="mt-4">
                 <Link

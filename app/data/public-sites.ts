@@ -46,6 +46,8 @@ type PublicReviewRow = {
   title: string;
   experience: string;
   issue_type: IssueType;
+  helpful_count?: number | null;
+  not_helpful_count?: number | null;
   created_at: string;
 };
 
@@ -258,6 +260,8 @@ function mapReviewRow(
     title: review.title,
     experience: review.experience,
     issueType: review.issue_type,
+    helpfulCount: Number(review.helpful_count ?? 0),
+    notHelpfulCount: Number(review.not_helpful_count ?? 0),
     createdAt: review.created_at,
     status: "approved",
   } satisfies SiteReview;
@@ -327,7 +331,7 @@ async function getPublicSitesUncached(): Promise<PublicSitesResult> {
       .order("created_at", { ascending: false }),
     supabase
       .from("reviews")
-      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, helpful_count, not_helpful_count, created_at")
       .eq("status", "approved"),
     supabase
       .from("scam_reports")
@@ -412,7 +416,7 @@ async function getPublicSiteDetailUncached(
   const [reviewsResult, scamReportsResult] = await Promise.all([
     supabase
       .from("reviews")
-      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, helpful_count, not_helpful_count, created_at")
       .eq("site_id", siteResult.data.id)
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
@@ -477,7 +481,7 @@ async function getPublicReviewListUncached(): Promise<
       .eq("status", "approved"),
     supabase
       .from("reviews")
-      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, helpful_count, not_helpful_count, created_at")
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
     supabase
@@ -548,7 +552,7 @@ async function getPublicScamReportListUncached(): Promise<
       .eq("status", "approved"),
     supabase
       .from("reviews")
-      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, created_at")
+      .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, helpful_count, not_helpful_count, created_at")
       .eq("status", "approved"),
     supabase
       .from("scam_reports")

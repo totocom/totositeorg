@@ -7,6 +7,8 @@ import { supabase } from "@/lib/supabase/client";
 type ReviewHelpfulnessVoteProps = {
   reviewId: string;
   authorUserId?: string | null;
+  initialHelpfulCount?: number;
+  initialNotHelpfulCount?: number;
 };
 
 type VoteValue = -1 | 1;
@@ -23,10 +25,12 @@ type VoteRow = {
 export function ReviewHelpfulnessVote({
   reviewId,
   authorUserId = null,
+  initialHelpfulCount = 0,
+  initialNotHelpfulCount = 0,
 }: ReviewHelpfulnessVoteProps) {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const [helpfulCount, setHelpfulCount] = useState(0);
-  const [notHelpfulCount, setNotHelpfulCount] = useState(0);
+  const [helpfulCount, setHelpfulCount] = useState(initialHelpfulCount);
+  const [notHelpfulCount, setNotHelpfulCount] = useState(initialNotHelpfulCount);
   const [currentVote, setCurrentVote] = useState<VoteValue | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -38,9 +42,9 @@ export function ReviewHelpfulnessVote({
 
     const [countsResult, userVoteResult] = await Promise.all([
       supabase
-        .from("review_helpfulness_counts")
+        .from("reviews")
         .select("helpful_count, not_helpful_count")
-        .eq("review_id", reviewId)
+        .eq("id", reviewId)
         .maybeSingle<CountRow>(),
       user
         ? supabase
@@ -56,8 +60,8 @@ export function ReviewHelpfulnessVote({
       setHelpfulCount(Number(countsResult.data.helpful_count ?? 0));
       setNotHelpfulCount(Number(countsResult.data.not_helpful_count ?? 0));
     } else {
-      setHelpfulCount(0);
-      setNotHelpfulCount(0);
+      setHelpfulCount(initialHelpfulCount);
+      setNotHelpfulCount(initialNotHelpfulCount);
     }
 
     if (!userVoteResult.error && userVoteResult.data) {
