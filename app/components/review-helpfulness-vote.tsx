@@ -136,8 +136,9 @@ export function ReviewHelpfulnessVote({
               : "border-line text-foreground hover:border-accent hover:text-accent",
           ].join(" ")}
           aria-pressed={helpfulSelected}
+          aria-label={`도움돼요 ${helpfulCount}`}
         >
-          도움돼요 {helpfulCount}
+          👍 {helpfulCount}
         </button>
         <button
           type="button"
@@ -150,8 +151,9 @@ export function ReviewHelpfulnessVote({
               : "border-line text-foreground hover:border-red-500 hover:text-red-600",
           ].join(" ")}
           aria-pressed={notHelpfulSelected}
+          aria-label={`아쉬워요 ${notHelpfulCount}`}
         >
-          아쉬워요 {notHelpfulCount}
+          👎 {notHelpfulCount}
         </button>
         {isSaving ? (
           <span className="text-xs font-semibold text-muted">저장 중...</span>
