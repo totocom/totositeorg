@@ -1107,6 +1107,10 @@ with check (
     from public.reviews
     where reviews.id = review_helpfulness_votes.review_id
       and reviews.status = 'approved'
+      and (
+        reviews.user_id is null
+        or reviews.user_id <> auth.uid()
+      )
   )
 );
 
@@ -1123,6 +1127,10 @@ with check (
     from public.reviews
     where reviews.id = review_helpfulness_votes.review_id
       and reviews.status = 'approved'
+      and (
+        reviews.user_id is null
+        or reviews.user_id <> auth.uid()
+      )
   )
 );
 

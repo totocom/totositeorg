@@ -248,6 +248,7 @@ function mapReviewRow(
   return {
     id: review.id,
     siteId: review.site_id,
+    authorUserId: review.user_id,
     authorNickname: getAuthorNickname(
       review.user_id,
       nicknameMap,

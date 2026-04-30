@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 
 type ReviewHelpfulnessVoteProps = {
   reviewId: string;
+  authorUserId?: string | null;
 };
 
 type VoteValue = -1 | 1;
@@ -21,6 +22,7 @@ type VoteRow = {
 
 export function ReviewHelpfulnessVote({
   reviewId,
+  authorUserId = null,
 }: ReviewHelpfulnessVoteProps) {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [helpfulCount, setHelpfulCount] = useState(0);
@@ -86,6 +88,11 @@ export function ReviewHelpfulnessVote({
       return;
     }
 
+    if (authorUserId && user.id === authorUserId) {
+      setMessage("내가 작성한 리뷰에는 투표할 수 없습니다.");
+      return;
+    }
+
     setIsSaving(true);
     setMessage("");
 
@@ -118,17 +125,27 @@ export function ReviewHelpfulnessVote({
 
   const helpfulSelected = currentVote === 1;
   const notHelpfulSelected = currentVote === -1;
+  const isOwnReview = Boolean(user && authorUserId && user.id === authorUserId);
+
+  if (isAuthLoading || !user) {
+    return null;
+  }
 
   return (
     <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">
       <p className="text-xs font-semibold text-muted">
         이 리뷰가 도움이 됐나요?
       </p>
+      {isOwnReview ? (
+        <p className="text-xs font-semibold text-muted">
+          내가 작성한 리뷰에는 투표할 수 없습니다.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => submitVote(1)}
-          disabled={isLoading || isSaving}
+          disabled={isOwnReview || isLoading || isSaving}
           className={[
             "h-9 rounded-md border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
             helpfulSelected
@@ -143,7 +160,7 @@ export function ReviewHelpfulnessVote({
         <button
           type="button"
           onClick={() => submitVote(-1)}
-          disabled={isLoading || isSaving}
+          disabled={isOwnReview || isLoading || isSaving}
           className={[
             "h-9 rounded-md border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
             notHelpfulSelected

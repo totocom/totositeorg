@@ -181,7 +181,10 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
                 siteName={review.site.siteName}
                 experience={review.experience}
               />
-              <ReviewHelpfulnessVote reviewId={review.id} />
+              <ReviewHelpfulnessVote
+                reviewId={review.id}
+                authorUserId={review.authorUserId}
+              />
               <div className="mt-4">
                 <Link
                   href={`/sites/${review.site.slug}#reviews`}

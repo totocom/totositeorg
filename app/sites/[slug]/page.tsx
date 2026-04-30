@@ -554,7 +554,10 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                     </p>
                   </div>
                   <ReviewSummary siteName={site.siteName} experience={review.experience} />
-                  <ReviewHelpfulnessVote reviewId={review.id} />
+                  <ReviewHelpfulnessVote
+                    reviewId={review.id}
+                    authorUserId={review.authorUserId}
+                  />
                 </article>
               ))}
             </div>

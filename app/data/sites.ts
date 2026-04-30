@@ -57,6 +57,7 @@ export type SiteTrustScore = {
 export type SiteReview = {
   id: string;
   siteId: string;
+  authorUserId?: string | null;
   authorNickname?: string | null;
   rating: number;
   title: string;
