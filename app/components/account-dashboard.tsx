@@ -76,7 +76,7 @@ function formatDate(value: string) {
 }
 
 function getReviewSiteName(review: UserReview) {
-  return review.sites?.[0]?.name ?? "알 수 없음";
+  return review.sites?.[0]?.name?.trim() || null;
 }
 
 function getScamReportSiteName(report: UserScamReport) {
@@ -221,7 +221,9 @@ export function AccountDashboard() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase text-accent">
-                      {getReviewSiteName(review)} · 만족도 평가
+                      {getReviewSiteName(review)
+                        ? `${getReviewSiteName(review)} · 만족도 평가`
+                        : "만족도 평가"}
                     </p>
                     <h3 className="mt-1 font-semibold">{review.title}</h3>
                   </div>
