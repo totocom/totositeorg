@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function SiteRegistrationPage() {
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-5 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
       <div className="mb-5">
         <p className="text-sm font-semibold uppercase text-accent">
           사이트 등록
