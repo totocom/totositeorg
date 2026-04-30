@@ -455,6 +455,18 @@ create table if not exists public.site_domain_submissions (
   )
 );
 
+create table if not exists public.review_helpfulness_votes (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid not null references public.reviews(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  vote smallint not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint review_helpfulness_votes_review_user_unique unique (review_id, user_id),
+  constraint review_helpfulness_votes_vote_allowed check (vote in (-1, 1))
+);
+
 create index if not exists sites_status_idx
   on public.sites (status);
 
@@ -613,6 +625,12 @@ create index if not exists site_domain_submissions_user_id_idx
 create index if not exists site_domain_submissions_status_idx
   on public.site_domain_submissions (status);
 
+create index if not exists review_helpfulness_votes_review_id_idx
+  on public.review_helpfulness_votes (review_id);
+
+create index if not exists review_helpfulness_votes_user_id_idx
+  on public.review_helpfulness_votes (user_id);
+
 create or replace view public.public_profile_nicknames as
 select
   user_id,
@@ -620,6 +638,16 @@ select
 from public.profiles;
 
 grant select on public.public_profile_nicknames to anon, authenticated;
+
+create or replace view public.review_helpfulness_counts as
+select
+  review_id,
+  count(*) filter (where vote = 1)::integer as helpful_count,
+  count(*) filter (where vote = -1)::integer as not_helpful_count
+from public.review_helpfulness_votes
+group by review_id;
+
+grant select on public.review_helpfulness_counts to anon, authenticated;
 
 update public.sites
 set slug = regexp_replace(
@@ -706,6 +734,13 @@ drop trigger if exists set_site_domain_submissions_updated_at
   on public.site_domain_submissions;
 create trigger set_site_domain_submissions_updated_at
 before update on public.site_domain_submissions
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_review_helpfulness_votes_updated_at
+  on public.review_helpfulness_votes;
+create trigger set_review_helpfulness_votes_updated_at
+before update on public.review_helpfulness_votes
 for each row
 execute function public.set_updated_at();
 
@@ -874,6 +909,7 @@ alter table public.site_telegram_subscriptions enable row level security;
 alter table public.domain_whois_cache enable row level security;
 alter table public.site_dns_records enable row level security;
 alter table public.site_domain_submissions enable row level security;
+alter table public.review_helpfulness_votes enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -1052,6 +1088,51 @@ on public.site_domain_submissions
 for select
 using (user_id = auth.uid());
 
+drop policy if exists "Users can read own review helpfulness votes"
+  on public.review_helpfulness_votes;
+create policy "Users can read own review helpfulness votes"
+on public.review_helpfulness_votes
+for select
+using (user_id = auth.uid());
+
+drop policy if exists "Users can insert own review helpfulness votes"
+  on public.review_helpfulness_votes;
+create policy "Users can insert own review helpfulness votes"
+on public.review_helpfulness_votes
+for insert
+with check (
+  user_id = auth.uid()
+  and exists (
+    select 1
+    from public.reviews
+    where reviews.id = review_helpfulness_votes.review_id
+      and reviews.status = 'approved'
+  )
+);
+
+drop policy if exists "Users can update own review helpfulness votes"
+  on public.review_helpfulness_votes;
+create policy "Users can update own review helpfulness votes"
+on public.review_helpfulness_votes
+for update
+using (user_id = auth.uid())
+with check (
+  user_id = auth.uid()
+  and exists (
+    select 1
+    from public.reviews
+    where reviews.id = review_helpfulness_votes.review_id
+      and reviews.status = 'approved'
+  )
+);
+
+drop policy if exists "Users can delete own review helpfulness votes"
+  on public.review_helpfulness_votes;
+create policy "Users can delete own review helpfulness votes"
+on public.review_helpfulness_votes
+for delete
+using (user_id = auth.uid());
+
 -- Admin lookup policy:
 -- Authenticated users can read their own admin_users row to let the client
 -- determine whether the current email is an admin.
@@ -1224,6 +1305,14 @@ drop policy if exists "Admins can manage site domain submissions"
   on public.site_domain_submissions;
 create policy "Admins can manage site domain submissions"
 on public.site_domain_submissions
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage review helpfulness votes"
+  on public.review_helpfulness_votes;
+create policy "Admins can manage review helpfulness votes"
+on public.review_helpfulness_votes
 for all
 using (public.is_admin())
 with check (public.is_admin());

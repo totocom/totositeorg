@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary } from "@/app/components/review-summary";
 import type { PublicReviewListItem } from "@/app/data/public-sites";
 import { issueTypeLabels } from "@/app/data/sites";
@@ -180,6 +181,7 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
                 siteName={review.site.siteName}
                 experience={review.experience}
               />
+              <ReviewHelpfulnessVote reviewId={review.id} />
               <div className="mt-4">
                 <Link
                   href={`/sites/${review.site.slug}#reviews`}

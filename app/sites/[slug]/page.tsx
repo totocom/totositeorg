@@ -4,6 +4,7 @@ import Link from "next/link";
 import { domainToUnicode } from "node:url";
 import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actions";
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
+import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
@@ -553,6 +554,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                     </p>
                   </div>
                   <ReviewSummary siteName={site.siteName} experience={review.experience} />
+                  <ReviewHelpfulnessVote reviewId={review.id} />
                 </article>
               ))}
             </div>
