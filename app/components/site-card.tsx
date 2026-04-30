@@ -130,9 +130,6 @@ export function SiteCard({ site }: SiteCardProps) {
           <span className="text-xs font-semibold text-accent">✓ 먹튀 신고 없음</span>
         </div>
       )}
-      <p className="mt-2 text-xs leading-5 text-muted">
-        {trustScore.summary}
-      </p>
     </Link>
   );
 }
