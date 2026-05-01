@@ -11,6 +11,10 @@ type SiteBlogDraftContext = {
 export async function POST(request: Request, context: SiteBlogDraftContext) {
   const { siteId } = await context.params;
   const headers = new Headers(request.headers);
+  const body = (await request.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
 
   headers.set("content-type", "application/json");
 
@@ -19,6 +23,7 @@ export async function POST(request: Request, context: SiteBlogDraftContext) {
       method: "POST",
       headers,
       body: JSON.stringify({
+        ...body,
         siteId,
         mode: "update",
       }),

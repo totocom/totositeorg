@@ -1,5 +1,27 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# AI 블로그 생성 공통 규칙
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+1. AI 블로그는 추천, 홍보, 가입 유도 글이 아니라 정보 리포트다.
+2. 개별 사이트 글의 primary keyword는 `{사이트명} 토토사이트`다.
+3. secondary keywords는 다음과 같다.
+   - `{사이트명} 토토사이트 검증`
+   - `{사이트명} 주소`
+   - `{사이트명} 도메인`
+   - `{사이트명} 먹튀`
+   - `{사이트명} 먹튀 제보`
+   - `{사이트명} 후기`
+4. `title`, `meta_title`, `h1`, 주요 `h2`에는 `공개 제보`, `공개 피해`, `공개 데이터`, `공개 먹튀 제보` 표현을 우선 사용하지 않는다.
+5. `title`, `meta_title`, `h1`, 주요 `h2`에는 검색자가 실제로 검색할 표현을 사용한다.
+   - `{사이트명} 토토사이트`
+   - `{사이트명} 토토사이트 검증`
+   - `{사이트명} 주소`
+   - `{사이트명} 도메인`
+   - `{사이트명} 먹튀`
+   - `{사이트명} 먹튀 제보`
+   - `{사이트명} 후기`
+6. 공개 `body_md`에는 AI 내부 분석 필드를 출력하지 않는다.
+7. 공개 `body_md`에는 키워드 나열 섹션을 만들지 않는다.
+8. 모든 블로그 글은 사이트별 고유 데이터 최소 5개 이상을 포함해야 한다.
+9. 기존 글과 제목, `h2` 구조, 첫 문단, FAQ가 반복되지 않도록 중복 콘텐츠 검수를 수행한다.
+10. AI 결과는 항상 `draft`로 저장하고, 관리자가 검토한 뒤 `published`로 변경한다.
+11. `published`가 아닌 글은 `noindex` 처리한다.
+12. 변경 후에는 관련 테스트, lint, typecheck를 실행한다.

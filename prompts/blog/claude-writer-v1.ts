@@ -45,7 +45,9 @@ export function buildClaudeWriterPrompt({
 - 확인 근거와 조회 한계는 자연스러운 문장으로 설명하고, 내부 분석 라벨로 나열하지 않습니다.
 - 공개 draft_markdown에는 AI planner, writing brief, search intent, confirmed facts, inferences, unknowns, claim map, keyword list, primary_keyword, secondary_keywords 같은 내부 항목명을 제목·목록·문장으로 그대로 출력하지 않습니다.
 - primary_keyword, secondary_keywords, search_intent, confirmed_facts, inferences, unknowns, claim_map, writing_brief_for_claude, prohibited_phrase_check는 내부 JSON 또는 관리자 검토용 항목이며 공개 본문에 쓰지 않습니다.
+- 공개 draft_markdown에는 "핵심 키워드", "검색 의도", "이 글의 작성 방향", "확인된 사실", "추정:", "미확인 항목", "claim_map", "writing_brief", "Source Snapshot", "derived_facts", "sameIpSites", "lookup_status", "secondary_keywords", "primary_keyword"를 출력하지 않습니다.
 - 공개 본문은 자연스러운 제목, 요약, 본문, 표 형식 설명, FAQ, 체크리스트, 고지문으로만 구성합니다.
+- 공개 본문에는 키워드 목록, 검색어 목록, 키워드 리스트처럼 검색어를 나열하는 섹션을 만들지 않습니다.
 - 먹튀 없음, 안전함, 검증 완료, 추천, 가입 유도 등의 표현을 사용하지 않습니다.
 - DNS, WHOIS, 동일 IP는 기술 정보로만 설명하고 위험을 단정하지 않습니다.
 - Cloudflare 사용, WHOIS 비공개, 동일 IP 관측만으로 위험하다고 단정하지 않습니다.
@@ -59,7 +61,12 @@ export function buildClaudeWriterPrompt({
 - title은 CMS 대표 제목 역할이며 서버 제공값 "${seoTitle}"를 따릅니다.
 - H1은 본문 상단 제목 역할이며 반드시 "${seoH1}"를 사용합니다.
 - title, meta_title, H1, 주요 H2에는 "공개"를 최대한 사용하지 않습니다. "공개"는 내부 기준 설명이나 고지문에서만 필요한 경우 제한적으로 사용합니다.
+- 주요 H2에는 "공개 제보", "공개 피해", "공개 데이터", "공개 먹튀 제보" 표현을 사용하지 않습니다.
+- 주요 H2는 주소, 도메인, 먹튀 제보, 후기, DNS, WHOIS처럼 검색자가 실제로 찾는 표현과 사이트별 데이터 항목으로 작성합니다.
 - 제목과 H1에는 사이트명 외 최소 2개 이상의 고유 데이터(후기 수, 먹튀 피해 제보 수, 추가 도메인 수, DNS 레코드 유형, WHOIS 등록일 여부, 네임서버 정보, IP 수, 마지막 조회 시각, 최근 리뷰/제보 날짜)를 반영합니다.
+- 본문 전체에는 사이트별 고유 데이터 최소 5개 이상을 자연스럽게 반영합니다.
+- 동일한 일반 템플릿의 첫 문단을 반복하지 말고, 첫 문단에 해당 사이트의 고유 데이터 2개 이상을 포함합니다.
+- FAQ 질문은 주소, 도메인, 먹튀 제보, 후기, DNS/WHOIS 중 실제 데이터가 있는 항목을 중심으로 만들고 기존 글과 같은 질문만 반복하지 않습니다.
 - 제목과 H1에는 추천, 안전놀이터, 먹튀 없음, 검증 완료, 가입, 보너스, 이벤트, 우회주소, 최신 접속주소 표현을 쓰지 않습니다.
 - fallback 제목 문구를 본문에서 반복하지 않습니다.
 - 피해 제보 제목은 "먹튀 확정", "먹튀 사이트", "위험 사이트"처럼 단정하지 않습니다.

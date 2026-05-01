@@ -514,6 +514,7 @@ create table if not exists public.blog_posts (
   slug text not null unique,
   status text not null default 'draft',
   title text not null,
+  h1 text not null default '',
   meta_title text null,
   meta_description text null,
   primary_keyword text null,
@@ -526,6 +527,12 @@ create table if not exists public.blog_posts (
   ai_model text null,
   prompt_version text null,
   legal_review_status text not null default 'not_reviewed',
+  seo_review_status text not null default 'not_reviewed',
+  duplicate_risk text not null default 'unknown',
+  unique_fact_score integer not null default 0,
+  content_angle text not null default '',
+  normalized_title_pattern text not null default '',
+  normalized_h2_pattern text not null default '',
   admin_warnings text[] not null default '{}',
   reviewed_by uuid null references auth.users(id) on delete set null,
   published_at timestamptz null,
@@ -562,6 +569,12 @@ create table if not exists public.blog_posts (
   constraint blog_posts_legal_review_status_allowed check (
     legal_review_status in ('not_reviewed', 'needs_review', 'approved')
   ),
+  constraint blog_posts_seo_review_status_allowed check (
+    seo_review_status in ('not_reviewed', 'passed', 'warning', 'failed')
+  ),
+  constraint blog_posts_duplicate_risk_allowed check (
+    duplicate_risk in ('unknown', 'low', 'medium', 'high', 'failed')
+  ),
   constraint blog_posts_needs_review_not_published check (
     not (
       status = 'published'
@@ -596,6 +609,9 @@ create table if not exists public.blog_posts (
     ]::text[]
   ),
   constraint blog_posts_title_not_blank check (length(trim(title)) > 0),
+  constraint blog_posts_unique_fact_score_non_negative check (
+    unique_fact_score >= 0
+  ),
   constraint blog_posts_meta_title_not_blank check (
     meta_title is null
     or length(trim(meta_title)) > 0
@@ -633,6 +649,9 @@ alter table public.blog_posts
   add column if not exists meta_description text null;
 
 alter table public.blog_posts
+  add column if not exists h1 text not null default '';
+
+alter table public.blog_posts
   add column if not exists body_md text not null default '';
 
 alter table public.blog_posts
@@ -652,6 +671,24 @@ alter table public.blog_posts
 
 alter table public.blog_posts
   add column if not exists legal_review_status text not null default 'not_reviewed';
+
+alter table public.blog_posts
+  add column if not exists seo_review_status text not null default 'not_reviewed';
+
+alter table public.blog_posts
+  add column if not exists duplicate_risk text not null default 'unknown';
+
+alter table public.blog_posts
+  add column if not exists unique_fact_score integer not null default 0;
+
+alter table public.blog_posts
+  add column if not exists content_angle text not null default '';
+
+alter table public.blog_posts
+  add column if not exists normalized_title_pattern text not null default '';
+
+alter table public.blog_posts
+  add column if not exists normalized_h2_pattern text not null default '';
 
 alter table public.blog_posts
   add column if not exists admin_warnings text[] not null default '{}';
@@ -685,6 +722,9 @@ alter table public.blog_posts
   alter column primary_keyword drop not null;
 
 alter table public.blog_posts
+  alter column h1 set default '';
+
+alter table public.blog_posts
   alter column category set default '운영 정보';
 
 alter table public.blog_posts
@@ -701,6 +741,24 @@ alter table public.blog_posts
 
 alter table public.blog_posts
   alter column legal_review_status set default 'not_reviewed';
+
+alter table public.blog_posts
+  alter column seo_review_status set default 'not_reviewed';
+
+alter table public.blog_posts
+  alter column duplicate_risk set default 'unknown';
+
+alter table public.blog_posts
+  alter column unique_fact_score set default 0;
+
+alter table public.blog_posts
+  alter column content_angle set default '';
+
+alter table public.blog_posts
+  alter column normalized_title_pattern set default '';
+
+alter table public.blog_posts
+  alter column normalized_h2_pattern set default '';
 
 alter table public.blog_posts
   alter column body_md set default '';
@@ -725,6 +783,60 @@ set meta_description = description
 where meta_description is null
   and description is not null
   and length(trim(description)) > 0;
+
+update public.blog_posts
+set h1 = title
+where (h1 is null or length(trim(h1)) = 0)
+  and title is not null
+  and length(trim(title)) > 0;
+
+update public.blog_posts
+set seo_review_status = 'not_reviewed'
+where seo_review_status is null
+  or seo_review_status not in ('not_reviewed', 'passed', 'warning', 'failed');
+
+update public.blog_posts
+set duplicate_risk = 'unknown'
+where duplicate_risk is null
+  or duplicate_risk not in ('unknown', 'low', 'medium', 'high', 'failed');
+
+update public.blog_posts
+set unique_fact_score = 0
+where unique_fact_score is null
+  or unique_fact_score < 0;
+
+update public.blog_posts
+set content_angle = ''
+where content_angle is null;
+
+update public.blog_posts
+set normalized_title_pattern = ''
+where normalized_title_pattern is null;
+
+update public.blog_posts
+set normalized_h2_pattern = ''
+where normalized_h2_pattern is null;
+
+alter table public.blog_posts
+  alter column h1 set not null;
+
+alter table public.blog_posts
+  alter column seo_review_status set not null;
+
+alter table public.blog_posts
+  alter column duplicate_risk set not null;
+
+alter table public.blog_posts
+  alter column unique_fact_score set not null;
+
+alter table public.blog_posts
+  alter column content_angle set not null;
+
+alter table public.blog_posts
+  alter column normalized_title_pattern set not null;
+
+alter table public.blog_posts
+  alter column normalized_h2_pattern set not null;
 
 update public.blog_posts
 set faq_json = faqs
@@ -919,6 +1031,30 @@ begin
   alter table public.blog_posts
     add constraint blog_posts_legal_review_status_allowed check (
       legal_review_status in ('not_reviewed', 'needs_review', 'approved')
+    );
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_seo_review_status_allowed;
+
+  alter table public.blog_posts
+    add constraint blog_posts_seo_review_status_allowed check (
+      seo_review_status in ('not_reviewed', 'passed', 'warning', 'failed')
+    );
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_duplicate_risk_allowed;
+
+  alter table public.blog_posts
+    add constraint blog_posts_duplicate_risk_allowed check (
+      duplicate_risk in ('unknown', 'low', 'medium', 'high', 'failed')
+    );
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_unique_fact_score_non_negative;
+
+  alter table public.blog_posts
+    add constraint blog_posts_unique_fact_score_non_negative check (
+      unique_fact_score >= 0
     );
 
   alter table public.blog_posts
@@ -1573,6 +1709,33 @@ create table if not exists public.blog_post_versions (
   )
 );
 
+create table if not exists public.blog_content_fingerprints (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.blog_posts(id) on delete cascade,
+  site_id uuid not null references public.sites(id) on delete cascade,
+  title_pattern text not null default '',
+  h2_pattern text not null default '',
+  content_hash text not null,
+  normalized_content_hash text not null,
+  unique_fact_score integer not null default 0,
+  similarity_score numeric(5,4) not null default 0,
+  created_at timestamptz not null default now(),
+
+  constraint blog_content_fingerprints_content_hash_not_blank check (
+    length(trim(content_hash)) > 0
+  ),
+  constraint blog_content_fingerprints_normalized_hash_not_blank check (
+    length(trim(normalized_content_hash)) > 0
+  ),
+  constraint blog_content_fingerprints_unique_fact_score_non_negative check (
+    unique_fact_score >= 0
+  ),
+  constraint blog_content_fingerprints_similarity_score_range check (
+    similarity_score >= 0
+    and similarity_score <= 1
+  )
+);
+
 create table if not exists public.ai_generation_jobs (
   id uuid primary key default gen_random_uuid(),
   site_id uuid not null references public.sites(id) on delete cascade,
@@ -1805,6 +1968,15 @@ create index if not exists blog_posts_status_idx
 create index if not exists blog_posts_legal_review_status_idx
   on public.blog_posts (legal_review_status);
 
+create index if not exists blog_posts_seo_review_status_idx
+  on public.blog_posts (seo_review_status);
+
+create index if not exists blog_posts_duplicate_risk_idx
+  on public.blog_posts (duplicate_risk);
+
+create index if not exists blog_posts_normalized_title_pattern_idx
+  on public.blog_posts (normalized_title_pattern);
+
 create index if not exists blog_posts_site_id_idx
   on public.blog_posts (site_id);
 
@@ -1881,6 +2053,27 @@ create index if not exists blog_post_versions_ai_generation_job_id_idx
 
 create index if not exists blog_post_versions_created_at_idx
   on public.blog_post_versions (created_at desc);
+
+create index if not exists blog_content_fingerprints_post_id_idx
+  on public.blog_content_fingerprints (post_id);
+
+create index if not exists blog_content_fingerprints_site_id_idx
+  on public.blog_content_fingerprints (site_id);
+
+create index if not exists blog_content_fingerprints_title_pattern_idx
+  on public.blog_content_fingerprints (title_pattern);
+
+create index if not exists blog_content_fingerprints_h2_pattern_idx
+  on public.blog_content_fingerprints (h2_pattern);
+
+create index if not exists blog_content_fingerprints_content_hash_idx
+  on public.blog_content_fingerprints (content_hash);
+
+create index if not exists blog_content_fingerprints_normalized_hash_idx
+  on public.blog_content_fingerprints (normalized_content_hash);
+
+create index if not exists blog_content_fingerprints_created_at_idx
+  on public.blog_content_fingerprints (created_at desc);
 
 create index if not exists ai_generation_jobs_site_id_idx
   on public.ai_generation_jobs (site_id);
@@ -2303,16 +2496,44 @@ begin
     raise exception 'blog_posts_publish_requires_approved_legal_review';
   end if;
 
+  if new.seo_review_status = 'failed' then
+    raise exception 'blog_posts_publish_blocked_seo_review_failed';
+  end if;
+
+  if new.duplicate_risk = 'high' then
+    raise exception 'blog_posts_publish_blocked_duplicate_risk_high';
+  end if;
+
+  if new.duplicate_risk = 'failed' then
+    raise exception 'blog_posts_publish_blocked_duplicate_risk_failed';
+  end if;
+
+  if new.unique_fact_score < 5 then
+    raise exception 'blog_posts_publish_requires_unique_fact_score_minimum';
+  end if;
+
   if length(trim(coalesce(new.title, ''))) = 0 then
     raise exception 'blog_posts_publish_requires_title';
+  end if;
+
+  if length(trim(coalesce(new.meta_title, ''))) = 0 then
+    raise exception 'blog_posts_publish_requires_meta_title';
   end if;
 
   if length(trim(coalesce(new.meta_description, ''))) = 0 then
     raise exception 'blog_posts_publish_requires_meta_description';
   end if;
 
+  if length(trim(coalesce(new.h1, ''))) = 0 then
+    raise exception 'blog_posts_publish_requires_h1';
+  end if;
+
   if length(trim(coalesce(new.body_md, ''))) = 0 then
     raise exception 'blog_posts_publish_requires_body_md';
+  end if;
+
+  if new.primary_category_id is null then
+    raise exception 'blog_posts_publish_requires_primary_category_id';
   end if;
 
   if new.source_snapshot_id is null then
@@ -2347,9 +2568,15 @@ create trigger enforce_blog_post_publish_requirements_on_change
 before insert or update of
   status,
   legal_review_status,
+  seo_review_status,
+  duplicate_risk,
+  unique_fact_score,
   title,
+  meta_title,
   meta_description,
+  h1,
   body_md,
+  primary_category_id,
   source_snapshot_id,
   source_snapshot
 on public.blog_posts
@@ -2749,6 +2976,7 @@ alter table public.blog_tags enable row level security;
 alter table public.blog_post_tags enable row level security;
 alter table public.blog_source_snapshots enable row level security;
 alter table public.blog_post_versions enable row level security;
+alter table public.blog_content_fingerprints enable row level security;
 alter table public.ai_generation_jobs enable row level security;
 alter table public.public_profile_nicknames enable row level security;
 alter table public.site_telegram_subscription_counts enable row level security;
@@ -3304,6 +3532,14 @@ drop policy if exists "Admins can manage blog post versions"
   on public.blog_post_versions;
 create policy "Admins can manage blog post versions"
 on public.blog_post_versions
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage blog content fingerprints"
+  on public.blog_content_fingerprints;
+create policy "Admins can manage blog content fingerprints"
+on public.blog_content_fingerprints
 for all
 using (public.is_admin())
 with check (public.is_admin());

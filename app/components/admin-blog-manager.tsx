@@ -11,7 +11,9 @@ import {
   getBlogTagSlug,
   isBlogCategoryValue,
   type BlogCategorySlug,
+  type BlogDuplicateRisk,
   type BlogPost,
+  type BlogSeoReviewStatus,
 } from "@/app/data/blog-posts";
 import { supabase } from "@/lib/supabase/client";
 
@@ -22,6 +24,7 @@ type BlogPostRow = {
   id: string;
   site_id: string | null;
   source_site_id: string | null;
+  ai_generation_job_id?: string | null;
   slug: string;
   status: BlogStatus;
   legal_review_status: LegalReviewStatus;
@@ -33,6 +36,7 @@ type BlogPostRow = {
   tags: string[] | null;
   priority: BlogPost["priority"];
   title: string;
+  h1: string | null;
   meta_title: string | null;
   meta_description: string | null;
   description: string;
@@ -45,6 +49,12 @@ type BlogPostRow = {
   source_snapshot: unknown;
   ai_model: string | null;
   prompt_version: string | null;
+  seo_review_status: BlogSeoReviewStatus;
+  duplicate_risk: BlogDuplicateRisk;
+  unique_fact_score: number | null;
+  content_angle: string | null;
+  normalized_title_pattern: string | null;
+  normalized_h2_pattern: string | null;
   search_intent: string | null;
   reader_question: string | null;
   recommended_title_pattern: string | null;
@@ -70,6 +80,7 @@ type BlogPostFormValues = {
   tagsText: string;
   priority: BlogPost["priority"];
   title: string;
+  h1: string;
   metaTitle: string;
   metaDescription: string;
   bodyMarkdown: string;
@@ -98,6 +109,7 @@ type BlogPostPayload = {
   tags: string[];
   priority: BlogPost["priority"];
   title: string;
+  h1: string;
   meta_title: string;
   meta_description: string;
   description: string;
@@ -106,6 +118,12 @@ type BlogPostPayload = {
   body_md: string;
   faq_json: unknown[];
   checklist_json: unknown[];
+  seo_review_status?: BlogSeoReviewStatus;
+  duplicate_risk?: BlogDuplicateRisk;
+  unique_fact_score?: number;
+  content_angle?: string;
+  normalized_title_pattern?: string;
+  normalized_h2_pattern?: string;
   search_intent: string;
   reader_question: string;
   recommended_title_pattern: string;
@@ -122,6 +140,12 @@ type BlogPostPayload = {
 type GenerateBlogDraftResponse = {
   ok?: boolean;
   post?: BlogPostRow;
+  job?: {
+    id: string;
+    post_id: string | null;
+    source_snapshot_id: string | null;
+    status: string;
+  };
   error?: string;
   violations?: Array<{
     pattern: string;
@@ -157,6 +181,7 @@ const blogPostSelect = [
   "tags",
   "priority",
   "title",
+  "h1",
   "meta_title",
   "meta_description",
   "description",
@@ -169,6 +194,12 @@ const blogPostSelect = [
   "source_snapshot",
   "ai_model",
   "prompt_version",
+  "seo_review_status",
+  "duplicate_risk",
+  "unique_fact_score",
+  "content_angle",
+  "normalized_title_pattern",
+  "normalized_h2_pattern",
   "search_intent",
   "reader_question",
   "recommended_title_pattern",
@@ -196,6 +227,22 @@ const legalReviewStatusLabels: Record<LegalReviewStatus, string> = {
   approved: "검수 완료",
 };
 
+const duplicateRiskLabels: Record<BlogDuplicateRisk, string> = {
+  unknown: "미확인",
+  low: "낮음",
+  medium: "중간",
+  high: "높음",
+  failed: "게시 차단",
+};
+
+const duplicateRiskBadgeClasses: Record<BlogDuplicateRisk, string> = {
+  unknown: "bg-surface text-muted",
+  low: "bg-accent-soft text-accent",
+  medium: "bg-yellow-50 text-yellow-700",
+  high: "bg-orange-50 text-orange-700",
+  failed: "bg-red-50 text-red-700",
+};
+
 const prohibitedPhraseCheckKeys = [
   "contains_recommendation",
   "contains_signup_cta",
@@ -219,6 +266,7 @@ const emptyFormValues: BlogPostFormValues = {
   tagsText: "",
   priority: "중",
   title: "",
+  h1: "",
   metaTitle: "",
   metaDescription: "",
   bodyMarkdown: "",
@@ -246,6 +294,22 @@ const emptyFormValues: BlogPostFormValues = {
   checklistText: "",
   checklistJson: "[]",
   faqJson: "[]",
+};
+
+type AiGenerationJobRow = {
+  id: string;
+  post_id: string | null;
+  source_snapshot_id: string | null;
+  status: string;
+  created_at: string;
+};
+
+type InternalLinkItem = {
+  href?: unknown;
+  label?: unknown;
+  placement?: unknown;
+  purpose?: unknown;
+  [key: string]: unknown;
 };
 
 function formatJson(value: unknown) {
@@ -488,6 +552,38 @@ function getProhibitedPhraseCheck(post: BlogPostRow | null) {
   return null;
 }
 
+function getFinalReview(post: BlogPostRow | null) {
+  if (!post || !isRecord(post.source_snapshot)) return null;
+
+  const finalReview = post.source_snapshot.finalReview;
+  if (isRecord(finalReview)) return finalReview;
+
+  const snapshot = getSnapshotRecord(post);
+  const snapshotFinalReview = snapshot?.finalReview;
+  return isRecord(snapshotFinalReview) ? snapshotFinalReview : null;
+}
+
+function getDuplicateRiskCheck(post: BlogPostRow | null) {
+  const finalReview = getFinalReview(post);
+  const duplicateRiskCheck = finalReview?.duplicate_risk_check;
+
+  if (isRecord(duplicateRiskCheck)) return duplicateRiskCheck;
+
+  if (post && isRecord(post.source_snapshot)) {
+    const duplicateRiskReview = post.source_snapshot.duplicateRiskReview;
+    if (isRecord(duplicateRiskReview)) return duplicateRiskReview;
+  }
+
+  return null;
+}
+
+function getExternalReferences(post: BlogPostRow | null) {
+  const finalReview = getFinalReview(post);
+  const references = finalReview?.external_references;
+
+  return Array.isArray(references) ? references : [];
+}
+
 function getCategoryRecommendationReason(post: BlogPostRow | null) {
   if (!post || !isRecord(post.source_snapshot)) return "";
 
@@ -523,6 +619,47 @@ function getProhibitedPhraseCheckBlockingReasons(post: BlogPostRow | null) {
   return prohibitedPhraseCheckKeys
     .filter((key) => prohibitedPhraseCheck[key] !== false)
     .map((key) => `금지 표현 검사 항목 ${key}가 false가 아닙니다.`);
+}
+
+function parseInternalLinkItems(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isRecord) as InternalLinkItem[];
+  } catch {
+    return [];
+  }
+}
+
+function mergePostClientFields(
+  post: BlogPostRow,
+  previousPost?: BlogPostRow | null,
+): BlogPostRow {
+  return {
+    ...post,
+    ai_generation_job_id:
+      post.ai_generation_job_id ?? previousPost?.ai_generation_job_id ?? null,
+  };
+}
+
+function attachAiGenerationJobIds(
+  posts: BlogPostRow[],
+  jobs: AiGenerationJobRow[],
+) {
+  const latestJobByPostId = new Map<string, AiGenerationJobRow>();
+
+  for (const job of jobs) {
+    if (!job.post_id || latestJobByPostId.has(job.post_id)) continue;
+    latestJobByPostId.set(job.post_id, job);
+  }
+
+  return posts.map((post) => ({
+    ...post,
+    ai_generation_job_id: latestJobByPostId.get(post.id)?.id ?? null,
+  }));
 }
 
 function getSnapshotSummary(post: BlogPostRow | null) {
@@ -606,18 +743,46 @@ function getPublishBlockingReasons({
     reasons.push("관리자 검수 완료 상태가 아닙니다.");
   }
 
-  reasons.push(...getProhibitedPhraseCheckBlockingReasons(post));
-
-  if (!payload.body_md.trim()) {
-    reasons.push("본문 Markdown이 비어 있습니다.");
+  if (post.seo_review_status === "failed") {
+    reasons.push("SEO 검수 상태가 failed라 published 전환할 수 없습니다.");
   }
+
+  if (post.duplicate_risk === "high") {
+    reasons.push("중복 콘텐츠 위험도가 high라 published 전환할 수 없습니다.");
+  }
+
+  if (post.duplicate_risk === "failed") {
+    reasons.push("중복 콘텐츠 위험도가 failed라 published 전환할 수 없습니다.");
+  }
+
+  if ((post.unique_fact_score ?? 0) < 5) {
+    reasons.push("unique_fact_score가 5 미만입니다.");
+  }
+
+  reasons.push(...getProhibitedPhraseCheckBlockingReasons(post));
 
   if (!payload.title.trim()) {
     reasons.push("제목이 비어 있습니다.");
   }
 
+  if (!payload.meta_title.trim()) {
+    reasons.push("메타 제목이 비어 있습니다.");
+  }
+
   if (!payload.meta_description.trim()) {
     reasons.push("메타 설명이 비어 있습니다.");
+  }
+
+  if (!payload.h1.trim()) {
+    reasons.push("H1이 비어 있습니다.");
+  }
+
+  if (!payload.body_md.trim()) {
+    reasons.push("본문 Markdown이 비어 있습니다.");
+  }
+
+  if (!post.primary_category_id) {
+    reasons.push("primary_category_id가 없습니다. 대표 카테고리를 저장한 뒤 다시 시도하세요.");
   }
 
   if (!post.source_snapshot_id) {
@@ -645,6 +810,7 @@ function rowToFormValues(row: BlogPostRow): BlogPostFormValues {
     tagsText: (row.tags ?? []).join(", "),
     priority: row.priority,
     title: row.title,
+    h1: row.h1 ?? row.title,
     metaTitle: row.meta_title ?? row.title,
     metaDescription: row.meta_description ?? row.description,
     bodyMarkdown: row.body_md ?? "",
@@ -682,6 +848,7 @@ function blogPostToPayload(post: BlogPost): BlogPostPayload {
       .slice(0, 20),
     priority: post.priority,
     title: post.title,
+    h1: post.h1 ?? post.title,
     meta_title: post.metaTitle,
     meta_description: post.description,
     description: post.description,
@@ -710,6 +877,7 @@ function blogPostToPayload(post: BlogPost): BlogPostPayload {
 function formValuesToPayload(values: BlogPostFormValues): BlogPostPayload {
   const slug = values.slug.trim();
   const title = values.title.trim();
+  const h1 = values.h1.trim();
   const readingMinutes = Number.parseInt(values.readingMinutes, 10);
   const faqJson = parseJsonArray(values.faqJson, "FAQ");
   const checklistJson = parseJsonArray(values.checklistJson, "체크리스트");
@@ -747,6 +915,7 @@ function formValuesToPayload(values: BlogPostFormValues): BlogPostPayload {
     tags: splitTagList(values.tagsText),
     priority: values.priority,
     title,
+    h1,
     meta_title: values.metaTitle.trim() || title,
     meta_description: values.metaDescription.trim(),
     description: values.metaDescription.trim(),
@@ -804,9 +973,21 @@ export function AdminBlogManager() {
     () => getProhibitedPhraseCheck(selectedPost),
     [selectedPost],
   );
+  const duplicateRiskCheck = useMemo(
+    () => getDuplicateRiskCheck(selectedPost),
+    [selectedPost],
+  );
+  const externalReferences = useMemo(
+    () => getExternalReferences(selectedPost),
+    [selectedPost],
+  );
   const categoryRecommendationReason = useMemo(
     () => getCategoryRecommendationReason(selectedPost),
     [selectedPost],
+  );
+  const editableInternalLinks = useMemo(
+    () => parseInternalLinkItems(formValues.internalLinksJson),
+    [formValues.internalLinksJson],
   );
   const selectedSecondaryCategories = useMemo(
     () =>
@@ -823,6 +1004,20 @@ export function AdminBlogManager() {
     () => getCategoryIndexInfo(posts, formValues.primaryCategory),
     [formValues.primaryCategory, posts],
   );
+  const publishBlockingReasons = useMemo(() => {
+    if (!selectedPost) return ["공개할 블로그 글을 선택해주세요."];
+
+    try {
+      return getPublishBlockingReasons({
+        post: selectedPost,
+        payload: formValuesToPayload(formValues),
+      });
+    } catch (error) {
+      return [
+        error instanceof Error ? error.message : "입력값을 확인해주세요.",
+      ];
+    }
+  }, [formValues, selectedPost]);
 
   async function loadPosts() {
     setIsLoading(true);
@@ -843,7 +1038,26 @@ export function AdminBlogManager() {
       return;
     }
 
-    setPosts((data ?? []) as unknown as BlogPostRow[]);
+    const fetchedPosts = (data ?? []) as unknown as BlogPostRow[];
+    const postIds = fetchedPosts.map((post) => post.id);
+
+    if (postIds.length === 0) {
+      setPosts([]);
+      return;
+    }
+
+    const { data: jobData } = await supabase
+      .from("ai_generation_jobs")
+      .select("id, post_id, source_snapshot_id, status, created_at")
+      .in("post_id", postIds)
+      .order("created_at", { ascending: false });
+
+    setPosts(
+      attachAiGenerationJobIds(
+        fetchedPosts,
+        (jobData ?? []) as unknown as AiGenerationJobRow[],
+      ),
+    );
   }
 
   useEffect(() => {
@@ -858,6 +1072,20 @@ export function AdminBlogManager() {
       ...current,
       [field]: value,
     }));
+  }
+
+  function updateInternalLinkLabel(index: number, label: string) {
+    const links = parseInternalLinkItems(formValues.internalLinksJson);
+    const target = links[index];
+
+    if (!target) return;
+
+    links[index] = {
+      ...target,
+      label,
+    };
+
+    updateField("internalLinksJson", JSON.stringify(links, null, 2));
   }
 
   function startNewPost() {
@@ -937,7 +1165,10 @@ async function savePost() {
       return;
     }
 
-    const nextPost = data as unknown as BlogPostRow;
+    const nextPost = mergePostClientFields(
+      data as unknown as BlogPostRow,
+      selectedPost,
+    );
     setPosts((current) => {
       const exists = current.some((post) => post.id === nextPost.id);
       const nextPosts = exists
@@ -982,7 +1213,10 @@ async function savePost() {
       return;
     }
 
-    const nextPost = data as unknown as BlogPostRow;
+    const nextPost = mergePostClientFields(
+      data as unknown as BlogPostRow,
+      selectedPost,
+    );
     setPosts((current) =>
       current.map((post) => (post.id === nextPost.id ? nextPost : post)),
     );
@@ -1151,7 +1385,13 @@ async function savePost() {
       return;
     }
 
-    const nextPost = result.post;
+    const nextPost = mergePostClientFields(
+      {
+        ...result.post,
+        ai_generation_job_id: result.job?.id ?? result.post.ai_generation_job_id,
+      },
+      selectedPost,
+    );
     setPosts((current) => {
       const exists = current.some((post) => post.id === nextPost.id);
       const nextPosts = exists
@@ -1420,7 +1660,11 @@ async function savePost() {
               <button
                 type="button"
                 onClick={publishSelectedPost}
-                disabled={isSaving || !selectedPost}
+                disabled={
+                  isSaving ||
+                  !selectedPost ||
+                  publishBlockingReasons.length > 0
+                }
                 className="h-10 rounded-md border border-accent px-3 text-sm font-bold text-accent disabled:opacity-50"
               >
                 published로 전환
@@ -1480,6 +1724,134 @@ async function savePost() {
                   label="승인된 피해 제보 수"
                   value={`${selectedSnapshotSummary.approvedPublicReportCount}건`}
                 />
+              </div>
+
+              <div className="rounded-md border border-line bg-surface p-3">
+                <h4 className="text-sm font-bold">published 전환 조건</h4>
+                {publishBlockingReasons.length > 0 ? (
+                  <ul className="mt-3 grid gap-2 text-xs leading-5 text-red-700">
+                    {publishBlockingReasons.map((reason) => (
+                      <li key={reason} className="rounded-md bg-red-50 p-2">
+                        {reason}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 rounded-md bg-accent-soft p-2 text-xs font-bold text-accent">
+                    published 전환 조건을 모두 통과했습니다.
+                  </p>
+                )}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-md border border-line bg-surface p-3">
+                  <h4 className="text-sm font-bold">초안 SEO 필드</h4>
+                  <dl className="mt-3 grid gap-3 text-xs">
+                    <div>
+                      <dt className="font-semibold text-muted">title</dt>
+                      <dd className="mt-1 break-words font-bold">
+                        {formValues.title || "입력 필요"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">meta_title</dt>
+                      <dd className="mt-1 break-words">
+                        {formValues.metaTitle || "입력 필요"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">
+                        meta_description
+                      </dt>
+                      <dd className="mt-1 break-words leading-5">
+                        {formValues.metaDescription || "입력 필요"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">h1</dt>
+                      <dd className="mt-1 break-words">
+                        {formValues.h1 || "입력 필요"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">slug</dt>
+                      <dd className="mt-1 break-all">{formValues.slug}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">body_md</dt>
+                      <dd className="mt-1">
+                        {formValues.bodyMarkdown.trim().length.toLocaleString(
+                          "ko-KR",
+                        )}
+                        자
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="rounded-md border border-line bg-surface p-3">
+                  <h4 className="text-sm font-bold">분류 및 검수 필드</h4>
+                  <dl className="mt-3 grid gap-3 text-xs">
+                    <div>
+                      <dt className="font-semibold text-muted">
+                        primary_keyword
+                      </dt>
+                      <dd className="mt-1 break-words">
+                        {formValues.primaryKeyword || "입력값 없음"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">
+                        secondary_keywords
+                      </dt>
+                      <dd className="mt-1 break-words">
+                        {formValues.secondaryKeywordsText || "입력값 없음"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">category</dt>
+                      <dd className="mt-1 font-bold">
+                        {getBlogCategoryLabel(formValues.primaryCategory)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">tags</dt>
+                      <dd className="mt-1 break-words">
+                        {selectedTags.length > 0
+                          ? selectedTags.join(", ")
+                          : "태그 없음"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">
+                        seo_review_status
+                      </dt>
+                      <dd className="mt-1 font-bold">
+                        {selectedPost.seo_review_status}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">duplicate_risk</dt>
+                      <dd className="mt-1 font-bold">
+                        {selectedPost.duplicate_risk}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">
+                        unique_fact_score
+                      </dt>
+                      <dd className="mt-1 font-bold">
+                        {selectedPost.unique_fact_score ?? 0}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">content_angle</dt>
+                      <dd className="mt-1 break-words">
+                        {selectedPost.content_angle || "저장된 값 없음"}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -1575,9 +1947,56 @@ async function savePost() {
                   label="Source snapshot ID"
                   value={selectedPost.source_snapshot_id ?? "확인되지 않음"}
                 />
+                <ReviewMetric
+                  label="AI generation job ID"
+                  value={selectedPost.ai_generation_job_id ?? "확인되지 않음"}
+                />
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-md border border-line bg-surface p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h4 className="text-sm font-bold">중복 콘텐츠 검수</h4>
+                    <span
+                      className={`rounded-md px-2 py-1 text-xs font-bold ${
+                        duplicateRiskBadgeClasses[selectedPost.duplicate_risk]
+                      }`}
+                    >
+                      {duplicateRiskLabels[selectedPost.duplicate_risk]}
+                    </span>
+                  </div>
+                  <dl className="mt-3 grid gap-2 text-xs">
+                    <div>
+                      <dt className="font-semibold text-muted">
+                        사이트별 고유 데이터 점수
+                      </dt>
+                      <dd className="mt-1 font-bold">
+                        {selectedPost.unique_fact_score ?? 0}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">Title pattern</dt>
+                      <dd className="mt-1 break-all text-muted">
+                        {selectedPost.normalized_title_pattern || "저장된 값 없음"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-muted">H2 pattern</dt>
+                      <dd className="mt-1 break-all text-muted">
+                        {selectedPost.normalized_h2_pattern || "저장된 값 없음"}
+                      </dd>
+                    </div>
+                  </dl>
+                  {["medium", "high", "failed"].includes(
+                    selectedPost.duplicate_risk,
+                  ) ? (
+                    <p className="mt-3 rounded-md bg-background p-2 text-xs font-semibold text-red-700">
+                      중복 위험 경고가 있습니다. 관리자 경고 메시지와 source
+                      snapshot의 duplicateRiskReview를 확인하세요.
+                    </p>
+                  ) : null}
+                </div>
+
                 <div className="rounded-md border border-line bg-surface p-3">
                   <h4 className="text-sm font-bold">금지 표현 검사 결과</h4>
                   {prohibitedPhraseCheck ? (
@@ -1622,6 +2041,26 @@ async function savePost() {
                       관리자 경고 메시지가 없습니다.
                     </p>
                   )}
+                </div>
+
+                <div className="rounded-md border border-line bg-surface p-3">
+                  <h4 className="text-sm font-bold">duplicate_risk_check</h4>
+                  <textarea
+                    value={formatJsonObject(duplicateRiskCheck)}
+                    readOnly
+                    rows={10}
+                    className="font-mono mt-3 w-full rounded-md border border-line bg-background px-3 py-2 text-xs leading-5"
+                  />
+                </div>
+
+                <div className="rounded-md border border-line bg-surface p-3">
+                  <h4 className="text-sm font-bold">external_references</h4>
+                  <textarea
+                    value={formatJson(externalReferences)}
+                    readOnly
+                    rows={10}
+                    className="font-mono mt-3 w-full rounded-md border border-line bg-background px-3 py-2 text-xs leading-5"
+                  />
                 </div>
               </div>
 
@@ -1787,7 +2226,13 @@ async function savePost() {
               <Field label="제목">
                 <input
                   value={formValues.title}
-                  onChange={(event) => updateField("title", event.target.value)}
+                  onChange={(event) => {
+                    const nextTitle = event.target.value;
+                    updateField("title", nextTitle);
+                    if (!formValues.h1 || formValues.h1 === formValues.title) {
+                      updateField("h1", nextTitle);
+                    }
+                  }}
                   onBlur={() => {
                     if (!formValues.slug && formValues.title) {
                       updateField("slug", createSlug(formValues.title));
@@ -1806,6 +2251,14 @@ async function savePost() {
                 />
               </Field>
             </div>
+
+            <Field label="H1">
+              <input
+                value={formValues.h1}
+                onChange={(event) => updateField("h1", event.target.value)}
+                className="h-11 rounded-md border border-line bg-background px-3 text-sm"
+              />
+            </Field>
 
             <Field label="메타 제목">
               <input
@@ -1944,6 +2397,39 @@ async function savePost() {
                 className="font-mono rounded-md border border-line bg-background px-3 py-2 text-xs leading-5"
               />
             </Field>
+
+            <div className="grid gap-2 rounded-md border border-line bg-background p-3">
+              <span className="text-sm font-bold text-foreground">
+                내부 링크 anchor text
+              </span>
+              {editableInternalLinks.length > 0 ? (
+                <div className="grid gap-3">
+                  {editableInternalLinks.map((link, index) => (
+                    <div
+                      key={`${getString(link.href)}-${index}`}
+                      className="grid gap-2 rounded-md border border-line bg-surface p-3 md:grid-cols-[1fr_1.5fr]"
+                    >
+                      <input
+                        value={getString(link.href)}
+                        readOnly
+                        className="h-10 rounded-md border border-line bg-muted/20 px-3 text-xs text-muted"
+                      />
+                      <input
+                        value={getString(link.label)}
+                        onChange={(event) =>
+                          updateInternalLinkLabel(index, event.target.value)
+                        }
+                        className="h-10 rounded-md border border-line bg-background px-3 text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted">
+                  내부 링크 JSON 배열이 없거나 파싱할 수 없습니다.
+                </p>
+              )}
+            </div>
 
             <Field label="본문 섹션 JSON">
               <textarea

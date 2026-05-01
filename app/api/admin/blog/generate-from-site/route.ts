@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
@@ -18,8 +18,16 @@ import {
   getBlogCategoryLabel,
   getBlogTagSlug,
   isBlogCategoryValue,
+  type BlogDuplicateRisk,
   type BlogCategorySlug,
+  type BlogSeoReviewStatus,
 } from "@/app/data/blog-posts";
+import {
+  reviewBlogDuplicateRisk,
+  validateBlogSeoDraft,
+  type BlogDuplicateComparisonPost,
+  type BlogDuplicateRiskReview,
+} from "@/app/data/blog-seo-review";
 import { calculateSiteTrustScore } from "@/app/data/sites";
 import {
   BLOG_PROMPT_VERSION,
@@ -127,12 +135,30 @@ type SameIpSiteRow = {
 
 type ExistingBlogRow = {
   id: string;
+  site_id: string | null;
+  source_site_id: string | null;
   slug: string;
   status: string;
   title: string | null;
   body_md: string | null;
   source_snapshot_id: string | null;
   source_snapshot: unknown;
+  updated_at: string | null;
+};
+
+type DuplicateComparisonBlogRow = {
+  id: string;
+  slug: string | null;
+  title: string | null;
+  body_md: string | null;
+  sections: unknown;
+  source_snapshot: unknown;
+  primary_category: BlogCategorySlug | null;
+  category: string | null;
+  normalized_title_pattern: string | null;
+  normalized_h2_pattern: string | null;
+  unique_fact_score: number | null;
+  published_at: string | null;
   updated_at: string | null;
 };
 
@@ -150,6 +176,7 @@ type BlogPostRow = {
   tags: string[] | null;
   priority: BlogPriority;
   title: string;
+  h1: string | null;
   meta_title: string | null;
   meta_description: string | null;
   description: string;
@@ -163,6 +190,12 @@ type BlogPostRow = {
   ai_model: string | null;
   prompt_version: string | null;
   reviewed_by: string | null;
+  seo_review_status: BlogSeoReviewStatus;
+  duplicate_risk: BlogDuplicateRisk;
+  unique_fact_score: number | null;
+  content_angle: string | null;
+  normalized_title_pattern: string | null;
+  normalized_h2_pattern: string | null;
   search_intent: string | null;
   reader_question: string | null;
   recommended_title_pattern: string | null;
@@ -497,14 +530,40 @@ type ProhibitedPhraseCheck = {
   contains_access_facilitation: boolean;
 };
 
+type DuplicateRiskCheck = {
+  title_pattern_reused: boolean;
+  h2_pattern_reused: boolean;
+  intro_too_similar: boolean;
+  faq_too_similar: boolean;
+  unique_fact_score: number;
+  estimated_duplicate_risk: "low" | "medium" | "high";
+  reason: string;
+};
+
 type FinalReviewOutput = {
   title: string;
   slug: string;
   meta_title: string;
   meta_description: string;
+  h1: string;
   primary_keyword: string;
   secondary_keywords: string[];
+  content_angle: string;
   category_strategy: CategoryStrategy;
+  duplicate_risk_check: DuplicateRiskCheck;
+  unique_fact_score: number;
+  internal_links: Array<{
+    href: string;
+    label: string;
+    placement: "summary" | "dns_section" | "reports_section" | "reviews_section";
+    purpose: "source_detail" | "dns_detail" | "report_detail" | "review_detail";
+  }>;
+  external_references: Array<{
+    url: string;
+    label: string;
+    reason: string;
+    rel: string;
+  }>;
   body_md: string;
   faq_json: Array<{
     question: string;
@@ -599,6 +658,7 @@ const blogPostSelect = [
   "tags",
   "priority",
   "title",
+  "h1",
   "meta_title",
   "meta_description",
   "description",
@@ -612,6 +672,12 @@ const blogPostSelect = [
   "ai_model",
   "prompt_version",
   "reviewed_by",
+  "seo_review_status",
+  "duplicate_risk",
+  "unique_fact_score",
+  "content_angle",
+  "normalized_title_pattern",
+  "normalized_h2_pattern",
   "search_intent",
   "reader_question",
   "recommended_title_pattern",
@@ -629,12 +695,30 @@ const blogPostSelect = [
 
 const existingBlogSelect = [
   "id",
+  "site_id",
+  "source_site_id",
   "slug",
   "status",
   "title",
   "body_md",
   "source_snapshot_id",
   "source_snapshot",
+  "updated_at",
+].join(", ");
+
+const duplicateComparisonBlogSelect = [
+  "id",
+  "slug",
+  "title",
+  "body_md",
+  "sections",
+  "source_snapshot",
+  "primary_category",
+  "category",
+  "normalized_title_pattern",
+  "normalized_h2_pattern",
+  "unique_fact_score",
+  "published_at",
   "updated_at",
 ].join(", ");
 
@@ -819,9 +903,15 @@ const finalReviewSchema = {
     "slug",
     "meta_title",
     "meta_description",
+    "h1",
     "primary_keyword",
     "secondary_keywords",
+    "content_angle",
     "category_strategy",
+    "duplicate_risk_check",
+    "unique_fact_score",
+    "internal_links",
+    "external_references",
     "body_md",
     "faq_json",
     "checklist_json",
@@ -835,9 +925,71 @@ const finalReviewSchema = {
     slug: { type: "string" },
     meta_title: { type: "string" },
     meta_description: { type: "string" },
+    h1: { type: "string" },
     primary_keyword: { type: "string" },
     secondary_keywords: { type: "array", items: { type: "string" } },
+    content_angle: { type: "string" },
     category_strategy: categoryStrategySchema,
+    duplicate_risk_check: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "title_pattern_reused",
+        "h2_pattern_reused",
+        "intro_too_similar",
+        "faq_too_similar",
+        "unique_fact_score",
+        "estimated_duplicate_risk",
+        "reason",
+      ],
+      properties: {
+        title_pattern_reused: { type: "boolean" },
+        h2_pattern_reused: { type: "boolean" },
+        intro_too_similar: { type: "boolean" },
+        faq_too_similar: { type: "boolean" },
+        unique_fact_score: { type: "number" },
+        estimated_duplicate_risk: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+        },
+        reason: { type: "string" },
+      },
+    },
+    unique_fact_score: { type: "number" },
+    internal_links: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["href", "label", "placement", "purpose"],
+        properties: {
+          href: { type: "string" },
+          label: { type: "string" },
+          placement: {
+            type: "string",
+            enum: ["summary", "dns_section", "reports_section", "reviews_section"],
+          },
+          purpose: {
+            type: "string",
+            enum: ["source_detail", "dns_detail", "report_detail", "review_detail"],
+          },
+        },
+      },
+    },
+    external_references: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["url", "label", "reason", "rel"],
+        properties: {
+          url: { type: "string" },
+          label: { type: "string" },
+          reason: { type: "string" },
+          rel: { type: "string" },
+        },
+      },
+    },
     body_md: { type: "string" },
     faq_json: {
       type: "array",
@@ -1763,6 +1915,26 @@ async function findExistingBlogBySlug(
   }
 
   return data ?? null;
+}
+
+function blogBelongsToSite(blog: ExistingBlogRow, siteId: string) {
+  return blog.site_id === siteId || blog.source_site_id === siteId;
+}
+
+async function getAvailableBlogSlug(
+  supabase: SupabaseClient,
+  preferredSlug: string,
+) {
+  const slugBase = normalizeSlug(preferredSlug) || `blog-${randomUUID().slice(0, 8)}`;
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const slug = attempt === 0 ? slugBase : `${slugBase}-${attempt + 1}`;
+    const existingBlog = await findExistingBlogBySlug(supabase, slug);
+
+    if (!existingBlog) return slug;
+  }
+
+  return `${slugBase}-${randomUUID().slice(0, 8)}`;
 }
 
 async function getBlogCategoryIdBySlug(
@@ -3853,6 +4025,191 @@ async function reviewTitleQuality({
   };
 }
 
+const duplicateRiskRank: Record<BlogDuplicateRisk, number> = {
+  unknown: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+  failed: 4,
+};
+
+function getDuplicateRiskFromTitleQuality(
+  titleQualityReview: TitleQualityReview,
+): BlogDuplicateRisk {
+  if (titleQualityReview.same_pattern_count >= 5) return "high";
+  if (titleQualityReview.same_pattern_count >= 2) return "medium";
+  return "low";
+}
+
+function getDuplicateRiskFromFinalReview({
+  finalReview,
+  titleQualityReview,
+}: {
+  finalReview: FinalReviewOutput;
+  titleQualityReview: TitleQualityReview;
+}): BlogDuplicateRisk {
+  const finalReviewRisk = finalReview.duplicate_risk_check.estimated_duplicate_risk;
+  const titleRisk = getDuplicateRiskFromTitleQuality(titleQualityReview);
+
+  return duplicateRiskRank[finalReviewRisk] >= duplicateRiskRank[titleRisk]
+    ? finalReviewRisk
+    : titleRisk;
+}
+
+function maxDuplicateRisk(...risks: BlogDuplicateRisk[]): BlogDuplicateRisk {
+  return risks.reduce<BlogDuplicateRisk>(
+    (maxRisk, risk) =>
+      duplicateRiskRank[risk] > duplicateRiskRank[maxRisk] ? risk : maxRisk,
+    "unknown",
+  );
+}
+
+function getUniqueFactScoreFromFinalReview(
+  finalReview: FinalReviewOutput,
+  fallback: number,
+) {
+  const scores = [
+    finalReview.unique_fact_score,
+    finalReview.duplicate_risk_check.unique_fact_score,
+  ].filter((score) => Number.isFinite(score) && score >= 0);
+
+  if (scores.length === 0) return fallback;
+  return Math.round(Math.min(...scores));
+}
+
+function getSeoReviewStatusFromQuality(
+  titleQualityReview: TitleQualityReview,
+  duplicateRisk: BlogDuplicateRisk,
+  draftSeoReviewStatus: BlogSeoReviewStatus,
+): BlogSeoReviewStatus {
+  if (draftSeoReviewStatus === "failed") return "failed";
+  if (duplicateRisk === "failed") return "failed";
+  if (
+    draftSeoReviewStatus === "warning" ||
+    duplicateRisk === "high" ||
+    duplicateRisk === "medium" ||
+    titleQualityReview.warnings.length > 0
+  ) {
+    return "warning";
+  }
+
+  return "passed";
+}
+
+function getSectionHeadingsFromUnknown(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => {
+    if (!isRecord(item) || typeof item.heading !== "string") return [];
+    return [item.heading];
+  });
+}
+
+function mapDuplicateComparisonBlogRow(
+  row: DuplicateComparisonBlogRow,
+  fallbackSiteName: string,
+): BlogDuplicateComparisonPost {
+  return {
+    id: row.id,
+    slug: row.slug,
+    siteName: getBlogSourceSnapshotSiteName(row.source_snapshot) ?? fallbackSiteName,
+    title: row.title,
+    bodyMd: row.body_md,
+    h2Headings: getSectionHeadingsFromUnknown(row.sections),
+    normalizedTitlePattern: row.normalized_title_pattern,
+    normalizedH2Pattern: row.normalized_h2_pattern,
+  };
+}
+
+async function getDuplicateComparisonPosts({
+  supabase,
+  primaryCategory,
+  excludePostId,
+  fallbackSiteName,
+}: {
+  supabase: SupabaseClient;
+  primaryCategory: BlogCategorySlug;
+  excludePostId?: string | null;
+  fallbackSiteName: string;
+}) {
+  const [recentResult, categoryResult] = await Promise.all([
+    supabase
+      .from("blog_posts")
+      .select(duplicateComparisonBlogSelect)
+      .eq("status", "published")
+      .order("published_at", { ascending: false, nullsFirst: false })
+      .limit(20),
+    supabase
+      .from("blog_posts")
+      .select(duplicateComparisonBlogSelect)
+      .eq("status", "published")
+      .eq("primary_category", primaryCategory)
+      .order("published_at", { ascending: false, nullsFirst: false })
+      .limit(100),
+  ]);
+
+  if (recentResult.error) {
+    throw new Error(
+      `최근 published 블로그 중복 검사를 수행하지 못했습니다: ${recentResult.error.message}`,
+    );
+  }
+
+  if (categoryResult.error) {
+    throw new Error(
+      `같은 카테고리 published 블로그 중복 검사를 수행하지 못했습니다: ${categoryResult.error.message}`,
+    );
+  }
+
+  const byId = new Map<string, DuplicateComparisonBlogRow>();
+
+  for (const row of [
+    ...((recentResult.data ?? []) as unknown as DuplicateComparisonBlogRow[]),
+    ...((categoryResult.data ?? []) as unknown as DuplicateComparisonBlogRow[]),
+  ]) {
+    if (excludePostId && row.id === excludePostId) continue;
+    byId.set(row.id, row);
+  }
+
+  return Array.from(byId.values()).map((row) =>
+    mapDuplicateComparisonBlogRow(row, fallbackSiteName),
+  );
+}
+
+function createSha256Hash(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+async function saveBlogContentFingerprint({
+  supabase,
+  postId,
+  siteId,
+  bodyMd,
+  duplicateReview,
+}: {
+  supabase: SupabaseClient;
+  postId: string;
+  siteId: string;
+  bodyMd: string;
+  duplicateReview: BlogDuplicateRiskReview;
+}) {
+  const { error } = await supabase.from("blog_content_fingerprints").insert({
+    post_id: postId,
+    site_id: siteId,
+    title_pattern: duplicateReview.normalizedTitlePattern,
+    h2_pattern: duplicateReview.normalizedH2Pattern,
+    content_hash: createSha256Hash(bodyMd),
+    normalized_content_hash: createSha256Hash(duplicateReview.normalizedBody),
+    unique_fact_score: duplicateReview.uniqueFactScore,
+    similarity_score: duplicateReview.maxBodySimilarity,
+  });
+
+  if (error) {
+    throw new Error(
+      `블로그 콘텐츠 fingerprint를 저장하지 못했습니다: ${error.message}`,
+    );
+  }
+}
+
 function normalizeMarkdownTitle(markdown: string, title: string) {
   const normalized = markdown.replace(/\r\n/g, "\n").trim();
 
@@ -4067,6 +4424,18 @@ function normalizeBlogMarkdown(
   return appendRequiredBlogNotices(
     withVerification,
   );
+}
+
+function sanitizePublicBody({
+  markdown,
+  h1,
+  verificationSummary,
+}: {
+  markdown: string;
+  h1: string;
+  verificationSummary?: BlogVerificationSummary | null;
+}) {
+  return normalizeBlogMarkdown(markdown, h1, verificationSummary);
 }
 
 function normalizeSeoPlan(
@@ -4672,12 +5041,15 @@ export async function POST(request: Request) {
     siteSlug?: unknown;
     blogPostId?: unknown;
     mode?: unknown;
+    allowAdditionalPostForSameSite?: unknown;
   } | null;
   const siteId = typeof body?.siteId === "string" ? body.siteId.trim() : "";
   const siteSlug = typeof body?.siteSlug === "string" ? body.siteSlug.trim() : "";
   const blogPostId =
     typeof body?.blogPostId === "string" ? body.blogPostId.trim() : "";
   const mode = body?.mode === "update" ? "update" : "create";
+  const allowAdditionalPostForSameSite =
+    body?.allowAdditionalPostForSameSite === true;
 
   if (!siteId && !siteSlug) {
     return NextResponse.json(
@@ -4729,11 +5101,26 @@ export async function POST(request: Request) {
       );
     }
 
+    if (
+      requestedBlog.data &&
+      !blogBelongsToSite(requestedBlog.data, site.id)
+    ) {
+      return NextResponse.json(
+        { error: "선택한 블로그 글이 요청한 사이트에 속하지 않습니다." },
+        { status: 400 },
+      );
+    }
+
+    const publishedBlog = requestedBlog.data
+      ? null
+      : await findPublishedBlogBySource(supabase, site.id);
     const existingBlog = requestedBlog.data
       ? requestedBlog.data
       : mode === "update"
-        ? await findPublishedBlogBySource(supabase, site.id)
-        : await findExistingBlogBySource(supabase, site.id);
+        ? publishedBlog
+        : allowAdditionalPostForSameSite
+          ? null
+          : publishedBlog ?? (await findExistingBlogBySource(supabase, site.id));
 
     if (mode === "update" && !existingBlog) {
       return NextResponse.json(
@@ -4745,7 +5132,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const jobType = mode === "update" || existingBlog ? "update" : "create";
+    const isAdditionalPost =
+      allowAdditionalPostForSameSite && mode === "create" && !existingBlog;
+    const jobType = existingBlog ? "update" : "create";
     const activeJob = await findActiveAiGenerationJob(supabase, site.id);
 
     if (activeJob) {
@@ -4777,7 +5166,11 @@ export async function POST(request: Request) {
     });
 
     const fallbackSlug = getFallbackBlogSlug(site);
-    const preferredSlug = existingBlog?.slug ?? fallbackSlug;
+    const preferredSlug = existingBlog?.slug ?? (
+      isAdditionalPost
+        ? `${fallbackSlug}-${new Date().toISOString().slice(0, 10)}`
+        : fallbackSlug
+    );
     const approvedDomainSubmissions = await getApprovedDomainSubmissionRows(
       supabase,
       site.id,
@@ -4811,14 +5204,14 @@ export async function POST(request: Request) {
     );
     persistedSnapshotForFailure = persistedSnapshot;
     const previousSnapshot =
-      mode === "update" && existingBlog
+      existingBlog
         ? (await getBlogSourceSnapshotById(
             supabase,
             existingBlog.source_snapshot_id,
           )) ?? getPreviousSnapshotFromBlog(existingBlog)
         : null;
     const updateContext =
-      mode === "update" && existingBlog
+      existingBlog
         ? buildUpdateContext({
             previousPost: existingBlog,
             previousSnapshot,
@@ -4836,9 +5229,18 @@ export async function POST(request: Request) {
       anthropicModel,
     });
 
-    const finalSlug = existingBlog?.slug ?? generated.finalDraft.slug;
+    const rawFinalSlug = existingBlog?.slug ?? generated.finalDraft.slug;
+    const slugMatchedBlog = isAdditionalPost
+      ? null
+      : await findExistingBlogBySlug(supabase, rawFinalSlug);
     const targetBlog =
-      existingBlog ?? (await findExistingBlogBySlug(supabase, finalSlug));
+      existingBlog ??
+      (slugMatchedBlog && blogBelongsToSite(slugMatchedBlog, site.id)
+        ? slugMatchedBlog
+        : null);
+    const finalSlug = targetBlog
+      ? targetBlog.slug
+      : await getAvailableBlogSlug(supabase, rawFinalSlug);
     const today = new Date().toISOString().slice(0, 10);
     const titleQualityReview = await reviewTitleQuality({
       supabase,
@@ -4861,18 +5263,75 @@ export async function POST(request: Request) {
         title_similarity_warning: titleQualityReview.title_similarity_warning,
       },
     };
-    const adminWarnings = buildAdminWarnings({
-      finalReview: generated.finalReview,
-      claudeDraft: generated.claudeDraft,
-      safetyViolations: generated.safetyViolations,
-      minimumPublishWarning: persistedSnapshot.minimum_publish_check?.warning,
-      seoTitleDataWarning: getSeoTitleDataWarning(persistedSnapshot),
-      titleQualityWarnings: titleQualityReview.warnings,
-    });
     const primaryCategoryId = await getBlogCategoryIdBySlug(
       supabase,
       generated.finalDraft.primary_category,
     );
+    const h1 = getSeoH1(persistedSnapshot);
+    const finalBodyMarkdown = sanitizePublicBody({
+      markdown: generated.finalReview.body_md,
+      h1,
+      verificationSummary: persistedSnapshot.site_specific_verification,
+    });
+    const seoDraftValidation = validateBlogSeoDraft({
+      siteName: site.name,
+      slug: finalSlug,
+      title: generated.finalDraft.title,
+      metaTitle: generated.finalDraft.meta_title,
+      metaDescription: generated.finalDraft.description,
+      h1,
+      bodyMd: finalBodyMarkdown,
+      faq: generated.finalReview.faq_json,
+      internalLinks: generated.finalDraft.internal_links,
+      externalLinks: generated.finalReview.external_references,
+      facts: generated.finalReview.summary.confirmed_facts,
+    });
+    const duplicateComparisonPosts = await getDuplicateComparisonPosts({
+      supabase,
+      primaryCategory: generated.finalDraft.primary_category,
+      excludePostId: targetBlog?.id,
+      fallbackSiteName: site.name,
+    });
+    const duplicateReview = reviewBlogDuplicateRisk({
+      siteName: site.name,
+      title: generated.finalDraft.title,
+      bodyMd: finalBodyMarkdown,
+      h2Headings: generated.finalDraft.sections.map((section) => section.heading),
+      facts: generated.finalReview.summary.confirmed_facts,
+      comparisonPosts: duplicateComparisonPosts,
+    });
+    const duplicateRisk = maxDuplicateRisk(
+      getDuplicateRiskFromFinalReview({
+        finalReview: generated.finalReview,
+        titleQualityReview,
+      }),
+      duplicateReview.duplicateRisk,
+    );
+    const uniqueFactScore = Math.min(
+      getUniqueFactScoreFromFinalReview(
+        generated.finalReview,
+        titleQualityReview.uniqueness_score,
+      ),
+      seoDraftValidation.uniqueFactScore,
+      duplicateReview.uniqueFactScore,
+    );
+
+    if (duplicateRisk === "high" || duplicateRisk === "failed") {
+      legalReviewStatus = "needs_review";
+    }
+
+    const adminWarnings = uniqueStrings([
+      ...buildAdminWarnings({
+        finalReview: generated.finalReview,
+        claudeDraft: generated.claudeDraft,
+        safetyViolations: generated.safetyViolations,
+        minimumPublishWarning: persistedSnapshot.minimum_publish_check?.warning,
+        seoTitleDataWarning: getSeoTitleDataWarning(persistedSnapshot),
+        titleQualityWarnings: titleQualityReview.warnings,
+      }),
+      ...seoDraftValidation.adminWarnings,
+      ...duplicateReview.adminWarnings,
+    ]);
     const blogPayload = {
       site_id: site.id,
       slug: finalSlug,
@@ -4886,22 +5345,31 @@ export async function POST(request: Request) {
       tags: generated.finalDraft.tags,
       priority: generated.finalDraft.priority,
       title: generated.finalDraft.title,
+      h1,
       meta_title: generated.finalDraft.meta_title,
       meta_description: generated.finalDraft.description,
       description: generated.finalDraft.description,
       primary_keyword: generated.finalDraft.primary_keyword,
       secondary_keywords: generated.finalDraft.secondary_keywords,
-      body_md: normalizeBlogMarkdown(
-        generated.finalReview.body_md,
-        getSeoH1(persistedSnapshot),
-        persistedSnapshot.site_specific_verification,
-      ),
+      body_md: finalBodyMarkdown,
       faq_json: generated.finalReview.faq_json,
       checklist_json: generated.finalReview.checklist_json,
       source_snapshot_id: persistedSnapshot.source_snapshot_id ?? null,
       ai_provider: "mixed",
       prompt_version: blogPromptVersion,
       reviewed_by: null,
+      seo_review_status: getSeoReviewStatusFromQuality(
+        titleQualityReview,
+        duplicateRisk,
+        seoDraftValidation.seoReviewStatus,
+      ),
+      duplicate_risk: duplicateRisk,
+      unique_fact_score: uniqueFactScore,
+      content_angle:
+        generated.finalReview.content_angle.trim() ||
+        generated.seoPlan.title_strategy.selected_pattern,
+      normalized_title_pattern: duplicateReview.normalizedTitlePattern,
+      normalized_h2_pattern: duplicateReview.normalizedH2Pattern,
       search_intent: generated.finalDraft.search_intent,
       reader_question: generated.finalDraft.reader_question,
       recommended_title_pattern: generated.finalDraft.recommended_title_pattern,
@@ -4913,7 +5381,7 @@ export async function POST(request: Request) {
       sections: generated.finalDraft.sections,
       checklist: generated.finalDraft.checklist,
       faqs: generated.finalDraft.faqs,
-      source_site_id: site.id,
+      source_site_id: isAdditionalPost ? null : site.id,
       source_snapshot: {
         sourceSnapshotId: persistedSnapshot.source_snapshot_id,
         snapshot: persistedSnapshot,
@@ -4924,7 +5392,7 @@ export async function POST(request: Request) {
           title: generated.finalDraft.title,
           metaTitle: generated.finalDraft.meta_title,
           metaDescription: generated.finalDraft.description,
-          h1: getSeoH1(persistedSnapshot),
+          h1,
           primaryKeyword: generated.finalDraft.primary_keyword,
           secondaryKeywords: generated.finalDraft.secondary_keywords,
         },
@@ -4934,6 +5402,12 @@ export async function POST(request: Request) {
         seoTitleSignals: persistedSnapshot.seo_title_signals,
         seoTitleDataWarning: getSeoTitleDataWarning(persistedSnapshot),
         titleQualityReview,
+        seoDraftValidation,
+        duplicateRiskReview: duplicateReview,
+        duplicateRisk,
+        uniqueFactScore,
+        allowAdditionalPostForSameSite,
+        isAdditionalPost,
         internalLinks: generated.finalDraft.internal_links,
         categoryStructure: {
           primaryCategoryId,
@@ -4975,6 +5449,14 @@ export async function POST(request: Request) {
     }
 
     savedPostForFailure = saveResult.data;
+    await saveBlogContentFingerprint({
+      supabase,
+      postId: saveResult.data.id,
+      siteId: site.id,
+      bodyMd: finalBodyMarkdown,
+      duplicateReview,
+    });
+
     const version = await createBlogPostVersion({
       supabase,
       postId: saveResult.data.id,
@@ -5035,6 +5517,11 @@ export async function POST(request: Request) {
         seoTitleSignals: persistedSnapshot.seo_title_signals ?? null,
         seoTitleDataWarning: getSeoTitleDataWarning(persistedSnapshot),
         titleQualityReview,
+        seoDraftValidation,
+        duplicateRiskReview: duplicateReview,
+        duplicateRisk,
+        uniqueFactScore,
+        isAdditionalPost,
         sameIpSites: persistedSnapshot.sameIpSites.length,
       },
     });

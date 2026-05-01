@@ -14,6 +14,32 @@ export type BlogTitlePattern = {
   example: string;
 };
 
+export type BlogSeoReviewStatus =
+  | "not_reviewed"
+  | "passed"
+  | "warning"
+  | "failed";
+
+export type BlogDuplicateRisk =
+  | "unknown"
+  | "low"
+  | "medium"
+  | "high"
+  | "failed";
+
+export type BlogContentFingerprint = {
+  id: string;
+  postId: string;
+  siteId: string;
+  titlePattern: string;
+  h2Pattern: string;
+  contentHash: string;
+  normalizedContentHash: string;
+  uniqueFactScore: number;
+  similarityScore: number;
+  createdAt: string;
+};
+
 export type BlogCategorySlug =
   | "site-reports"
   | "domain-dns"
@@ -38,8 +64,17 @@ export type BlogPostSection = {
   bullets?: string[];
 };
 
+export type BlogPostExternalReference = {
+  title: string;
+  url: string;
+  publisher?: string;
+  evidenceType?: string;
+};
+
 export type BlogPost = {
   slug: string;
+  status?: string;
+  legalReviewStatus?: string;
   category: string;
   primaryCategory?: BlogCategorySlug;
   secondaryCategories?: BlogCategorySlug[];
@@ -50,10 +85,18 @@ export type BlogPost = {
   tags?: string[];
   priority: "상" | "중" | "하";
   title: string;
+  h1?: string;
   metaTitle: string;
+  metaDescription?: string;
   description: string;
   primaryKeyword: string;
   secondaryKeywords: string[];
+  seoReviewStatus?: BlogSeoReviewStatus;
+  duplicateRisk?: BlogDuplicateRisk;
+  uniqueFactScore?: number;
+  contentAngle?: string;
+  normalizedTitlePattern?: string;
+  normalizedH2Pattern?: string;
   searchIntent: string;
   readerQuestion: string;
   recommendedTitlePattern: string;
@@ -73,6 +116,8 @@ export type BlogPost = {
     question: string;
     answer: string;
   }>;
+  externalReferences?: BlogPostExternalReference[];
+  adminWarnings?: string[];
   verificationSummary?: BlogVerificationSummary | null;
 };
 
@@ -80,6 +125,12 @@ export type PublicBlogPost = Omit<
   BlogPost,
   | "primaryKeyword"
   | "secondaryKeywords"
+  | "seoReviewStatus"
+  | "duplicateRisk"
+  | "uniqueFactScore"
+  | "contentAngle"
+  | "normalizedTitlePattern"
+  | "normalizedH2Pattern"
   | "searchIntent"
   | "readerQuestion"
   | "recommendedTitlePattern"

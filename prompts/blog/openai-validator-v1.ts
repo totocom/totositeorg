@@ -51,6 +51,7 @@ export function buildOpenAiValidatorPrompt({
 - title은 반드시 "${seoTitle}"로 둔다.
 - meta_title은 반드시 "${seoMetaTitle}"로 둔다.
 - meta_description은 반드시 "${seoMetaDescription}"로 둔다.
+- h1은 반드시 "${seoH1}"로 둔다.
 - primary_keyword는 반드시 "${primaryKeyword}"로 둔다.
 - secondary_keywords는 반드시 다음 순서와 값으로 둔다: ${secondaryKeywords.join(", ")}.
 - category_strategy는 OpenAI SEO Plan의 category_strategy를 유지한다.
@@ -60,9 +61,13 @@ export function buildOpenAiValidatorPrompt({
 - category_strategy.reason에는 대표 카테고리를 site-reports로 둔 이유를 한국어 한 문장으로 적는다.
 - body_md의 H1은 반드시 "# ${seoH1}"로 둔다.
 - title, meta_title, H1, 주요 H2에는 "공개"를 최대한 사용하지 않는다. "공개"는 내부 기준 설명이나 고지문에서만 필요한 경우 제한적으로 사용한다.
+- title, meta_title, H1, 주요 H2에는 "공개 제보", "공개 피해", "공개 데이터", "공개 먹튀 제보" 표현을 사용하지 않는다.
+- title, meta_title, H1, 주요 H2에는 검색자가 실제로 검색할 표현인 "${primaryKeyword}", ${secondaryKeywords.join(", ")}를 자연스럽게 우선 사용한다.
 - body_md에는 AI planner, writing brief, search intent, confirmed facts, inferences, unknowns, claim map, keyword list, primary_keyword, secondary_keywords 같은 내부 항목명을 제목·목록·문장으로 그대로 출력하지 않는다.
+- body_md에는 "핵심 키워드", "검색 의도", "이 글의 작성 방향", "확인된 사실", "추정:", "미확인 항목", "claim_map", "writing_brief", "Source Snapshot", "derived_facts", "sameIpSites", "lookup_status", "secondary_keywords", "primary_keyword"를 출력하지 않는다.
 - primary_keyword, secondary_keywords, search_intent, summary.confirmed_facts, summary.inferences, summary.unknowns, claim_map, writing_brief_for_claude, prohibited_phrase_check는 CMS JSON 또는 관리자 검토용으로만 둔다.
 - 공개 body_md는 자연스러운 제목, 요약, 본문, 표 형식 설명, FAQ, 체크리스트, 고지문만 포함한다.
+- body_md에는 키워드 목록, 검색어 목록, 키워드 리스트처럼 검색어를 나열하는 섹션을 만들지 않는다.
 - title, meta_title, H1은 같은 문자열로 만들지 않는다.
 - title은 CMS/관리자 대표 제목, meta_title은 검색 결과용 짧은 제목, H1은 본문 상단 제목 역할로 분리한다.
 - "{사이트명} 토토사이트 정보 리포트: 제보, 도메인, DNS 조회 기준 정리" 형태는 fallback 용도로만 허용한다.
@@ -83,9 +88,15 @@ ${noticeLines.join("\n")}
 - DNS/WHOIS 조회 실패가 있으면 "일부 DNS 또는 WHOIS 정보는 조회 시점에 확인되지 않았습니다." 문장을 유지한다.
 - body_md에는 Source Snapshot의 site_specific_verification 값이 반영되어야 한다.
 - body_md에는 대표 도메인, 추가 도메인 수, DNS 조회 결과, WHOIS 등록일/갱신일/만료일, 승인 리뷰 수, 승인 피해 제보 수, 마지막 정보 확인 시각이 빠지면 안 된다.
+- body_md에는 사이트별 고유 데이터가 최소 5개 이상 반영되어야 하며, unique_fact_score는 이 기준을 보수적으로 계산한다.
 - Source Snapshot에 display_domain, display_url, primary_domain_display, additional_domains_display 값이 있으면 사람이 읽는 도메인 표기는 해당 값을 우선 사용한다. xn-- punycode 도메인을 본문, FAQ, checklist에 단독 표기로 남기지 않는다.
 - "마지막 정보 확인 시각: YYYY-MM-DD HH:mm KST" 형식의 문장을 유지한다.
 - 사이트마다 동일한 템플릿 문장만 반복되는 본문은 site_specific_verification 값을 이용해 해당 사이트 고유 문장으로 고친다.
+- 최근 발행 글 또는 update_context가 있으면 제목 패턴, H2 흐름, 첫 문단, FAQ 질문이 반복되는지 점검하고 duplicate_risk_check에 반영한다.
+- duplicate_risk_check.unique_fact_score와 최상위 unique_fact_score는 같은 숫자로 둔다.
+- duplicate_risk_check.estimated_duplicate_risk는 고유 데이터가 5개 이상이고 반복 신호가 없으면 low, 일부 반복 또는 고유 데이터 부족이면 medium, 제목/H2/첫 문단/FAQ 반복이 강하거나 고유 데이터가 3개 미만이면 high로 둔다.
+- internal_links는 사이트 상세, 먹튀 제보, 후기, 도메인/DNS 관련 내부 링크를 3개 이상 제안한다. 외부 토토사이트 URL은 넣지 않는다.
+- external_references에는 토토사이트, 가입 페이지, 이벤트 페이지, 충전 페이지, 우회 주소를 넣지 마라. 참고 자료는 ICANN, Cloudflare DNS 설명, 한국도박문제예방치유원 1336 안내 등 신뢰 보강용 자료만 사용하라.
 - Claude draft_markdown, faq, checklist, editor_notes를 모두 검토해 CMS JSON으로 정리한다.
 - 제목, 메타 제목, 메타 설명, FAQ, checklist를 정리한다.
 - 금지 표현, 과도한 단정 표현, 확인되지 않은 주장, 홍보성 표현, 이용/접근 지원 표현을 검사한다.
@@ -103,8 +114,10 @@ ${updateContext ? '- 이 출력은 기존 글의 업데이트 초안이다. slug
   "slug": "",
   "meta_title": "",
   "meta_description": "",
+  "h1": "",
   "primary_keyword": "",
   "secondary_keywords": [],
+  "content_angle": "",
   "category_strategy": {
     "primary_category_slug": "site-reports",
     "secondary_category_slugs": [
@@ -119,6 +132,32 @@ ${updateContext ? '- 이 출력은 기존 글의 업데이트 초안이다. slug
     ],
     "reason": "이 글은 특정 토토사이트의 도메인, DNS, WHOIS, 먹튀 제보, 승인 리뷰를 종합 정리하는 사이트 정보 리포트이므로 site-reports를 대표 카테고리로 지정한다."
   },
+  "duplicate_risk_check": {
+    "title_pattern_reused": false,
+    "h2_pattern_reused": false,
+    "intro_too_similar": false,
+    "faq_too_similar": false,
+    "unique_fact_score": 5,
+    "estimated_duplicate_risk": "low",
+    "reason": ""
+  },
+  "unique_fact_score": 5,
+  "internal_links": [
+    {
+      "href": "",
+      "label": "",
+      "placement": "summary",
+      "purpose": "source_detail"
+    }
+  ],
+  "external_references": [
+    {
+      "url": "",
+      "label": "",
+      "reason": "",
+      "rel": "nofollow ugc noopener noreferrer"
+    }
+  ],
   "body_md": "",
   "faq_json": [
     {

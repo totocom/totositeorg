@@ -10,6 +10,7 @@ import {
   type PublicBlogPost,
   type BlogCategorySlug,
   type BlogPostSection,
+  type BlogPostExternalReference,
 } from "@/app/data/blog-posts";
 import { buildBlogVerificationSummary } from "@/app/data/blog-verification";
 import { supabase } from "@/lib/supabase/client";
@@ -43,7 +44,9 @@ type BlogPostRow = {
   tags: string[] | null;
   priority: string;
   title: string;
-  meta_title: string;
+  h1: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
   description: string;
   summary: string | null;
   published_at: string | null;
@@ -54,6 +57,7 @@ type BlogPostRow = {
   checklist: string[] | null;
   faqs: unknown;
   source_snapshot: unknown;
+  admin_warnings: string[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -86,7 +90,9 @@ const blogPostSelect = [
   "tags",
   "priority",
   "title",
+  "h1",
   "meta_title",
+  "meta_description",
   "description",
   "summary",
   "published_at",
@@ -97,6 +103,7 @@ const blogPostSelect = [
   "checklist",
   "faqs",
   "source_snapshot",
+  "admin_warnings",
   "created_at",
   "updated_at",
 ].join(", ");
@@ -204,6 +211,72 @@ function normalizeStringArray(value: unknown) {
     : [];
 }
 
+function getSourceSnapshotFinalReview(value: unknown) {
+  const wrappedSnapshot = isRecord(value) ? value : null;
+  const snapshot = isRecord(wrappedSnapshot?.snapshot)
+    ? wrappedSnapshot.snapshot
+    : null;
+  const finalReview = isRecord(wrappedSnapshot?.finalReview)
+    ? wrappedSnapshot.finalReview
+    : isRecord(wrappedSnapshot?.final_review)
+      ? wrappedSnapshot.final_review
+      : isRecord(snapshot?.finalReview)
+        ? snapshot.finalReview
+        : isRecord(snapshot?.final_review)
+          ? snapshot.final_review
+          : null;
+
+  return isRecord(finalReview) ? finalReview : null;
+}
+
+function normalizeExternalReferences(value: unknown): BlogPostExternalReference[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+
+      const title =
+        getString(item.title) ||
+        getString(item.label) ||
+        getString(item.name) ||
+        getString(item.url);
+      const url = getString(item.url) || getString(item.href);
+      const publisher =
+        getString(item.publisher) ||
+        getString(item.source) ||
+        getString(item.site_name);
+      const evidenceType =
+        getString(item.evidenceType) ||
+        getString(item.evidence_type) ||
+        getString(item.type);
+
+      if (!title || !/^https?:\/\//i.test(url)) return null;
+
+      return {
+        title: formatDisplayDomainText(normalizePublicSeoText(title)),
+        url,
+        ...(publisher
+          ? { publisher: formatDisplayDomainText(normalizePublicSeoText(publisher)) }
+          : {}),
+        ...(evidenceType
+          ? {
+              evidenceType: formatDisplayDomainText(
+                normalizePublicSeoText(evidenceType),
+              ),
+            }
+          : {}),
+      };
+    })
+    .filter((item): item is BlogPostExternalReference => Boolean(item));
+}
+
+function getExternalReferencesFromSourceSnapshot(value: unknown) {
+  const finalReview = getSourceSnapshotFinalReview(value);
+
+  return normalizeExternalReferences(finalReview?.external_references);
+}
+
 const internalPublicContentPatterns = [
   /\bai\s*planner\b/i,
   /\bwriting\s*brief\b/i,
@@ -219,12 +292,24 @@ const internalPublicContentPatterns = [
   /\bconfirmed_facts\b/i,
   /\bwriting_brief\b/i,
   /\bprohibited_phrase_check\b/i,
+  /\bsource\s*snapshot\b/i,
+  /\bderived_facts\b/i,
+  /\bsameIpSites\b/i,
+  /\blookup_status\b/i,
+  /\bnormalized_title_pattern\b/i,
+  /\bnormalized_h2_pattern\b/i,
+  /\bduplicate_risk\b/i,
   /검색\s*의도/,
+  /핵심\s*키워드/,
+  /주요\s*키워드/,
+  /보조\s*키워드/,
+  /메타\s*키워드/,
   /확인된\s*사실/,
   /추정\s*[:：]/,
   /미확인\s*항목/,
   /클레임\s*맵/,
   /키워드\s*(목록|리스트)/,
+  /키워드\s*[:：]/,
   /작성\s*브리프/,
 ];
 
@@ -316,16 +401,27 @@ function toPublicBlogPost(post: BlogPost): PublicBlogPost {
 
   return {
     ...publicPost,
+    status: publicPost.status ?? "published",
+    legalReviewStatus: publicPost.legalReviewStatus ?? "approved",
     title: ensurePrimaryKeywordInTitle(publicPost.title, publicPost.sourceSite?.name),
+    h1: ensurePrimaryKeywordInTitle(
+      publicPost.h1 || publicPost.title,
+      publicPost.sourceSite?.name,
+    ),
     metaTitle: ensurePrimaryKeywordInTitle(
       publicPost.metaTitle,
       publicPost.sourceSite?.name,
+    ),
+    metaDescription: normalizePublicSeoText(
+      publicPost.metaDescription ?? publicPost.description,
     ),
     description: normalizePublicSeoText(publicPost.description),
     summary: sanitizePublicText(publicPost.summary, publicPost.description),
     sections: normalizeSections(publicPost.sections),
     checklist: sanitizePublicStringArray(publicPost.checklist),
     faqs: normalizeFaqs(publicPost.faqs),
+    externalReferences: normalizeExternalReferences(publicPost.externalReferences),
+    adminWarnings: sanitizePublicStringArray(publicPost.adminWarnings),
   };
 }
 
@@ -405,9 +501,17 @@ function mapBlogPostRow(row: BlogPostRow): PublicBlogPost {
   const description = formatDisplayDomainText(
     normalizePublicSeoText(row.description),
   );
+  const metaTitle = formatDisplayDomainText(
+    ensurePrimaryKeywordInTitle(row.meta_title || row.title, sourceSite?.name),
+  );
+  const metaDescription = formatDisplayDomainText(
+    normalizePublicSeoText(row.meta_description || row.description),
+  );
 
   return {
     slug: row.slug,
+    status: row.status,
+    legalReviewStatus: row.legal_review_status ?? "not_reviewed",
     category: row.category,
     primaryCategory: normalizeBlogCategorySlug(row.primary_category, row.category),
     secondaryCategories: normalizeBlogCategorySlugs(
@@ -421,9 +525,11 @@ function mapBlogPostRow(row: BlogPostRow): PublicBlogPost {
     title: formatDisplayDomainText(
       ensurePrimaryKeywordInTitle(row.title, sourceSite?.name),
     ),
-    metaTitle: formatDisplayDomainText(
-      ensurePrimaryKeywordInTitle(row.meta_title, sourceSite?.name),
+    h1: formatDisplayDomainText(
+      ensurePrimaryKeywordInTitle(row.h1 || row.title, sourceSite?.name),
     ),
+    metaTitle,
+    metaDescription,
     description,
     summary: formatDisplayDomainText(sanitizePublicText(row.summary, description)),
     publishedAt,
@@ -435,6 +541,10 @@ function mapBlogPostRow(row: BlogPostRow): PublicBlogPost {
       formatDisplayDomainText,
     ),
     faqs: normalizeFaqs(row.faqs),
+    externalReferences: getExternalReferencesFromSourceSnapshot(row.source_snapshot),
+    adminWarnings: sanitizePublicStringArray(row.admin_warnings).map(
+      formatDisplayDomainText,
+    ),
     sourceSite,
     verificationSummary: buildBlogVerificationSummary(row.source_snapshot),
   };

@@ -80,6 +80,8 @@ export function buildOpenAiPlannerPrompt({
 - meta_title은 검색 결과용 짧은 제목 역할이며 "${seoMetaTitle}"로 둔다.
 - H1은 본문 상단 제목 역할이며 "${seoH1}"로 둔다.
 - title, meta_title, H1, 주요 H2에는 "공개"를 최대한 사용하지 않는다. "공개"는 내부 기준 설명이나 고지문에서만 필요한 경우 제한적으로 사용한다.
+- title, meta_title, H1, 주요 H2에는 "공개 제보", "공개 피해", "공개 데이터", "공개 먹튀 제보" 표현을 사용하지 않는다.
+- title, meta_title, H1, 주요 H2에는 검색자가 실제로 검색할 표현인 "${primaryKeyword}", ${secondaryKeywords.join(", ")}를 자연스럽게 우선 사용한다.
 - "{사이트명} 토토사이트 정보 리포트: 제보, 도메인, DNS 조회 기준 정리" 형태는 fallback 용도로만 사용한다.
 - Google 검색 노출 기준에 맞춰 각 페이지의 title은 고유하고 설명적이어야 한다. 사이트명만 바뀌고 나머지 문구가 동일한 boilerplate 제목 후보를 대량 생성하지 않는다.
 - 제목 후보는 Source Snapshot의 seo_title_signals 중 사이트명 외 최소 2개 이상, 가능하면 2~3개를 조합한다: 후기 수, 먹튀 제보 수, 추가 도메인 수, DNS 레코드 타입, WHOIS 등록일 여부, 네임서버 정보, IP 수, 최신 리뷰/제보 시각, DNS/WHOIS 조회 시각.
@@ -97,13 +99,19 @@ export function buildOpenAiPlannerPrompt({
 - 먹튀 제보가 0건인 경우에도 "먹튀 없음"이라고 쓰지 말고, "먹튀 제보 0건"처럼 표현한다.
 - search_intent.main_intent는 "정보 확인" 방향으로 둔다.
 - section_plan은 H2/H3 작성에 바로 사용할 수 있는 구조로 만든다.
+- section_plan의 주요 H2는 "공개 제보", "공개 피해", "공개 데이터", "공개 먹튀 제보"를 쓰지 않고 주소, 도메인, 먹튀 제보, 후기, DNS, WHOIS처럼 실제 검색 표현과 데이터 항목을 중심으로 작성한다.
 - confirmed_facts, inferences, unknowns를 분리한다.
 - claim_map.source는 sites, dns, whois, reviews, scam_reports, domain_submissions 중 하나만 사용한다.
 - search_intent, confirmed_facts, inferences, unknowns, claim_map, writing_brief_for_claude, primary_keyword, secondary_keywords, prohibited_phrase_check는 내부 JSON 또는 관리자 검토용 항목이며 공개 본문에 그대로 노출하지 않도록 계획한다.
 - section_plan과 writing_brief_for_claude는 공개 본문이 자연스러운 제목, 요약, 본문, 표 형식 설명, FAQ, 체크리스트, 고지문으로만 구성되도록 지시한다.
+- writing_brief_for_claude에는 공개 body_md 안에 primary_keyword, secondary_keywords, search_intent, claim_map, confirmed_facts, inferences, unknowns, writing_brief 같은 내부 필드명이 절대 나오지 않도록 지시한다.
+- writing_brief_for_claude에는 키워드 목록, 검색어 목록, 키워드 나열 섹션을 만들지 말고 문맥 속 자연스러운 표현만 쓰라고 지시한다.
 - confidence는 근거가 직접 있으면 high, 집계/간접 관측이면 medium, 조회 실패/부재/불명확하면 low를 사용한다.
 - 모든 글에는 Source Snapshot의 site_specific_verification 값을 고유 데이터로 반영한다.
+- 모든 글은 사이트별 고유 데이터 최소 5개 이상을 반영해야 한다. 예: 대표 도메인, 추가 도메인 수, DNS 레코드 유형, WHOIS 날짜, 네임서버, 승인 리뷰 수, 먹튀 제보 수, 마지막 조회 시각, 동일 IP 관측 여부.
 - 글마다 같은 템플릿 문장을 반복하지 말고, 대표 도메인, 추가 도메인 수, DNS 조회 결과, WHOIS 날짜, 리뷰 수, 피해 제보 수, 마지막 정보 확인 시각을 해당 사이트 값으로 구체화한다.
+- 최근 발행 글 또는 update_context가 제공되면 제목 패턴, H2 흐름, 첫 문단, FAQ 질문이 반복되지 않도록 section_plan과 writing_brief_for_claude에 차별화 지침을 포함한다.
+- 최종 OpenAI validator가 duplicate_risk_check를 작성할 수 있도록, section_plan에는 제목 패턴, H2 패턴, 첫 문단 차별화 포인트, FAQ 차별화 포인트를 명확히 남긴다.
 - Source Snapshot에 display_domain, display_url, primary_domain_display, additional_domains_display 값이 있으면 제목, 본문, FAQ, checklist의 사람이 읽는 도메인 표기는 해당 값을 우선 사용한다. xn-- punycode 도메인은 내부 식별자나 기술 설명이 꼭 필요할 때만 괄호로 보조 표기한다.
 - 피해 제보가 없으면 title, meta_title, H1, 주요 H2에서는 "먹튀 제보 0건"으로 표현하고, 본문 설명에서는 "조회 시점 기준 승인된 피해 제보는 확인되지 않음"처럼 표현한다.
 - risk_warnings에는 "먹튀 없음", "안전 보장", "추천", "가입 유도", 운영 주체 단정, 동일 IP 단정 금지를 포함한다.

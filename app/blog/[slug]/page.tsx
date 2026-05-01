@@ -39,6 +39,26 @@ function getInternalLinksByPlacement(
   return internalLinks.filter((link) => link.placement === placement);
 }
 
+function stringifyJsonLd(value: unknown) {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+function getPostMetaDescription(post: PublicBlogPost) {
+  return post.metaDescription || post.description;
+}
+
+function normalizeImportantSeoText(value: string | undefined) {
+  return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function hasIdenticalTitleMetaH1(post: PublicBlogPost) {
+  const title = normalizeImportantSeoText(post.title);
+  const metaTitle = normalizeImportantSeoText(post.metaTitle);
+  const h1 = normalizeImportantSeoText(post.h1 || post.title);
+
+  return Boolean(title && title === metaTitle && title === h1);
+}
+
 function getSectionInternalLinkPlacements(heading: string) {
   const normalizedHeading = heading.toLowerCase();
   const placements: string[] = [];
@@ -85,6 +105,84 @@ function InternalDataLinks({ links }: { links: InternalDataLink[] }) {
         </Link>
       ))}
     </div>
+  );
+}
+
+function BlogExternalReferences({
+  references,
+}: {
+  references: NonNullable<PublicBlogPost["externalReferences"]>;
+}) {
+  if (references.length === 0) return null;
+
+  return (
+    <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
+      <h2 className="text-sm font-bold uppercase text-muted">참고 자료</h2>
+      <div className="mt-3 grid gap-3">
+        {references.map((reference) => (
+          <a
+            key={`${reference.url}-${reference.title}`}
+            href={reference.url}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="rounded-md border border-line px-3 py-2 text-sm font-semibold leading-6 text-foreground transition hover:border-accent hover:text-accent"
+          >
+            <span className="block">{reference.title}</span>
+            {reference.publisher || reference.evidenceType ? (
+              <span className="mt-1 block text-xs font-medium text-muted">
+                {[reference.publisher, reference.evidenceType]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            ) : null}
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function BlogShareButtons({
+  articleUrl,
+  title,
+}: {
+  articleUrl: string;
+  title: string;
+}) {
+  const encodedUrl = encodeURIComponent(articleUrl);
+  const encodedTitle = encodeURIComponent(title);
+  const shareLinks = [
+    {
+      label: "X",
+      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`,
+    },
+    {
+      label: "Facebook",
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+    },
+    {
+      label: "메일",
+      href: `mailto:?subject=${encodedTitle}&body=${encodedUrl}`,
+    },
+  ];
+
+  return (
+    <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
+      <h2 className="text-sm font-bold uppercase text-muted">공유</h2>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {shareLinks.map((link) => (
+          <a
+            key={link.label}
+            href={link.href}
+            target={link.href.startsWith("mailto:") ? undefined : "_blank"}
+            rel={link.href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
+            className="inline-flex min-h-9 items-center rounded-md border border-line px-3 text-xs font-bold text-foreground transition hover:border-accent hover:text-accent"
+          >
+            {link.label}
+          </a>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -165,7 +263,7 @@ export async function generateMetadata({
   const indexState = await getBlogPostIndexStateBySlug(slug);
   const robots = canIndexBlogPostState(indexState)
     ? { index: true, follow: true }
-    : { index: false, follow: false };
+    : { index: false, follow: true };
 
   if (!post) {
     return {
@@ -175,10 +273,11 @@ export async function generateMetadata({
   }
 
   const canonicalUrl = `${siteUrl}/blog/${post.slug}`;
+  const metaDescription = getPostMetaDescription(post);
 
   return {
-    title: post.metaTitle,
-    description: post.description,
+    title: post.metaTitle || post.title,
+    description: metaDescription,
     robots,
     alternates: {
       canonical: canonicalUrl,
@@ -186,11 +285,16 @@ export async function generateMetadata({
     openGraph: {
       type: "article",
       url: canonicalUrl,
-      title: `${post.metaTitle} | ${siteName}`,
-      description: post.description,
+      title: `${post.metaTitle || post.title} | ${siteName}`,
+      description: metaDescription,
       publishedTime: post.publishedAt,
       modifiedTime: post.updatedAt,
       authors: [siteName],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.metaTitle || post.title,
+      description: metaDescription,
     },
   };
 }
@@ -204,6 +308,11 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   }
 
   const articleUrl = `${siteUrl}/blog/${post.slug}`;
+  const h1 = post.h1 || post.title;
+  const metaDescription = getPostMetaDescription(post);
+  const titleMetaH1Warnings = hasIdenticalTitleMetaH1(post)
+    ? ["관리자 경고: title, meta_title, h1이 모두 동일합니다."]
+    : [];
   const primaryCategory =
     post.primaryCategory ?? getBlogPrimaryCategoryFromLabel(post.category);
   const primaryCategoryLabel = getBlogCategoryLabel(primaryCategory);
@@ -235,6 +344,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   );
   const faqInternalLinks = getInternalLinksByPlacement(post.internalLinks, "faq");
   const sidebarInternalLinks = post.internalLinks.filter((link) => !link.placement);
+  const externalReferences = post.externalReferences ?? [];
   const sectionLinkPlacementsByHeading = new Map<string, string[]>();
   const usedSectionLinkPlacements = new Set<string>();
 
@@ -251,12 +361,18 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
   const articleJsonLd = {
     "@context": "https://schema.org",
-    "@type": "Article",
-    headline: post.title,
-    description: post.description,
-    mainEntityOfPage: articleUrl,
+    "@type": "BlogPosting",
+    headline: h1,
+    name: post.title,
+    description: metaDescription,
+    url: articleUrl,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": articleUrl,
+    },
     datePublished: post.publishedAt,
     dateModified: post.updatedAt,
+    inLanguage: "ko-KR",
     author: {
       "@type": "Organization",
       name: siteName,
@@ -279,33 +395,38 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     })),
   };
 
-  const faqJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: post.faqs.map((faq) => ({
-      "@type": "Question",
-      name: faq.question,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: faq.answer,
-      },
-    })),
-  };
+  const faqJsonLd =
+    post.faqs.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: post.faqs.map((faq) => ({
+            "@type": "Question",
+            name: faq.question,
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: faq.answer,
+            },
+          })),
+        }
+      : null;
 
   return (
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: stringifyJsonLd(articleJsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: stringifyJsonLd(breadcrumbJsonLd) }}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
-      />
+      {faqJsonLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: stringifyJsonLd(faqJsonLd) }}
+        />
+      ) : null}
 
       <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[1fr_320px] lg:px-8">
         <article className="min-w-0 rounded-lg border border-line bg-surface p-5 shadow-sm sm:p-7">
@@ -360,11 +481,16 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               </p>
             ) : null}
             <h1 className="mt-4 text-3xl font-extrabold leading-tight text-foreground sm:text-4xl">
-              {post.title}
+              {h1}
             </h1>
             <p className="mt-4 text-base leading-7 text-muted">
               {post.description}
             </p>
+            {titleMetaH1Warnings.length > 0 ? (
+              <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                {titleMetaH1Warnings[0]}
+              </div>
+            ) : null}
             {post.tags?.length ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {post.tags.slice(0, 10).map((tag) => (
@@ -431,38 +557,42 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             })}
           </div>
 
-          <section className="rounded-lg border border-line bg-background p-5">
-            <h2 className="text-xl font-bold text-foreground">
-              체크리스트
-            </h2>
-            <ul className="mt-4 grid gap-2 text-sm leading-6 text-muted">
-              {post.checklist.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-accent-soft text-xs font-bold text-accent">
-                    ✓
-                  </span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {post.checklist.length > 0 ? (
+            <section className="rounded-lg border border-line bg-background p-5">
+              <h2 className="text-xl font-bold text-foreground">
+                체크리스트
+              </h2>
+              <ul className="mt-4 grid gap-2 text-sm leading-6 text-muted">
+                {post.checklist.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-accent-soft text-xs font-bold text-accent">
+                      ✓
+                    </span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
-          <section className="mt-6 rounded-lg border border-line bg-background p-5">
-            <h2 className="text-xl font-bold text-foreground">자주 묻는 질문</h2>
-            <dl className="mt-4 divide-y divide-line">
-              {post.faqs.map((faq) => (
-                <div key={faq.question} className="py-4 first:pt-0 last:pb-0">
-                  <dt className="text-sm font-bold text-foreground">
-                    {faq.question}
-                  </dt>
-                  <dd className="mt-2 text-sm leading-6 text-muted">
-                    {faq.answer}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            <InternalDataLinks links={faqInternalLinks} />
-          </section>
+          {post.faqs.length > 0 ? (
+            <section className="mt-6 rounded-lg border border-line bg-background p-5">
+              <h2 className="text-xl font-bold text-foreground">자주 묻는 질문</h2>
+              <dl className="mt-4 divide-y divide-line">
+                {post.faqs.map((faq) => (
+                  <div key={faq.question} className="py-4 first:pt-0 last:pb-0">
+                    <dt className="text-sm font-bold text-foreground">
+                      {faq.question}
+                    </dt>
+                    <dd className="mt-2 text-sm leading-6 text-muted">
+                      {faq.answer}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <InternalDataLinks links={faqInternalLinks} />
+            </section>
+          ) : null}
         </article>
 
         <aside className="grid content-start gap-4">
@@ -531,6 +661,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               </div>
             </section>
           ) : null}
+
+          <BlogExternalReferences references={externalReferences} />
+
+          <BlogShareButtons articleUrl={articleUrl} title={post.title} />
 
           {relatedPosts.length > 0 ? (
             <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
