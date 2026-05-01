@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
+import { formatDisplayUrl } from "@/app/data/domain-display";
 import { supabase } from "@/lib/supabase/client";
 
 const telegramBotUrl = process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? "";
@@ -358,7 +359,9 @@ export function ProfileDashboard() {
                         {site?.name ?? "알 수 없음"}
                       </h3>
                       <p className="mt-1 break-all text-sm text-muted">
-                        {site?.url ?? "사이트 정보를 불러오지 못했습니다."}
+                        {site?.url
+                          ? formatDisplayUrl(site.url)
+                          : "사이트 정보를 불러오지 못했습니다."}
                       </p>
                     </div>
                     {site?.slug ? (

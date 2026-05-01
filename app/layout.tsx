@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthProvider } from "@/app/components/auth-provider";
 import { Footer } from "@/app/components/footer";
 import { Header } from "@/app/components/header";
+import { SiteShell } from "@/app/components/site-shell";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
 import "./globals.css";
 
@@ -81,9 +82,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-full bg-background text-foreground">
         <AuthProvider>
-          <Header />
-          {children}
-          <Footer />
+          <SiteShell header={<Header />} footer={<Footer />}>
+            {children}
+          </SiteShell>
         </AuthProvider>
       </body>
     </html>

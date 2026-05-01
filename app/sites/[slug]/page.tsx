@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { domainToUnicode } from "node:url";
 import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actions";
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
@@ -9,7 +8,9 @@ import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summ
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
+import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
 import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
+import { getPublishedBlogPostForSite } from "@/app/data/public-blog-posts";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
 import {
   calculateSiteTrustScore,
@@ -38,29 +39,6 @@ type SiteDetailPageProps = {
 
 export const dynamicParams = true;
 export const revalidate = 300;
-
-function formatDisplayDomain(value: string) {
-  if (!value) return "";
-
-  try {
-    const parsedUrl = new URL(value);
-    return domainToUnicode(parsedUrl.hostname) || parsedUrl.hostname;
-  } catch {
-    return domainToUnicode(value) || value;
-  }
-}
-
-function formatDisplayUrl(value: string) {
-  if (!value) return "";
-
-  try {
-    const parsedUrl = new URL(value);
-    const hostname = domainToUnicode(parsedUrl.hostname) || parsedUrl.hostname;
-    return `${parsedUrl.protocol}//${hostname}${parsedUrl.port ? `:${parsedUrl.port}` : ""}${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
-  } catch {
-    return domainToUnicode(value) || value;
-  }
-}
 
 function getDomainAge(value: string) {
   if (!value) return "확인 불가";
@@ -293,6 +271,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const trustToneClasses = getTrustToneClasses(getTrustScoreTone(trustScore.total));
   const screenshotPreviewUrl = site.screenshotThumbUrl || site.screenshotUrl;
   const logoAlt = `${site.siteName} 토토사이트 로고`;
+  const relatedBlogPost = await getPublishedBlogPostForSite(site.id);
 
   return (
     <>
@@ -376,7 +355,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   <p className="mt-0.5 text-xs text-accent/70">신고 이력 없음</p>
                 </div>
               )}
-              <AdminSiteDetailActions siteId={site.id} />
+              <AdminSiteDetailActions siteId={site.id} siteSlug={site.slug} />
             </div>
           </div>
 
@@ -432,6 +411,27 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
         </article>
 
+        {relatedBlogPost ? (
+          <section className="mt-5 rounded-xl border border-line bg-surface p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wider text-accent">
+              공개 데이터 리포트
+            </p>
+            <h2 className="mt-1 text-base font-bold">
+              블로그 정보 리포트
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              이 상세 페이지의 공개 데이터, DNS/WHOIS 조회 정보, 승인 리뷰와
+              피해 제보 현황을 기준으로 정리한 블로그 글입니다.
+            </p>
+            <Link
+              href={`/blog/${relatedBlogPost.slug}`}
+              className="mt-3 inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
+            >
+              {relatedBlogPost.title}
+            </Link>
+          </section>
+        ) : null}
+
         <SiteTelegramAlertSubscription siteId={site.id} siteName={site.siteName} />
 
         {/* 스크린샷 */}
@@ -467,7 +467,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
         <DomainInfoTabs items={domainInfoTabs} />
 
         {/* 먹튀 피해 이력 */}
-        <section id="scam-reports" className="mt-5 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
+        <section id="reports" className="mt-5 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
+          <span id="scam-reports" className="sr-only" aria-hidden="true" />
           <div className="flex flex-col gap-3 border-b border-line px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력</p>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
+import { formatDisplayUrl } from "@/app/data/domain-display";
 import { formatRatingScore, moderationStatusLabels } from "@/app/data/sites";
 import { supabase } from "@/lib/supabase/client";
 
@@ -302,7 +303,7 @@ export function AccountDashboard() {
                   <div>
                     <h3 className="font-semibold">{site.name}</h3>
                     <p className="mt-1 break-all text-sm text-muted">
-                      {site.url}
+                      {formatDisplayUrl(site.url)}
                     </p>
                   </div>
                   <StatusBadge status={site.status} />

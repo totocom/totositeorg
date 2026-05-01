@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { AdminFooterButton } from "@/app/components/admin-footer-button";
 import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 
 const footerLinks = [
+  { href: "/blog", label: "블로그" },
   { href: "/telegram-guide", label: "텔레그램 기능 안내" },
 ];
 
@@ -34,6 +36,7 @@ export function Footer() {
         <div className="mt-6 border-t border-white/10 pt-6">
           <ResponsibleUseNotice />
         </div>
+        <AdminFooterButton />
       </div>
     </footer>
   );

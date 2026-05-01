@@ -12,27 +12,27 @@ export function AdminGate({ section = "home" }: { section?: AdminSection }) {
 
   if (isLoading) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-4xl">
         <section className="rounded-lg border border-line bg-surface p-5 text-sm text-muted shadow-sm">
           로그인 상태를 확인하는 중입니다.
         </section>
-      </main>
+      </div>
     );
   }
 
   if (errorMessage) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-4xl">
         <section className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700 shadow-sm">
           {errorMessage}
         </section>
-      </main>
+      </div>
     );
   }
 
   if (!user) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-4xl">
         <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
           <h1 className="text-2xl font-bold">관리자 페이지 로그인 필요</h1>
           <p className="mt-2 text-sm leading-6 text-muted">
@@ -46,13 +46,13 @@ export function AdminGate({ section = "home" }: { section?: AdminSection }) {
             로그인으로 이동
           </Link>
         </section>
-      </main>
+      </div>
     );
   }
 
   if (!isAdmin) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-4xl">
         <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
           <h1 className="text-2xl font-bold">관리자 권한이 없습니다.</h1>
           <p className="mt-2 text-sm leading-6 text-muted">
@@ -60,7 +60,7 @@ export function AdminGate({ section = "home" }: { section?: AdminSection }) {
             관리자 이메일 등록은 Supabase SQL Editor에서 처리해야 합니다.
           </p>
         </section>
-      </main>
+      </div>
     );
   }
 

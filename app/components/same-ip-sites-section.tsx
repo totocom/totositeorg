@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { formatDisplayUrl } from "@/app/data/domain-display";
 
 type SameIpSite = {
   id: string;
@@ -16,17 +17,6 @@ type SameIpSitesSectionProps = {
   siteId: string;
   currentIps: string[];
 };
-
-function formatDisplayUrl(value: string) {
-  if (!value) return "";
-
-  try {
-    const parsedUrl = new URL(value);
-    return `${parsedUrl.protocol}//${parsedUrl.hostname}${parsedUrl.port ? `:${parsedUrl.port}` : ""}${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
-  } catch {
-    return value;
-  }
-}
 
 export function SameIpSitesSection({
   siteId,

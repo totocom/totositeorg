@@ -69,7 +69,10 @@ export function extractDomain(value: string) {
         : `https://${value}`,
     );
 
-    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+    const hostname = url.hostname
+      .toLowerCase()
+      .replace(/^www\./, "")
+      .replace(/\.$/, "");
 
     return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(hostname) ? hostname : "";
   } catch {
@@ -178,9 +181,12 @@ function toPublicWhoisInfo(
   provider: ActiveWhoisProvider,
 ): PublicWhoisInfo {
   const nameServers = stringArray(result.name_servers);
+  const providerDomain = extractDomain(
+    firstOf(result.domain, result.domain_name, result.name),
+  );
 
   return {
-    domain: firstOf(result.domain, result.domain_name, result.name) || domain,
+    domain: providerDomain || domain,
     registrar:
       firstString(result.registrar) ||
       firstNestedString(result.registrar, "name"),

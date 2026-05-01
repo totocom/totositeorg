@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary } from "@/app/components/review-summary";
+import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
 import type { PublicReviewListItem } from "@/app/data/public-sites";
 import { issueTypeLabels } from "@/app/data/sites";
 
@@ -63,7 +64,9 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
             review.site.siteNameKo ?? "",
             review.site.siteNameEn ?? "",
             review.site.siteUrl,
+            formatDisplayUrl(review.site.siteUrl),
             ...review.site.domains,
+            ...review.site.domains.map(formatDisplayDomain),
             review.authorNickname ?? "",
           ]
             .join(" ")

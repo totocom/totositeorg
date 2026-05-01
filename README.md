@@ -13,6 +13,28 @@ Run order:
 The SQL includes `sites`, `reviews`, and `state_availability` tables, indexes,
 check constraints, `updated_at` triggers, `admin_users`, and RLS policies.
 
+## Environment variables
+
+Copy `.env.example` to `.env.local` and fill in the values for your project.
+Blog AI model names are configured only through environment variables.
+
+```bash
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+
+OPENAI_BLOG_PLANNER_MODEL=
+OPENAI_BLOG_VALIDATOR_MODEL=
+ANTHROPIC_BLOG_WRITER_MODEL=
+
+BLOG_PROMPT_VERSION=blog-v1
+BLOG_GENERATION_MAX_REVIEWS=20
+BLOG_GENERATION_MAX_SCAM_REPORTS=20
+```
+
+`BLOG_PROMPT_VERSION` must match the prompt files under `prompts/blog`.
+For the current prompt set, generated posts and jobs are saved with
+`prompt_version = "blog-v1"`.
+
 When updating an existing Supabase project, run the latest
 `supabase/schema.sql` again in SQL Editor. The file uses `create table if not
 exists`, `add column if not exists`, and `drop policy if exists` for repeatable

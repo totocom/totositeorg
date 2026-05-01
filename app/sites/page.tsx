@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { domainToUnicode } from "node:url";
 import { SiteBrowser } from "@/app/components/site-browser";
+import { formatDisplayDomain } from "@/app/data/domain-display";
 import { getPublicSites } from "@/app/data/public-sites";
 import type { ReviewTarget } from "@/app/data/sites";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
@@ -22,15 +22,6 @@ export const metadata: Metadata = {
   },
 };
 
-function formatSearchDomain(value: string) {
-  try {
-    const url = new URL(value);
-    return domainToUnicode(url.hostname) || url.hostname;
-  } catch {
-    return domainToUnicode(value) || value;
-  }
-}
-
 function buildDomainSearchText(site: ReviewTarget) {
   const domains = Array.from(new Set(site.domains.length > 0 ? site.domains : [site.siteUrl]))
     .filter(Boolean)
@@ -39,7 +30,7 @@ function buildDomainSearchText(site: ReviewTarget) {
   const searchText = domains
     .flatMap((domain) => [
       domain,
-      formatSearchDomain(domain),
+      formatDisplayDomain(domain),
     ])
     .filter(Boolean)
     .join(" ");

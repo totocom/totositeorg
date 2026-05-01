@@ -154,7 +154,7 @@ export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
   const isActiveLoaded = Boolean(activeItem?.isLoaded);
 
   return (
-    <section className="mt-6 rounded-lg border border-line bg-surface shadow-sm">
+    <section id="dns" className="mt-6 scroll-mt-24 rounded-lg border border-line bg-surface shadow-sm">
       <div className="border-b border-line px-5 py-4">
         <p className="text-sm font-semibold uppercase text-accent">
           도메인 조사 정보

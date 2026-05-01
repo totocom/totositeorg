@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/app/components/auth-provider";
 import { ScreenshotUploadControl } from "@/app/components/screenshot-upload-control";
+import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
 import { supabase } from "@/lib/supabase/client";
 
 type SiteRow = {
@@ -200,10 +201,10 @@ function WhoisInfoCard({ whoisInfo }: { whoisInfo: WhoisLookupResult }) {
             : ""}
         </p>
         <h3 className="mt-1 break-all text-base font-bold">
-          {whoisInfo.domain}
+          {formatDisplayDomain(whoisInfo.domain)}
         </h3>
         <p className="mt-1 break-all text-xs text-muted">
-          조회 URL: {whoisInfo.lookupUrl}
+          조회 URL: {formatDisplayUrl(whoisInfo.lookupUrl)}
         </p>
       </div>
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -783,17 +784,17 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
   if (isLoading || isLoadingSite) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-5xl">
         <section className="rounded-lg border border-line bg-surface p-5 text-sm text-muted shadow-sm">
           사이트 정보를 불러오는 중입니다.
         </section>
-      </main>
+      </div>
     );
   }
 
   if (!user || !isAdmin) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-5xl">
         <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
           <h1 className="text-2xl font-bold">관리자 권한이 필요합니다</h1>
           <p className="mt-2 text-sm text-muted">
@@ -806,12 +807,12 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
             관리자 페이지로 이동
           </Link>
         </section>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-5xl">
       <Link href="/admin" className="text-sm font-semibold text-accent">
         관리자 페이지로 돌아가기
       </Link>
@@ -1109,6 +1110,6 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
           </div>
         </form>
       </section>
-    </main>
+    </div>
   );
 }

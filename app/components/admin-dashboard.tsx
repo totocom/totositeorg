@@ -1,9 +1,11 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { AdminBlogManager } from "@/app/components/admin-blog-manager";
 import { useAuth } from "@/app/components/auth-provider";
 import { ReviewSummary } from "@/app/components/review-summary";
 import { ScreenshotUploadControl } from "@/app/components/screenshot-upload-control";
+import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
 import {
   formatRatingScore,
   issueTypeLabels,
@@ -17,6 +19,7 @@ export type AdminSection =
   | "sites"
   | "rejected-sites"
   | "site-registration"
+  | "blog"
   | "users"
   | "reviews"
   | "scam-reports"
@@ -117,6 +120,11 @@ type UpdatingItem = {
 type DeletingItem = {
   table: "sites" | "reviews" | "scam_reports";
   id: string;
+} | null;
+
+type BlogDraftGeneration = {
+  siteId: string;
+  mode: "create" | "update";
 } | null;
 
 type EditingSlug = {
@@ -249,6 +257,12 @@ function isValidUrl(value: string) {
   }
 }
 
+function refreshAdminCounts() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("admin-counts-refresh"));
+  }
+}
+
 function normalizeUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -374,9 +388,12 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
   const [usersErrorMessage, setUsersErrorMessage] = useState("");
   const [updatingItem, setUpdatingItem] = useState<UpdatingItem>(null);
   const [deletingItem, setDeletingItem] = useState<DeletingItem>(null);
+  const [generatingBlogDraft, setGeneratingBlogDraft] =
+    useState<BlogDraftGeneration>(null);
   const [deletingUserId, setDeletingUserId] = useState("");
   const [editingSlug, setEditingSlug] = useState<EditingSlug>(null);
   const [slugErrorMessage, setSlugErrorMessage] = useState("");
+  const [blogDraftMessage, setBlogDraftMessage] = useState("");
   const [siteFormValues, setSiteFormValues] = useState<AdminSiteFormValues>(
     initialAdminSiteFormValues,
   );
@@ -458,6 +475,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setScamReports(result.scamReports);
     setSiteDomainSubmissions(result.siteDomainSubmissions);
     setIsLoading(false);
+    refreshAdminCounts();
   }
 
   async function loadAdminUsers() {
@@ -471,6 +489,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       setAdminUsers([]);
       setUsersErrorMessage("관리자 로그인 세션을 확인하지 못했습니다.");
       setIsLoadingUsers(false);
+      refreshAdminCounts();
       return;
     }
 
@@ -491,10 +510,12 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       setUsersErrorMessage(
         result?.error ?? "회원 목록을 불러오지 못했습니다.",
       );
+      refreshAdminCounts();
       return;
     }
 
     setAdminUsers(result.users);
+    refreshAdminCounts();
   }
 
   useEffect(() => {
@@ -511,6 +532,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       setScamReports(result.scamReports);
       setSiteDomainSubmissions(result.siteDomainSubmissions);
       setIsLoading(false);
+      refreshAdminCounts();
     });
     Promise.resolve().then(() => loadAdminUsers());
 
@@ -705,6 +727,80 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
   async function getAdminToken() {
     const { data: sessionResult } = await supabase.auth.getSession();
     return sessionResult.session?.access_token ?? "";
+  }
+
+  async function generateSiteBlogDraft(
+    site: SiteRow,
+    mode: "create" | "update",
+  ) {
+    const actionLabel =
+      mode === "update" ? "AI 블로그 업데이트 초안" : "AI 블로그 초안";
+    const confirmed = window.confirm(
+      `${site.name} 사이트 데이터로 ${actionLabel}을 생성할까요? DNS/WHOIS를 최신 조회한 뒤 draft로 저장합니다.`,
+    );
+
+    if (!confirmed) return;
+
+    setGeneratingBlogDraft({ siteId: site.id, mode });
+    setErrorMessage("");
+    setBlogDraftMessage("");
+
+    try {
+      const token = await getAdminToken();
+
+      if (!token) {
+        throw new Error("관리자 로그인 세션을 확인하지 못했습니다.");
+      }
+
+      const endpoint =
+        mode === "update"
+          ? `/api/admin/sites/${site.id}/generate-blog-update-draft`
+          : `/api/admin/sites/${site.id}/generate-blog-draft`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      });
+      const result = (await response.json().catch(() => null)) as {
+        post?: {
+          slug?: string;
+          title?: string;
+        };
+        error?: string;
+        snapshotSummary?: {
+          reviews: number;
+          scamReports: number;
+          dnsRecords: number;
+          whoisRecords: number;
+          sameIpSites: number;
+        };
+      } | null;
+
+      if (!response.ok || !result?.post) {
+        throw new Error(
+          result?.error ?? `${actionLabel} 생성에 실패했습니다.`,
+        );
+      }
+
+      const summary = result.snapshotSummary;
+      const summaryText = summary
+        ? ` 리뷰 ${summary.reviews}건, 피해 제보 ${summary.scamReports}건, DNS ${summary.dnsRecords}건, WHOIS ${summary.whoisRecords}건을 반영했습니다.`
+        : "";
+
+      setBlogDraftMessage(
+        `${actionLabel}을 draft로 저장했습니다: /blog/${result.post.slug ?? ""}.${summaryText}`,
+      );
+      refreshAdminCounts();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : `${actionLabel} 생성 중 문제가 발생했습니다.`,
+      );
+    } finally {
+      setGeneratingBlogDraft(null);
+    }
   }
 
   async function storeFaviconUrl(faviconUrl: string) {
@@ -1353,9 +1449,13 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     updatingItem.status === status;
   const isDeleting = (table: "sites" | "reviews" | "scam_reports", id: string) =>
     deletingItem?.table === table && deletingItem.id === id;
+  const isGeneratingBlogDraft = (siteId: string, mode: "create" | "update") =>
+    generatingBlogDraft?.siteId === siteId && generatingBlogDraft.mode === mode;
+  const showHome = section === "home";
   const showSites = section === "sites";
   const showRejectedSites = section === "rejected-sites";
   const showSiteRegistration = section === "site-registration";
+  const showBlog = section === "blog";
   const showUsers = section === "users";
   const showReviews = section === "reviews" || section === "surveys";
   const showScamReports = section === "scam-reports";
@@ -1367,87 +1467,84 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     showScamReports ||
     showRejectedReviews;
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
-      <div className="mb-5">
-        <p className="text-sm font-semibold uppercase text-accent">
-          관리자 검토
-        </p>
-        <h1 className="mt-1 text-3xl font-bold">사이트와 리뷰 승인 관리</h1>
-        <p className="mt-2 text-sm leading-6 text-muted">
-          임시 관리자 화면입니다. 로그인과 권한 검사는 아직 적용하지
-          않았습니다.
-        </p>
-      </div>
-
+    <div className="grid w-full gap-5">
       {errorMessage ? (
-        <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {errorMessage}
         </div>
       ) : null}
 
       {slugErrorMessage ? (
-        <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {slugErrorMessage}
         </div>
       ) : null}
 
-      <section className="mb-6 grid gap-3 sm:grid-cols-4">
-        <SummaryCard
-          label="승인 대기 사이트"
-          value={pendingSites.length}
-          href="/admin/sites"
-        />
-        <SummaryCard
-          label="도메인 추가 요청"
-          value={pendingSiteDomainSubmissions.length}
-          href="/admin/sites#site-domain-submissions"
-        />
-        <SummaryCard
-          label="승인 대기 리뷰"
-          value={pendingReviews.length}
-          href="/admin/reviews"
-        />
-        <SummaryCard
-          label="승인 대기 먹튀 제보"
-          value={pendingScamReports.length}
-          href="/admin/scam-reports"
-        />
-        <SummaryCard
-          label="승인된 사이트"
-          value={approvedSites.length}
-          href="/admin/sites#approved-sites"
-        />
-        <SummaryCard
-          label="승인된 리뷰"
-          value={approvedReviews.length}
-          href="/admin/reviews#approved-reviews"
-        />
-        <SummaryCard
-          label="승인된 먹튀 제보"
-          value={approvedScamReports.length}
-          href="/admin/scam-reports#approved-scam-reports"
-        />
-        <SummaryCard
-          label="거절된 사이트"
-          value={rejectedSites.length}
-          href="/admin/rejected-sites"
-        />
-        <SummaryCard
-          label="거절된 리뷰"
-          value={rejectedReviews.length}
-          href="/admin/rejected-reviews"
-        />
-        <SummaryCard
-          label="거절된 먹튀 제보"
-          value={rejectedScamReports.length}
-          href="/admin/scam-reports#rejected-scam-reports"
-        />
-        <SummaryCard
-          label="전체 회원"
-          value={adminUsers.length}
-          href="/admin/users"
-        />
-      </section>
+      {blogDraftMessage ? (
+        <div className="rounded-md border border-accent bg-accent-soft px-4 py-3 text-sm font-semibold text-accent">
+          {blogDraftMessage}
+        </div>
+      ) : null}
+
+      {showHome ? (
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard
+            label="승인 대기 사이트"
+            value={pendingSites.length}
+            href="/admin/sites"
+          />
+          <SummaryCard
+            label="도메인 추가 요청"
+            value={pendingSiteDomainSubmissions.length}
+            href="/admin/sites#site-domain-submissions"
+          />
+          <SummaryCard
+            label="승인 대기 리뷰"
+            value={pendingReviews.length}
+            href="/admin/reviews"
+          />
+          <SummaryCard
+            label="승인 대기 먹튀 제보"
+            value={pendingScamReports.length}
+            href="/admin/scam-reports"
+          />
+          <SummaryCard
+            label="승인된 사이트"
+            value={approvedSites.length}
+            href="/admin/sites#approved-sites"
+          />
+          <SummaryCard
+            label="승인된 리뷰"
+            value={approvedReviews.length}
+            href="/admin/reviews#approved-reviews"
+          />
+          <SummaryCard
+            label="승인된 먹튀 제보"
+            value={approvedScamReports.length}
+            href="/admin/scam-reports#approved-scam-reports"
+          />
+          <SummaryCard
+            label="거절된 사이트"
+            value={rejectedSites.length}
+            href="/admin/rejected-sites"
+          />
+          <SummaryCard
+            label="거절된 리뷰"
+            value={rejectedReviews.length}
+            href="/admin/rejected-reviews"
+          />
+          <SummaryCard
+            label="거절된 먹튀 제보"
+            value={rejectedScamReports.length}
+            href="/admin/scam-reports#rejected-scam-reports"
+          />
+          <SummaryCard
+            label="전체 회원"
+            value={adminUsers.length}
+            href="/admin/users"
+          />
+        </section>
+      ) : null}
 
       {showUsers ? (
         <UserTable
@@ -1460,10 +1557,12 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
         />
       ) : null}
 
+      {showBlog ? <AdminBlogManager /> : null}
+
       {showSiteRegistration ? (
       <section
         id="site-registration"
-        className="mb-6 rounded-lg border border-line bg-surface p-5 shadow-sm"
+        className="rounded-lg border border-line bg-surface p-5 shadow-sm"
       >
         <div className="mb-4">
           <p className="text-sm font-semibold uppercase text-accent">사이트 등록</p>
@@ -1882,6 +1981,8 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
             editingSlug={editingSlug}
             setEditingSlug={setEditingSlug}
             onUpdateSlug={updateSlug}
+            isGeneratingBlogDraft={isGeneratingBlogDraft}
+            onGenerateBlogDraft={generateSiteBlogDraft}
           />
           ) : null}
           {showReviews ? (
@@ -1918,6 +2019,8 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
             editingSlug={editingSlug}
             setEditingSlug={setEditingSlug}
             onUpdateSlug={updateSlug}
+            isGeneratingBlogDraft={isGeneratingBlogDraft}
+            onGenerateBlogDraft={generateSiteBlogDraft}
           />
           ) : null}
           {showReviews ? (
@@ -1954,6 +2057,8 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
             editingSlug={editingSlug}
             setEditingSlug={setEditingSlug}
             onUpdateSlug={updateSlug}
+            isGeneratingBlogDraft={isGeneratingBlogDraft}
+            onGenerateBlogDraft={generateSiteBlogDraft}
           />
           ) : null}
           {showRejectedReviews ? (
@@ -1980,7 +2085,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
           ) : null}
         </div>
       ) : null}
-    </main>
+    </div>
   );
 }
 
@@ -2172,10 +2277,10 @@ function WhoisInfoCard({ whoisInfo }: { whoisInfo: WhoisLookupResult }) {
             : ""}
         </p>
         <h3 className="mt-1 break-all text-base font-bold">
-          {whoisInfo.domain}
+          {formatDisplayDomain(whoisInfo.domain)}
         </h3>
         <p className="mt-1 break-all text-xs text-muted">
-          조회 URL: {whoisInfo.lookupUrl}
+          조회 URL: {formatDisplayUrl(whoisInfo.lookupUrl)}
         </p>
       </div>
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -2287,11 +2392,11 @@ function SiteDomainSubmissionTable({
                         {site?.name ?? submission.site_id}
                       </p>
                       <p className="break-all text-xs text-muted">
-                        {site?.url ?? "-"}
+                        {site?.url ? formatDisplayUrl(site.url) : "-"}
                       </p>
                     </td>
                     <td className="break-all px-4 py-4">
-                      {submission.domain_url}
+                      {formatDisplayUrl(submission.domain_url)}
                     </td>
                     <td className="px-4 py-4">
                       {formatDate(submission.created_at)}
@@ -2348,6 +2453,8 @@ function SiteTable({
   editingSlug,
   setEditingSlug,
   onUpdateSlug,
+  isGeneratingBlogDraft,
+  onGenerateBlogDraft,
 }: {
   anchorId: string;
   title: string;
@@ -2367,6 +2474,8 @@ function SiteTable({
   editingSlug: EditingSlug;
   setEditingSlug: (editingSlug: EditingSlug) => void;
   onUpdateSlug: (siteId: string, nextSlug: string) => void;
+  isGeneratingBlogDraft: (siteId: string, mode: "create" | "update") => boolean;
+  onGenerateBlogDraft: (site: SiteRow, mode: "create" | "update") => void;
 }) {
   return (
     <section id={anchorId} className="overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
@@ -2391,7 +2500,9 @@ function SiteTable({
                 <tr key={site.id} className="border-t border-line">
                   <td className="px-4 py-4">
                     <p className="font-semibold">{site.name}</p>
-                    <p className="break-all text-xs text-muted">{site.url}</p>
+                    <p className="break-all text-xs text-muted">
+                      {formatDisplayUrl(site.url)}
+                    </p>
                     {site.domains && site.domains.length > 1 ? (
                       <p className="mt-1 text-xs text-muted">
                         추가 도메인 {site.domains.length - 1}개
@@ -2472,6 +2583,9 @@ function SiteTable({
                       isDeleting={isDeleting}
                       onUpdateStatus={onUpdateStatus}
                       onDelete={onDelete}
+                      site={site}
+                      isGeneratingBlogDraft={isGeneratingBlogDraft}
+                      onGenerateBlogDraft={onGenerateBlogDraft}
                     />
                   </td>
                 </tr>
@@ -2682,6 +2796,9 @@ function ActionButtons({
   isDeleting,
   onUpdateStatus,
   onDelete,
+  site,
+  isGeneratingBlogDraft,
+  onGenerateBlogDraft,
 }: {
   table: "sites" | "reviews" | "scam_reports";
   id: string;
@@ -2698,11 +2815,20 @@ function ActionButtons({
     status: ModerationStatus,
   ) => void;
   onDelete: (table: "sites" | "reviews" | "scam_reports", id: string) => void;
+  site?: SiteRow;
+  isGeneratingBlogDraft?: (siteId: string, mode: "create" | "update") => boolean;
+  onGenerateBlogDraft?: (site: SiteRow, mode: "create" | "update") => void;
 }) {
   const approving = isUpdating(table, id, "approved");
   const rejecting = isUpdating(table, id, "rejected");
   const deleting = isDeleting(table, id);
-  const disabled = approving || rejecting || deleting;
+  const creatingBlogDraft = site
+    ? Boolean(isGeneratingBlogDraft?.(site.id, "create"))
+    : false;
+  const updatingBlogDraft = site
+    ? Boolean(isGeneratingBlogDraft?.(site.id, "update"))
+    : false;
+  const disabled = approving || rejecting || deleting || creatingBlogDraft || updatingBlogDraft;
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -2713,6 +2839,26 @@ function ActionButtons({
         >
           수정
         </a>
+      ) : null}
+      {site && onGenerateBlogDraft ? (
+        <>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onGenerateBlogDraft(site, "create")}
+            className="rounded-md border border-accent/30 px-3 py-2 text-xs font-semibold text-accent disabled:opacity-50"
+          >
+            {creatingBlogDraft ? "생성 중..." : "AI 블로그 초안 생성"}
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onGenerateBlogDraft(site, "update")}
+            className="rounded-md border border-line px-3 py-2 text-xs font-semibold disabled:opacity-50"
+          >
+            {updatingBlogDraft ? "업데이트 중..." : "AI 블로그 업데이트 초안 생성"}
+          </button>
+        </>
       ) : null}
       <button
         type="button"

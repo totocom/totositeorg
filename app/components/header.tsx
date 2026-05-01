@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/app/components/theme-toggle";
 const navItems = [
   { href: "/", label: "홈" },
   { href: "/sites", label: "사이트 목록" },
+  { href: "/blog", label: "블로그" },
   { href: "/reviews", label: "만족도 평가" },
   { href: "/scam-reports", label: "먹튀 제보" },
   { href: "/site-registration", label: "사이트 등록" },

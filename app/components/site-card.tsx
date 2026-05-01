@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatDisplayUrl } from "@/app/data/domain-display";
 import {
   calculateSiteTrustScore,
   formatTrustScore,
@@ -97,7 +98,9 @@ export function SiteCard({ site }: SiteCardProps) {
           <h2 className="text-base font-bold text-foreground group-hover:text-accent transition-colors">
             {site.siteName}
           </h2>
-          <p className="mt-0.5 break-all text-xs text-muted">{site.siteUrl}</p>
+          <p className="mt-0.5 break-all text-xs text-muted">
+            {formatDisplayUrl(site.siteUrl)}
+          </p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className={`text-sm font-black ${getTrustToneClasses(trustScore.total)}`}>
               신뢰 점수 {formatTrustScore(trustScore)}

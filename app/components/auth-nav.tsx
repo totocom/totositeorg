@@ -42,14 +42,6 @@ export function AuthNav() {
           내 리뷰
         </Link>
       ) : null}
-      {isAdmin ? (
-        <Link
-          href="/admin"
-          className="rounded-md px-3 py-2 text-sm font-semibold text-muted transition hover:bg-background hover:text-foreground"
-        >
-          관리자
-        </Link>
-      ) : null}
       <Link
         href="/profiles"
         className="rounded-md px-3 py-2 text-sm font-semibold text-muted transition hover:bg-background hover:text-foreground"

@@ -508,6 +508,1133 @@ create table if not exists public.review_helpfulness_votes (
   constraint review_helpfulness_votes_vote_allowed check (vote in (-1, 1))
 );
 
+create table if not exists public.blog_posts (
+  id uuid primary key default gen_random_uuid(),
+  site_id uuid not null references public.sites(id) on delete cascade,
+  slug text not null unique,
+  status text not null default 'draft',
+  title text not null,
+  meta_title text null,
+  meta_description text null,
+  primary_keyword text null,
+  secondary_keywords text[] not null default '{}',
+  body_md text not null default '',
+  faq_json jsonb not null default '[]'::jsonb,
+  checklist_json jsonb not null default '[]'::jsonb,
+  source_snapshot_id uuid null,
+  ai_provider text null,
+  ai_model text null,
+  prompt_version text null,
+  legal_review_status text not null default 'not_reviewed',
+  admin_warnings text[] not null default '{}',
+  reviewed_by uuid null references auth.users(id) on delete set null,
+  published_at timestamptz null,
+
+  -- Compatibility columns used by the existing blog manager and public pages.
+  category text not null default '운영 정보',
+  primary_category text not null default 'site-reports',
+  secondary_categories text[] not null default '{}',
+  tags text[] not null default '{}',
+  priority text not null default '중',
+  description text not null default '',
+  search_intent text not null default '',
+  reader_question text not null default '',
+  recommended_title_pattern text not null default '',
+  summary text not null default '',
+  content_updated_at date not null default current_date,
+  reading_minutes integer not null default 3,
+  internal_links jsonb not null default '[]'::jsonb,
+  sections jsonb not null default '[]'::jsonb,
+  checklist text[] not null default '{}',
+  faqs jsonb not null default '[]'::jsonb,
+  source_site_id uuid null references public.sites(id) on delete set null,
+  source_snapshot jsonb not null default '{}'::jsonb,
+  ai_generated_at timestamptz null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint blog_posts_slug_format check (
+    slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+  ),
+  constraint blog_posts_status_allowed check (
+    status in ('draft', 'published', 'archived')
+  ),
+  constraint blog_posts_legal_review_status_allowed check (
+    legal_review_status in ('not_reviewed', 'needs_review', 'approved')
+  ),
+  constraint blog_posts_needs_review_not_published check (
+    not (
+      status = 'published'
+      and legal_review_status = 'needs_review'
+    )
+  ),
+  constraint blog_posts_priority_allowed check (
+    priority in ('상', '중', '하')
+  ),
+  constraint blog_posts_primary_category_allowed check (
+    primary_category in (
+      'site-reports',
+      'domain-dns',
+      'scam-reports',
+      'user-reviews',
+      'change-history',
+      'verification-guide',
+      'checklists',
+      'announcements'
+    )
+  ),
+  constraint blog_posts_secondary_categories_allowed check (
+    secondary_categories <@ array[
+      'site-reports',
+      'domain-dns',
+      'scam-reports',
+      'user-reviews',
+      'change-history',
+      'verification-guide',
+      'checklists',
+      'announcements'
+    ]::text[]
+  ),
+  constraint blog_posts_title_not_blank check (length(trim(title)) > 0),
+  constraint blog_posts_meta_title_not_blank check (
+    meta_title is null
+    or length(trim(meta_title)) > 0
+  ),
+  constraint blog_posts_faq_json_array check (
+    jsonb_typeof(faq_json) = 'array'
+  ),
+  constraint blog_posts_checklist_json_array check (
+    jsonb_typeof(checklist_json) = 'array'
+  ),
+  constraint blog_posts_reading_minutes_positive check (reading_minutes > 0),
+  constraint blog_posts_internal_links_array check (
+    jsonb_typeof(internal_links) = 'array'
+  ),
+  constraint blog_posts_sections_array check (
+    jsonb_typeof(sections) = 'array'
+  ),
+  constraint blog_posts_faqs_array check (
+    jsonb_typeof(faqs) = 'array'
+  ),
+  constraint blog_posts_source_snapshot_object check (
+    jsonb_typeof(source_snapshot) = 'object'
+  )
+);
+
+alter table public.blog_posts
+  add column if not exists site_id uuid null references public.sites(id)
+  on delete cascade;
+
+alter table public.blog_posts
+  add column if not exists source_site_id uuid null references public.sites(id)
+  on delete set null;
+
+alter table public.blog_posts
+  add column if not exists meta_description text null;
+
+alter table public.blog_posts
+  add column if not exists body_md text not null default '';
+
+alter table public.blog_posts
+  add column if not exists faq_json jsonb not null default '[]'::jsonb;
+
+alter table public.blog_posts
+  add column if not exists checklist_json jsonb not null default '[]'::jsonb;
+
+alter table public.blog_posts
+  add column if not exists source_snapshot_id uuid null;
+
+alter table public.blog_posts
+  add column if not exists ai_provider text null;
+
+alter table public.blog_posts
+  add column if not exists prompt_version text null;
+
+alter table public.blog_posts
+  add column if not exists legal_review_status text not null default 'not_reviewed';
+
+alter table public.blog_posts
+  add column if not exists admin_warnings text[] not null default '{}';
+
+alter table public.blog_posts
+  add column if not exists reviewed_by uuid null references auth.users(id)
+  on delete set null;
+
+alter table public.blog_posts
+  add column if not exists source_snapshot jsonb not null default '{}'::jsonb;
+
+alter table public.blog_posts
+  add column if not exists ai_generated_at timestamptz null;
+
+alter table public.blog_posts
+  add column if not exists ai_model text null;
+
+alter table public.blog_posts
+  add column if not exists primary_category text not null default 'site-reports';
+
+alter table public.blog_posts
+  add column if not exists secondary_categories text[] not null default '{}';
+
+alter table public.blog_posts
+  add column if not exists tags text[] not null default '{}';
+
+alter table public.blog_posts
+  alter column meta_title drop not null;
+
+alter table public.blog_posts
+  alter column primary_keyword drop not null;
+
+alter table public.blog_posts
+  alter column category set default '운영 정보';
+
+alter table public.blog_posts
+  alter column primary_category set default 'site-reports';
+
+alter table public.blog_posts
+  alter column secondary_categories set default '{}';
+
+alter table public.blog_posts
+  alter column tags set default '{}';
+
+alter table public.blog_posts
+  alter column description set default '';
+
+alter table public.blog_posts
+  alter column legal_review_status set default 'not_reviewed';
+
+alter table public.blog_posts
+  alter column body_md set default '';
+
+alter table public.blog_posts
+  alter column faq_json set default '[]'::jsonb;
+
+alter table public.blog_posts
+  alter column checklist_json set default '[]'::jsonb;
+
+alter table public.blog_posts
+  alter column published_at type timestamptz
+  using published_at::timestamptz;
+
+update public.blog_posts
+set site_id = source_site_id
+where site_id is null
+  and source_site_id is not null;
+
+update public.blog_posts
+set meta_description = description
+where meta_description is null
+  and description is not null
+  and length(trim(description)) > 0;
+
+update public.blog_posts
+set faq_json = faqs
+where jsonb_typeof(faqs) = 'array'
+  and faq_json = '[]'::jsonb
+  and faqs <> '[]'::jsonb;
+
+update public.blog_posts
+set checklist_json = coalesce(
+  (
+    select jsonb_agg(
+      jsonb_build_object(
+        'item',
+        checklist_item,
+        'reason',
+        ''
+      )
+    )
+    from unnest(checklist) as checklist_item
+    where length(trim(checklist_item)) > 0
+  ),
+  '[]'::jsonb
+)
+where checklist_json = '[]'::jsonb
+  and cardinality(checklist) > 0;
+
+do $$
+begin
+  drop trigger if exists set_blog_post_primary_category_id_on_change
+    on public.blog_posts;
+
+  drop trigger if exists sync_blog_post_taxonomy_on_change
+    on public.blog_posts;
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_primary_category_allowed;
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_secondary_categories_allowed;
+end $$;
+
+update public.blog_posts
+set primary_category = case
+  when source_site_id is not null or site_id is not null then 'site-reports'
+  when category = '검증 기준' then 'verification-guide'
+  when category = '피해 예방' then 'scam-reports'
+  when category = '후기 해석' then 'user-reviews'
+  when category = '운영 정보' then 'domain-dns'
+  when category = '토토사이트 정보 리포트' then 'site-reports'
+  when category = '도메인·DNS 분석' then 'domain-dns'
+  when category = '먹튀 제보 현황' then 'scam-reports'
+  when category = '이용자 리뷰 요약' then 'user-reviews'
+  when category = '변경 이력 리포트' then 'change-history'
+  when category = '검증 기준 안내' then 'verification-guide'
+  when category = '이용 전 체크리스트' then 'checklists'
+  when category = '공지 및 운영 안내' then 'announcements'
+  else primary_category
+end
+where primary_category is null
+  or primary_category = 'site-reports';
+
+update public.blog_posts
+set primary_category = 'scam-reports'
+where primary_category = 'public-reports';
+
+update public.blog_posts
+set secondary_categories = array_replace(
+  secondary_categories,
+  'public-reports',
+  'scam-reports'
+)
+where secondary_categories @> array['public-reports']::text[];
+
+update public.blog_posts
+set tags = array_remove(tags, 'public-reports')
+where tags @> array['public-reports']::text[];
+
+update public.blog_posts
+set primary_category = case
+  when primary_category in (
+    'site-reports',
+    'domain-dns',
+    'scam-reports',
+    'user-reviews',
+    'change-history',
+    'verification-guide',
+    'checklists',
+    'announcements'
+  ) then primary_category
+  when primary_category = 'public-reports' then 'scam-reports'
+  when primary_category = '검증 기준' then 'verification-guide'
+  when primary_category = '피해 예방' then 'scam-reports'
+  when primary_category = '후기 해석' then 'user-reviews'
+  when primary_category = '운영 정보' then 'domain-dns'
+  when primary_category = '토토사이트 정보 리포트' then 'site-reports'
+  when primary_category = '도메인·DNS 분석' then 'domain-dns'
+  when primary_category = '먹튀 제보 현황' then 'scam-reports'
+  when primary_category = '이용자 리뷰 요약' then 'user-reviews'
+  when primary_category = '변경 이력 리포트' then 'change-history'
+  when primary_category = '검증 기준 안내' then 'verification-guide'
+  when primary_category = '이용 전 체크리스트' then 'checklists'
+  when primary_category = '공지 및 운영 안내' then 'announcements'
+  when category = '검증 기준' then 'verification-guide'
+  when category = '피해 예방' then 'scam-reports'
+  when category = '후기 해석' then 'user-reviews'
+  when category = '운영 정보' then 'domain-dns'
+  when category = '토토사이트 정보 리포트' then 'site-reports'
+  when category = '도메인·DNS 분석' then 'domain-dns'
+  when category = '먹튀 제보 현황' then 'scam-reports'
+  when category = '이용자 리뷰 요약' then 'user-reviews'
+  when category = '변경 이력 리포트' then 'change-history'
+  when category = '검증 기준 안내' then 'verification-guide'
+  when category = '이용 전 체크리스트' then 'checklists'
+  when category = '공지 및 운영 안내' then 'announcements'
+  else 'site-reports'
+end
+where primary_category is null
+  or primary_category not in (
+    'site-reports',
+    'domain-dns',
+    'scam-reports',
+    'user-reviews',
+    'change-history',
+    'verification-guide',
+    'checklists',
+    'announcements'
+  );
+
+update public.blog_posts
+set secondary_categories = coalesce(
+  (
+    select array_agg(distinct normalized_secondary_category)
+    from (
+      select case
+        when secondary_category = 'public-reports' then 'scam-reports'
+        else secondary_category
+      end as normalized_secondary_category
+      from unnest(secondary_categories) as secondary_category
+    ) as normalized_secondary_categories
+    where normalized_secondary_category in (
+      'site-reports',
+      'domain-dns',
+      'scam-reports',
+      'user-reviews',
+      'change-history',
+      'verification-guide',
+      'checklists',
+      'announcements'
+    )
+  ),
+  '{}'::text[]
+)
+where exists (
+    select 1
+    from unnest(secondary_categories) as secondary_category
+    where secondary_category is null
+      or secondary_category = 'public-reports'
+      or secondary_category not in (
+        'site-reports',
+        'domain-dns',
+        'scam-reports',
+        'user-reviews',
+        'change-history',
+        'verification-guide',
+        'checklists',
+        'announcements'
+      )
+  );
+
+do $$
+begin
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_status_allowed;
+
+  alter table public.blog_posts
+    add constraint blog_posts_status_allowed check (
+      status in ('draft', 'published', 'archived')
+    );
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_legal_review_status_allowed;
+
+  update public.blog_posts
+  set legal_review_status = case legal_review_status
+    when 'not_required' then 'not_reviewed'
+    when 'reviewed' then 'approved'
+    when 'approved' then 'approved'
+    when 'needs_review' then 'needs_review'
+    else 'not_reviewed'
+  end;
+
+  alter table public.blog_posts
+    add constraint blog_posts_legal_review_status_allowed check (
+      legal_review_status in ('not_reviewed', 'needs_review', 'approved')
+    );
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_needs_review_not_published;
+
+  alter table public.blog_posts
+    add constraint blog_posts_needs_review_not_published check (
+      not (
+        status = 'published'
+        and legal_review_status = 'needs_review'
+      )
+    );
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_meta_title_not_blank;
+
+  alter table public.blog_posts
+    add constraint blog_posts_meta_title_not_blank check (
+      meta_title is null
+      or length(trim(meta_title)) > 0
+    );
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_description_not_blank;
+
+  alter table public.blog_posts
+    add constraint blog_posts_description_not_blank check (
+      description = ''
+      or length(trim(description)) > 0
+    );
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_primary_category_allowed;
+
+  update public.blog_posts
+  set primary_category = lower(trim(primary_category))
+  where primary_category is not null
+    and primary_category <> lower(trim(primary_category));
+
+  update public.blog_posts
+  set primary_category = case
+    when primary_category in (
+      'site-reports',
+      'domain-dns',
+      'scam-reports',
+      'user-reviews',
+      'change-history',
+      'verification-guide',
+      'checklists',
+      'announcements'
+    ) then primary_category
+    when primary_category in ('public-reports', 'public_reports') then 'scam-reports'
+    when primary_category = '검증 기준' then 'verification-guide'
+    when primary_category = '피해 예방' then 'scam-reports'
+    when primary_category = '후기 해석' then 'user-reviews'
+    when primary_category = '운영 정보' then 'domain-dns'
+    when primary_category = '토토사이트 정보 리포트' then 'site-reports'
+    when primary_category = '도메인·dns 분석' then 'domain-dns'
+    when primary_category = '먹튀 제보 현황' then 'scam-reports'
+    when primary_category = '이용자 리뷰 요약' then 'user-reviews'
+    when primary_category = '변경 이력 리포트' then 'change-history'
+    when primary_category = '검증 기준 안내' then 'verification-guide'
+    when primary_category = '이용 전 체크리스트' then 'checklists'
+    when primary_category = '공지 및 운영 안내' then 'announcements'
+    when category = '검증 기준' then 'verification-guide'
+    when category = '피해 예방' then 'scam-reports'
+    when category = '후기 해석' then 'user-reviews'
+    when category = '운영 정보' then 'domain-dns'
+    when category = '토토사이트 정보 리포트' then 'site-reports'
+    when category = '도메인·DNS 분석' then 'domain-dns'
+    when category = '먹튀 제보 현황' then 'scam-reports'
+    when category = '이용자 리뷰 요약' then 'user-reviews'
+    when category = '변경 이력 리포트' then 'change-history'
+    when category = '검증 기준 안내' then 'verification-guide'
+    when category = '이용 전 체크리스트' then 'checklists'
+    when category = '공지 및 운영 안내' then 'announcements'
+    else 'site-reports'
+  end
+  where primary_category is null
+    or primary_category not in (
+      'site-reports',
+      'domain-dns',
+      'scam-reports',
+      'user-reviews',
+      'change-history',
+      'verification-guide',
+      'checklists',
+      'announcements'
+    );
+
+  alter table public.blog_posts
+    add constraint blog_posts_primary_category_allowed check (
+      primary_category in (
+        'site-reports',
+        'domain-dns',
+        'scam-reports',
+        'user-reviews',
+        'change-history',
+        'verification-guide',
+        'checklists',
+        'announcements'
+      )
+    );
+
+  alter table public.blog_posts
+    drop constraint if exists blog_posts_secondary_categories_allowed;
+
+  update public.blog_posts
+  set secondary_categories = coalesce(
+    (
+      select array_agg(distinct normalized_secondary_category)
+      from (
+        select case
+          when secondary_category_slug in ('public-reports', 'public_reports')
+            then 'scam-reports'
+          when secondary_category_slug = '검증 기준' then 'verification-guide'
+          when secondary_category_slug = '피해 예방' then 'scam-reports'
+          when secondary_category_slug = '후기 해석' then 'user-reviews'
+          when secondary_category_slug = '운영 정보' then 'domain-dns'
+          when secondary_category_slug = '토토사이트 정보 리포트' then 'site-reports'
+          when secondary_category_slug = '도메인·dns 분석' then 'domain-dns'
+          when secondary_category_slug = '먹튀 제보 현황' then 'scam-reports'
+          when secondary_category_slug = '이용자 리뷰 요약' then 'user-reviews'
+          when secondary_category_slug = '변경 이력 리포트' then 'change-history'
+          when secondary_category_slug = '검증 기준 안내' then 'verification-guide'
+          when secondary_category_slug = '이용 전 체크리스트' then 'checklists'
+          when secondary_category_slug = '공지 및 운영 안내' then 'announcements'
+          else secondary_category_slug
+        end as normalized_secondary_category
+        from (
+          select lower(trim(secondary_category)) as secondary_category_slug
+          from unnest(coalesce(secondary_categories, '{}'::text[])) as secondary_category
+          where secondary_category is not null
+            and length(trim(secondary_category)) > 0
+        ) as raw_secondary_categories
+      ) as normalized_secondary_categories
+      where normalized_secondary_category in (
+          'site-reports',
+          'domain-dns',
+          'scam-reports',
+          'user-reviews',
+          'change-history',
+          'verification-guide',
+          'checklists',
+          'announcements'
+        )
+        and normalized_secondary_category <> primary_category
+    ),
+    '{}'::text[]
+  );
+
+  alter table public.blog_posts
+    add constraint blog_posts_secondary_categories_allowed check (
+      secondary_categories <@ array[
+        'site-reports',
+        'domain-dns',
+        'scam-reports',
+        'user-reviews',
+        'change-history',
+        'verification-guide',
+        'checklists',
+        'announcements'
+      ]::text[]
+    );
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'blog_posts_source_snapshot_object'
+      and conrelid = 'public.blog_posts'::regclass
+  ) then
+    alter table public.blog_posts
+      add constraint blog_posts_source_snapshot_object check (
+        jsonb_typeof(source_snapshot) = 'object'
+      );
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'blog_posts_faq_json_array'
+      and conrelid = 'public.blog_posts'::regclass
+  ) then
+    alter table public.blog_posts
+      add constraint blog_posts_faq_json_array check (
+        jsonb_typeof(faq_json) = 'array'
+      );
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'blog_posts_checklist_json_array'
+      and conrelid = 'public.blog_posts'::regclass
+  ) then
+    alter table public.blog_posts
+      add constraint blog_posts_checklist_json_array check (
+        jsonb_typeof(checklist_json) = 'array'
+      );
+  end if;
+end $$;
+
+create table if not exists public.blog_categories (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text not null unique,
+  description text null,
+  meta_title text null,
+  meta_description text null,
+  sort_order integer not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint blog_categories_name_not_blank check (length(trim(name)) > 0),
+  constraint blog_categories_slug_format check (
+    slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+  ),
+  constraint blog_categories_meta_title_not_blank check (
+    meta_title is null
+    or length(trim(meta_title)) > 0
+  ),
+  constraint blog_categories_meta_description_not_blank check (
+    meta_description is null
+    or length(trim(meta_description)) > 0
+  )
+);
+
+alter table public.blog_posts
+  add column if not exists primary_category_id uuid null
+  references public.blog_categories(id)
+  on delete set null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'blog_posts_primary_category_id_fkey'
+      and conrelid = 'public.blog_posts'::regclass
+  ) then
+    alter table public.blog_posts
+      add constraint blog_posts_primary_category_id_fkey
+      foreign key (primary_category_id)
+      references public.blog_categories(id)
+      on delete set null;
+  end if;
+end $$;
+
+create table if not exists public.blog_post_categories (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.blog_posts(id) on delete cascade,
+  category_id uuid not null references public.blog_categories(id) on delete cascade,
+  is_primary boolean not null default false,
+  created_at timestamptz not null default now(),
+
+  constraint blog_post_categories_post_category_unique unique (post_id, category_id)
+);
+
+create table if not exists public.blog_tags (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text not null unique,
+  description text null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint blog_tags_name_not_blank check (length(trim(name)) > 0),
+  constraint blog_tags_slug_format check (
+    slug ~ '^[a-z0-9가-힣]+(?:-[a-z0-9가-힣]+)*$'
+  ),
+  constraint blog_tags_description_not_blank check (
+    description is null
+    or length(trim(description)) > 0
+  )
+);
+
+create table if not exists public.blog_post_tags (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.blog_posts(id) on delete cascade,
+  tag_id uuid not null references public.blog_tags(id) on delete cascade,
+  created_at timestamptz not null default now(),
+
+  constraint blog_post_tags_post_tag_unique unique (post_id, tag_id)
+);
+
+create or replace function public.normalize_blog_taxonomy_slug(value text)
+returns text
+language sql
+immutable
+as $$
+  select trim(both '-' from regexp_replace(
+    regexp_replace(lower(trim(coalesce(value, ''))), '[^a-z0-9가-힣]+', '-', 'g'),
+    '-+',
+    '-',
+    'g'
+  ));
+$$;
+
+do $$
+declare
+  old_category_id uuid;
+  new_category_id uuid;
+begin
+  select id
+  into old_category_id
+  from public.blog_categories
+  where slug = 'public-reports'
+  limit 1;
+
+  select id
+  into new_category_id
+  from public.blog_categories
+  where slug = 'scam-reports'
+  limit 1;
+
+  if old_category_id is not null and new_category_id is null then
+    update public.blog_categories
+    set
+      slug = 'scam-reports',
+      updated_at = now()
+    where id = old_category_id;
+  elsif old_category_id is not null
+    and new_category_id is not null
+    and old_category_id <> new_category_id then
+    update public.blog_posts
+    set primary_category_id = new_category_id
+    where primary_category_id = old_category_id;
+
+    insert into public.blog_post_categories (
+      post_id,
+      category_id,
+      is_primary,
+      created_at
+    )
+    select
+      post_id,
+      new_category_id,
+      is_primary,
+      created_at
+    from public.blog_post_categories
+    where category_id = old_category_id
+    on conflict (post_id, category_id) do update
+    set is_primary = excluded.is_primary;
+
+    delete from public.blog_post_categories
+    where category_id = old_category_id;
+
+    delete from public.blog_categories
+    where id = old_category_id;
+  end if;
+end $$;
+
+insert into public.blog_categories (
+  name,
+  slug,
+  description,
+  meta_title,
+  meta_description,
+  sort_order,
+  is_active
+)
+values
+  (
+    '토토사이트 정보 리포트',
+    'site-reports',
+    '이 카테고리는 개별 사이트의 도메인, DNS, WHOIS, 공개 승인된 리뷰와 먹튀 피해 제보 현황을 종합 정리한 정보 리포트를 모아둔 페이지입니다.',
+    '토토사이트 정보 리포트 | 도메인·DNS·공개 제보 현황',
+    '개별 토토사이트별 도메인, DNS, WHOIS, 공개 승인 리뷰와 먹튀 제보 현황을 정리한 정보 리포트 모음입니다.',
+    1,
+    true
+  ),
+  (
+    '도메인·DNS 분석',
+    'domain-dns',
+    '도메인, DNS 레코드, WHOIS 등록 정보, 네임서버, IP 관측값처럼 기술적으로 확인 가능한 공개 데이터를 기준으로 사이트별 변화를 정리합니다.',
+    '도메인·DNS 분석 | WHOIS·네임서버 정보',
+    '도메인, DNS 레코드, WHOIS, 네임서버, IP 관측 정보를 기준으로 정리한 분석 글 모음입니다.',
+    2,
+    true
+  ),
+  (
+    '먹튀 제보 현황',
+    'scam-reports',
+    '공개 승인된 먹튀 피해 제보와 관련 집계, 피해 유형, 접수 시점 정보를 모아 사이트 이용 전 확인할 수 있는 제보 현황을 정리합니다.',
+    '먹튀 제보 현황 | 승인된 피해 제보 정리',
+    '공개 승인된 먹튀 제보 현황과 관련 데이터를 정리한 글 모음입니다.',
+    3,
+    true
+  ),
+  (
+    '이용자 리뷰 요약',
+    'user-reviews',
+    '승인된 이용자 리뷰를 바탕으로 결제, 고객지원, 계정 제한, 앱 사용성 등 실제 이용 경험에서 반복되는 신호를 카테고리별로 요약합니다.',
+    '이용자 리뷰 요약 | 승인 리뷰 기반 정보',
+    '승인된 이용자 리뷰를 바탕으로 이용 경험과 공개 평가 데이터를 정리한 글 모음입니다.',
+    4,
+    true
+  ),
+  (
+    '변경 이력 리포트',
+    'change-history',
+    '도메인 추가, DNS/WHOIS 갱신, 공개 리뷰와 먹튀 제보 증가처럼 사이트 정보가 바뀐 항목을 시간순으로 추적해 변화 흐름을 정리합니다.',
+    '변경 이력 리포트 | 도메인·DNS·제보 업데이트',
+    '사이트별 도메인, DNS, WHOIS, 리뷰, 공개 제보 변경 이력을 정리한 글 모음입니다.',
+    5,
+    true
+  ),
+  (
+    '검증 기준 안내',
+    'verification-guide',
+    '리뷰 승인 기준, 먹튀 피해 제보 검토 방식, DNS/WHOIS 조회 기준 등 서비스가 공개 데이터를 수집하고 해석하는 운영 원칙을 안내합니다.',
+    '검증 기준 안내 | 리뷰·제보·DNS 조회 기준',
+    '리뷰 승인, 먹튀 제보 검토, DNS/WHOIS 조회 방식과 정보 해석 기준을 안내합니다.',
+    6,
+    true
+  ),
+  (
+    '이용 전 체크리스트',
+    'checklists',
+    '사이트 이용 전 확인할 도메인, DNS, WHOIS, 공개 리뷰, 먹튀 피해 제보 항목을 단계별 체크리스트로 정리해 사전 확인 흐름을 제공합니다.',
+    '이용 전 체크리스트 | 정보 확인 항목',
+    '도메인, DNS, WHOIS, 먹튀 제보, 리뷰 등 이용 전 확인할 수 있는 정보 항목을 정리합니다.',
+    7,
+    true
+  ),
+  (
+    '공지 및 운영 안내',
+    'announcements',
+    '서비스 운영 정책, 기능 업데이트, 검토 기준 변경과 같은 공지성 내용을 모아 이용자가 중요한 변경 사항을 빠르게 확인하도록 안내합니다.',
+    '공지 및 운영 안내',
+    '서비스 운영 정책, 기능 업데이트, 검토 기준 변경 사항을 안내합니다.',
+    8,
+    true
+  )
+on conflict (slug) do update
+set
+  name = excluded.name,
+  description = excluded.description,
+  meta_title = excluded.meta_title,
+  meta_description = excluded.meta_description,
+  sort_order = excluded.sort_order,
+  is_active = excluded.is_active,
+  updated_at = now();
+
+update public.blog_posts
+set primary_category_id = blog_categories.id
+from public.blog_categories
+where blog_categories.slug = coalesce(nullif(blog_posts.primary_category, ''), 'site-reports')
+  and blog_posts.primary_category_id is distinct from blog_categories.id;
+
+update public.blog_post_categories
+set is_primary = false
+where is_primary = true
+  and exists (
+    select 1
+    from public.blog_posts
+    where blog_posts.id = blog_post_categories.post_id
+  );
+
+insert into public.blog_post_categories (
+  post_id,
+  category_id,
+  is_primary
+)
+select
+  blog_posts.id,
+  blog_categories.id,
+  true
+from public.blog_posts
+join public.blog_categories
+  on blog_categories.slug = coalesce(nullif(blog_posts.primary_category, ''), 'site-reports')
+on conflict (post_id, category_id) do update
+set is_primary = true;
+
+insert into public.blog_post_categories (
+  post_id,
+  category_id,
+  is_primary
+)
+select distinct
+  blog_posts.id,
+  blog_categories.id,
+  false
+from public.blog_posts
+cross join lateral unnest(blog_posts.secondary_categories) as secondary_category_slug
+join public.blog_categories
+  on blog_categories.slug = secondary_category_slug
+where secondary_category_slug <> coalesce(nullif(blog_posts.primary_category, ''), 'site-reports')
+on conflict (post_id, category_id) do nothing;
+
+with ranked_primary_blog_categories as (
+  select
+    id,
+    row_number() over (
+      partition by post_id
+      order by created_at desc, id desc
+    ) as primary_rank
+  from public.blog_post_categories
+  where is_primary = true
+)
+update public.blog_post_categories
+set is_primary = false
+from ranked_primary_blog_categories
+where blog_post_categories.id = ranked_primary_blog_categories.id
+  and ranked_primary_blog_categories.primary_rank > 1;
+
+with raw_blog_tags as (
+  select distinct
+    trim(tag_value) as name
+  from public.blog_posts
+  cross join lateral unnest(blog_posts.tags) as tag_value
+  where length(trim(tag_value)) > 0
+),
+normalized_blog_tags as (
+  select distinct on (slug)
+    name,
+    slug
+  from (
+    select
+      name,
+      public.normalize_blog_taxonomy_slug(name) as slug
+    from raw_blog_tags
+  ) as normalized
+  where length(slug) > 0
+    and not exists (
+      select 1
+      from public.blog_categories
+      where blog_categories.slug = normalized.slug
+        or blog_categories.name = normalized.name
+    )
+  order by slug, name
+)
+insert into public.blog_tags (
+  name,
+  slug
+)
+select
+  name,
+  slug
+from normalized_blog_tags
+on conflict (slug) do update
+set
+  name = excluded.name,
+  updated_at = now();
+
+with post_blog_tags as (
+  select distinct
+    blog_posts.id as post_id,
+    public.normalize_blog_taxonomy_slug(tag_value) as tag_slug
+  from public.blog_posts
+  cross join lateral unnest(blog_posts.tags) as tag_value
+  where length(trim(tag_value)) > 0
+)
+insert into public.blog_post_tags (
+  post_id,
+  tag_id
+)
+select
+  post_blog_tags.post_id,
+  blog_tags.id
+from post_blog_tags
+join public.blog_tags
+  on blog_tags.slug = post_blog_tags.tag_slug
+on conflict (post_id, tag_id) do nothing;
+
+create table if not exists public.blog_source_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  site_id uuid not null references public.sites(id) on delete cascade,
+  snapshot_at timestamptz not null default now(),
+
+  site_json jsonb not null,
+  domains_json jsonb not null default '[]'::jsonb,
+  dns_records_json jsonb not null default '[]'::jsonb,
+  whois_json jsonb not null default '[]'::jsonb,
+
+  reviews_summary_json jsonb not null default '{}'::jsonb,
+  scam_reports_summary_json jsonb not null default '{}'::jsonb,
+  derived_facts_json jsonb not null default '{}'::jsonb,
+
+  pii_redaction_version text not null default 'v1',
+  created_at timestamptz not null default now(),
+
+  constraint blog_source_snapshots_site_object check (
+    jsonb_typeof(site_json) = 'object'
+  ),
+  constraint blog_source_snapshots_domains_array check (
+    jsonb_typeof(domains_json) = 'array'
+  ),
+  constraint blog_source_snapshots_dns_records_array check (
+    jsonb_typeof(dns_records_json) = 'array'
+  ),
+  constraint blog_source_snapshots_whois_array check (
+    jsonb_typeof(whois_json) = 'array'
+  ),
+  constraint blog_source_snapshots_reviews_summary_object check (
+    jsonb_typeof(reviews_summary_json) = 'object'
+  ),
+  constraint blog_source_snapshots_scam_reports_summary_object check (
+    jsonb_typeof(scam_reports_summary_json) = 'object'
+  ),
+  constraint blog_source_snapshots_derived_facts_object check (
+    jsonb_typeof(derived_facts_json) = 'object'
+  ),
+  constraint blog_source_snapshots_pii_redaction_version_not_blank check (
+    length(trim(pii_redaction_version)) > 0
+  )
+);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'blog_posts_source_snapshot_id_fkey'
+      and conrelid = 'public.blog_posts'::regclass
+  ) then
+    alter table public.blog_posts
+      add constraint blog_posts_source_snapshot_id_fkey
+      foreign key (source_snapshot_id)
+      references public.blog_source_snapshots(id)
+      on delete set null;
+  end if;
+end $$;
+
+create table if not exists public.blog_post_versions (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.blog_posts(id) on delete cascade,
+  version_no integer not null,
+  title text not null,
+  meta_title text null,
+  meta_description text null,
+  body_md text not null,
+  faq_json jsonb not null default '[]'::jsonb,
+  checklist_json jsonb not null default '[]'::jsonb,
+  change_summary text null,
+  source_snapshot_id uuid null references public.blog_source_snapshots(id)
+    on delete set null,
+  ai_generation_job_id uuid null,
+  created_by uuid null references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+
+  constraint blog_post_versions_post_version_unique unique (post_id, version_no),
+  constraint blog_post_versions_version_no_positive check (version_no > 0),
+  constraint blog_post_versions_title_not_blank check (length(trim(title)) > 0),
+  constraint blog_post_versions_body_md_not_blank check (length(trim(body_md)) > 0),
+  constraint blog_post_versions_faq_json_array check (
+    jsonb_typeof(faq_json) = 'array'
+  ),
+  constraint blog_post_versions_checklist_json_array check (
+    jsonb_typeof(checklist_json) = 'array'
+  )
+);
+
+create table if not exists public.ai_generation_jobs (
+  id uuid primary key default gen_random_uuid(),
+  site_id uuid not null references public.sites(id) on delete cascade,
+  post_id uuid null references public.blog_posts(id) on delete set null,
+  job_type text not null,
+  status text not null default 'queued',
+  provider text not null,
+  openai_model text null,
+  anthropic_model text null,
+  prompt_version text not null,
+  source_snapshot_id uuid null references public.blog_source_snapshots(id)
+    on delete set null,
+  input_tokens integer null,
+  output_tokens integer null,
+  error_message text null,
+  idempotency_key text not null unique,
+  created_by uuid null references auth.users(id) on delete set null,
+  started_at timestamptz null,
+  finished_at timestamptz null,
+  created_at timestamptz not null default now(),
+
+  constraint ai_generation_jobs_job_type_allowed check (
+    job_type in ('create', 'update', 'validate')
+  ),
+  constraint ai_generation_jobs_status_allowed check (
+    status in ('queued', 'running', 'succeeded', 'failed')
+  ),
+  constraint ai_generation_jobs_provider_allowed check (
+    provider in ('openai', 'anthropic', 'mixed')
+  ),
+  constraint ai_generation_jobs_prompt_version_not_blank check (
+    length(trim(prompt_version)) > 0
+  ),
+  constraint ai_generation_jobs_idempotency_key_not_blank check (
+    length(trim(idempotency_key)) > 0
+  ),
+  constraint ai_generation_jobs_input_tokens_non_negative check (
+    input_tokens is null
+    or input_tokens >= 0
+  ),
+  constraint ai_generation_jobs_output_tokens_non_negative check (
+    output_tokens is null
+    or output_tokens >= 0
+  )
+);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'blog_post_versions_ai_generation_job_id_fkey'
+      and conrelid = 'public.blog_post_versions'::regclass
+  ) then
+    alter table public.blog_post_versions
+      add constraint blog_post_versions_ai_generation_job_id_fkey
+      foreign key (ai_generation_job_id)
+      references public.ai_generation_jobs(id)
+      on delete set null;
+  end if;
+end $$;
+
 create index if not exists sites_status_idx
   on public.sites (status);
 
@@ -671,6 +1798,108 @@ create index if not exists review_helpfulness_votes_review_id_idx
 
 create index if not exists review_helpfulness_votes_user_id_idx
   on public.review_helpfulness_votes (user_id);
+
+create index if not exists blog_posts_status_idx
+  on public.blog_posts (status);
+
+create index if not exists blog_posts_legal_review_status_idx
+  on public.blog_posts (legal_review_status);
+
+create index if not exists blog_posts_site_id_idx
+  on public.blog_posts (site_id);
+
+create index if not exists blog_posts_category_idx
+  on public.blog_posts (category);
+
+create index if not exists blog_posts_primary_category_idx
+  on public.blog_posts (primary_category);
+
+create index if not exists blog_posts_primary_category_id_idx
+  on public.blog_posts (primary_category_id);
+
+create index if not exists blog_posts_secondary_categories_idx
+  on public.blog_posts using gin (secondary_categories);
+
+create index if not exists blog_posts_tags_idx
+  on public.blog_posts using gin (tags);
+
+create index if not exists blog_categories_slug_idx
+  on public.blog_categories (slug);
+
+create index if not exists blog_categories_active_sort_idx
+  on public.blog_categories (is_active, sort_order, name);
+
+create index if not exists blog_post_categories_post_id_idx
+  on public.blog_post_categories (post_id);
+
+create index if not exists blog_post_categories_category_id_idx
+  on public.blog_post_categories (category_id);
+
+create unique index if not exists blog_post_categories_one_primary_idx
+  on public.blog_post_categories (post_id)
+  where is_primary = true;
+
+create index if not exists blog_tags_slug_idx
+  on public.blog_tags (slug);
+
+create index if not exists blog_post_tags_post_id_idx
+  on public.blog_post_tags (post_id);
+
+create index if not exists blog_post_tags_tag_id_idx
+  on public.blog_post_tags (tag_id);
+
+create index if not exists blog_posts_published_at_idx
+  on public.blog_posts (published_at desc);
+
+create index if not exists blog_posts_updated_at_idx
+  on public.blog_posts (updated_at desc);
+
+create index if not exists blog_posts_source_site_id_idx
+  on public.blog_posts (source_site_id);
+
+create index if not exists blog_posts_source_snapshot_id_idx
+  on public.blog_posts (source_snapshot_id);
+
+create unique index if not exists blog_posts_source_site_unique_idx
+  on public.blog_posts (source_site_id)
+  where source_site_id is not null;
+
+create index if not exists blog_source_snapshots_site_id_idx
+  on public.blog_source_snapshots (site_id);
+
+create index if not exists blog_source_snapshots_snapshot_at_idx
+  on public.blog_source_snapshots (snapshot_at desc);
+
+create index if not exists blog_post_versions_post_id_idx
+  on public.blog_post_versions (post_id);
+
+create index if not exists blog_post_versions_source_snapshot_id_idx
+  on public.blog_post_versions (source_snapshot_id);
+
+create index if not exists blog_post_versions_ai_generation_job_id_idx
+  on public.blog_post_versions (ai_generation_job_id);
+
+create index if not exists blog_post_versions_created_at_idx
+  on public.blog_post_versions (created_at desc);
+
+create index if not exists ai_generation_jobs_site_id_idx
+  on public.ai_generation_jobs (site_id);
+
+create index if not exists ai_generation_jobs_post_id_idx
+  on public.ai_generation_jobs (post_id);
+
+create index if not exists ai_generation_jobs_status_idx
+  on public.ai_generation_jobs (status);
+
+create unique index if not exists ai_generation_jobs_active_site_unique_idx
+  on public.ai_generation_jobs (site_id)
+  where status in ('queued', 'running');
+
+create index if not exists ai_generation_jobs_source_snapshot_id_idx
+  on public.ai_generation_jobs (source_snapshot_id);
+
+create index if not exists ai_generation_jobs_created_at_idx
+  on public.ai_generation_jobs (created_at desc);
 
 do $$
 begin
@@ -866,6 +2095,266 @@ create trigger set_review_helpfulness_votes_updated_at
 before update on public.review_helpfulness_votes
 for each row
 execute function public.set_updated_at();
+
+drop trigger if exists set_blog_posts_updated_at on public.blog_posts;
+create trigger set_blog_posts_updated_at
+before update on public.blog_posts
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_blog_categories_updated_at
+  on public.blog_categories;
+create trigger set_blog_categories_updated_at
+before update on public.blog_categories
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_blog_tags_updated_at on public.blog_tags;
+create trigger set_blog_tags_updated_at
+before update on public.blog_tags
+for each row
+execute function public.set_updated_at();
+
+create or replace function public.set_blog_post_primary_category_id()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  selected_category public.blog_categories%rowtype;
+begin
+  if new.primary_category_id is not null then
+    select *
+    into selected_category
+    from public.blog_categories
+    where blog_categories.id = new.primary_category_id
+    limit 1;
+
+    if found then
+      new.primary_category := selected_category.slug;
+      new.category := selected_category.name;
+      return new;
+    end if;
+  end if;
+
+  select *
+  into selected_category
+  from public.blog_categories
+  where blog_categories.slug = coalesce(nullif(new.primary_category, ''), 'site-reports')
+  limit 1;
+
+  if found then
+    new.primary_category_id := selected_category.id;
+    new.primary_category := selected_category.slug;
+    new.category := selected_category.name;
+  else
+    new.primary_category_id := null;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists set_blog_post_primary_category_id_on_change
+  on public.blog_posts;
+create trigger set_blog_post_primary_category_id_on_change
+before insert or update of
+  primary_category,
+  primary_category_id
+on public.blog_posts
+for each row
+execute function public.set_blog_post_primary_category_id();
+
+create or replace function public.sync_blog_post_taxonomy()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  primary_category_slug text;
+  tag_name text;
+  tag_slug text;
+  synced_tag_id uuid;
+begin
+  delete from public.blog_post_categories
+  where post_id = new.id;
+
+  delete from public.blog_post_tags
+  where post_id = new.id;
+
+  primary_category_slug := coalesce(nullif(new.primary_category, ''), 'site-reports');
+
+  insert into public.blog_post_categories (
+    post_id,
+    category_id,
+    is_primary
+  )
+  select
+    new.id,
+    blog_categories.id,
+    true
+  from public.blog_categories
+  where blog_categories.slug = primary_category_slug
+  on conflict (post_id, category_id) do update
+  set is_primary = true;
+
+  insert into public.blog_post_categories (
+    post_id,
+    category_id,
+    is_primary
+  )
+  select distinct
+    new.id,
+    blog_categories.id,
+    false
+  from unnest(new.secondary_categories) as secondary_category_slug
+  join public.blog_categories
+    on blog_categories.slug = secondary_category_slug
+  where secondary_category_slug <> primary_category_slug
+  on conflict (post_id, category_id) do nothing;
+
+  for tag_name in
+    select distinct trim(tag_value)
+    from unnest(new.tags) as tag_value
+    where length(trim(tag_value)) > 0
+  loop
+    tag_slug := public.normalize_blog_taxonomy_slug(tag_name);
+
+    if tag_slug = '' then
+      continue;
+    end if;
+
+    if exists (
+      select 1
+      from public.blog_categories
+      where blog_categories.slug = tag_slug
+        or blog_categories.name = tag_name
+    ) then
+      continue;
+    end if;
+
+    insert into public.blog_tags (
+      name,
+      slug
+    )
+    values (
+      tag_name,
+      tag_slug
+    )
+    on conflict (slug) do update
+    set
+      name = excluded.name,
+      updated_at = now()
+    returning id into synced_tag_id;
+
+    insert into public.blog_post_tags (
+      post_id,
+      tag_id
+    )
+    values (
+      new.id,
+      synced_tag_id
+    )
+    on conflict (post_id, tag_id) do nothing;
+  end loop;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists sync_blog_post_taxonomy_on_change
+  on public.blog_posts;
+create trigger sync_blog_post_taxonomy_on_change
+after insert or update of
+  primary_category,
+  primary_category_id,
+  secondary_categories,
+  tags
+on public.blog_posts
+for each row
+execute function public.sync_blog_post_taxonomy();
+
+create or replace function public.enforce_blog_post_publish_requirements()
+returns trigger
+language plpgsql
+as $$
+declare
+  prohibited_phrase_check jsonb;
+begin
+  if new.status <> 'published' then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    raise exception 'blog_posts_publish_requires_draft_status';
+  end if;
+
+  if old.status = 'published' then
+    return new;
+  end if;
+
+  if old.status <> 'draft' then
+    raise exception 'blog_posts_publish_requires_draft_status';
+  end if;
+
+  if new.legal_review_status <> 'approved' then
+    raise exception 'blog_posts_publish_requires_approved_legal_review';
+  end if;
+
+  if length(trim(coalesce(new.title, ''))) = 0 then
+    raise exception 'blog_posts_publish_requires_title';
+  end if;
+
+  if length(trim(coalesce(new.meta_description, ''))) = 0 then
+    raise exception 'blog_posts_publish_requires_meta_description';
+  end if;
+
+  if length(trim(coalesce(new.body_md, ''))) = 0 then
+    raise exception 'blog_posts_publish_requires_body_md';
+  end if;
+
+  if new.source_snapshot_id is null then
+    raise exception 'blog_posts_publish_requires_source_snapshot_id';
+  end if;
+
+  prohibited_phrase_check := case
+    when jsonb_typeof(new.source_snapshot -> 'prohibitedPhraseCheck') = 'object'
+      then new.source_snapshot -> 'prohibitedPhraseCheck'
+    when jsonb_typeof(new.source_snapshot #> '{finalReview,prohibited_phrase_check}') = 'object'
+      then new.source_snapshot #> '{finalReview,prohibited_phrase_check}'
+    else null
+  end;
+
+  if prohibited_phrase_check is null
+    or prohibited_phrase_check ->> 'contains_recommendation' is distinct from 'false'
+    or prohibited_phrase_check ->> 'contains_signup_cta' is distinct from 'false'
+    or prohibited_phrase_check ->> 'contains_bonus_or_event_promo' is distinct from 'false'
+    or prohibited_phrase_check ->> 'contains_absolute_safety_claim' is distinct from 'false'
+    or prohibited_phrase_check ->> 'contains_uncited_claims' is distinct from 'false'
+    or prohibited_phrase_check ->> 'contains_access_facilitation' is distinct from 'false' then
+    raise exception 'blog_posts_publish_requires_clean_prohibited_phrase_check';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_blog_post_publish_requirements_on_change
+  on public.blog_posts;
+create trigger enforce_blog_post_publish_requirements_on_change
+before insert or update of
+  status,
+  legal_review_status,
+  title,
+  meta_description,
+  body_md,
+  source_snapshot_id,
+  source_snapshot
+on public.blog_posts
+for each row
+execute function public.enforce_blog_post_publish_requirements();
 
 drop trigger if exists set_public_profile_nicknames_updated_at
   on public.public_profile_nicknames;
@@ -1253,6 +2742,14 @@ alter table public.domain_whois_cache enable row level security;
 alter table public.site_dns_records enable row level security;
 alter table public.site_domain_submissions enable row level security;
 alter table public.review_helpfulness_votes enable row level security;
+alter table public.blog_posts enable row level security;
+alter table public.blog_categories enable row level security;
+alter table public.blog_post_categories enable row level security;
+alter table public.blog_tags enable row level security;
+alter table public.blog_post_tags enable row level security;
+alter table public.blog_source_snapshots enable row level security;
+alter table public.blog_post_versions enable row level security;
+alter table public.ai_generation_jobs enable row level security;
 alter table public.public_profile_nicknames enable row level security;
 alter table public.site_telegram_subscription_counts enable row level security;
 
@@ -1355,6 +2852,70 @@ using (
     from public.sites
     where sites.id = site_telegram_subscription_counts.site_id
       and sites.status = 'approved'
+  )
+);
+
+drop policy if exists "Public can read published blog posts"
+  on public.blog_posts;
+create policy "Public can read published blog posts"
+on public.blog_posts
+for select
+using (status = 'published');
+
+drop policy if exists "Public can read active blog categories"
+  on public.blog_categories;
+create policy "Public can read active blog categories"
+on public.blog_categories
+for select
+using (is_active = true);
+
+drop policy if exists "Public can read published blog post categories"
+  on public.blog_post_categories;
+create policy "Public can read published blog post categories"
+on public.blog_post_categories
+for select
+using (
+  exists (
+    select 1
+    from public.blog_posts
+    where blog_posts.id = blog_post_categories.post_id
+      and blog_posts.status = 'published'
+  )
+  and exists (
+    select 1
+    from public.blog_categories
+    where blog_categories.id = blog_post_categories.category_id
+      and blog_categories.is_active = true
+  )
+);
+
+drop policy if exists "Public can read published blog tags"
+  on public.blog_tags;
+create policy "Public can read published blog tags"
+on public.blog_tags
+for select
+using (
+  exists (
+    select 1
+    from public.blog_post_tags
+    join public.blog_posts
+      on blog_posts.id = blog_post_tags.post_id
+    where blog_post_tags.tag_id = blog_tags.id
+      and blog_posts.status = 'published'
+  )
+);
+
+drop policy if exists "Public can read published blog post tags"
+  on public.blog_post_tags;
+create policy "Public can read published blog post tags"
+on public.blog_post_tags
+for select
+using (
+  exists (
+    select 1
+    from public.blog_posts
+    where blog_posts.id = blog_post_tags.post_id
+      and blog_posts.status = 'published'
   )
 );
 
@@ -1687,6 +3248,70 @@ drop policy if exists "Admins can manage review helpfulness votes"
   on public.review_helpfulness_votes;
 create policy "Admins can manage review helpfulness votes"
 on public.review_helpfulness_votes
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage blog posts"
+  on public.blog_posts;
+create policy "Admins can manage blog posts"
+on public.blog_posts
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage blog categories"
+  on public.blog_categories;
+create policy "Admins can manage blog categories"
+on public.blog_categories
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage blog post categories"
+  on public.blog_post_categories;
+create policy "Admins can manage blog post categories"
+on public.blog_post_categories
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage blog tags"
+  on public.blog_tags;
+create policy "Admins can manage blog tags"
+on public.blog_tags
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage blog post tags"
+  on public.blog_post_tags;
+create policy "Admins can manage blog post tags"
+on public.blog_post_tags
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage blog source snapshots"
+  on public.blog_source_snapshots;
+create policy "Admins can manage blog source snapshots"
+on public.blog_source_snapshots
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage blog post versions"
+  on public.blog_post_versions;
+create policy "Admins can manage blog post versions"
+on public.blog_post_versions
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can manage AI generation jobs"
+  on public.ai_generation_jobs;
+create policy "Admins can manage AI generation jobs"
+on public.ai_generation_jobs
 for all
 using (public.is_admin())
 with check (public.is_admin());
