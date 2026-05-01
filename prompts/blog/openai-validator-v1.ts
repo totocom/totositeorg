@@ -83,6 +83,9 @@ ${noticeLines.join("\n")}
 - title, meta_title, H1에는 다음 표현을 사용하지 않는다: 추천, 안전놀이터, 먹튀 없음, 검증 완료, 가입, 보너스, 이벤트, 우회주소, 최신 접속주소.
 - 서버가 이 JSON을 CMS 저장용 blog_posts 데이터로 변환한다.
 - 추천, 홍보, 가입 유도, 안전 보장 표현을 제거한다.
+- crawl_snapshot 또는 manual_html_snapshot은 원본 페이지의 공개 HTML에서 조회 시점 기준 관측된 정보입니다. 이 정보를 사이트 이용 권유, 가입 유도, 보너스/이벤트 소개, 최신 주소 안내로 사용하지 마세요. 관측 정보는 사이트 식별과 화면 기록 확인 목적의 설명에만 사용하세요.
+- crawl_snapshot의 원본 page_title, h1, observed_* 문구를 body_md에 그대로 복사하지 않았는지 확인한다.
+- crawl_snapshot.promotional_flags_json과 excluded_terms_json의 가입, 입금, 충전, 환전, 보너스, 이벤트, 추천, 바로가기, 최신 주소, 우회 주소 표현이 body_md, FAQ, checklist에서 강조되면 제거한다.
 - 피해 제보 부재는 본문 설명에서 "조회 시점 기준 승인된 피해 제보는 확인되지 않습니다"로 표현한다.
 - WHOIS 비공개, CDN, 동일 IP 관측은 기술적 관측으로만 설명한다.
 - DNS/WHOIS 조회 실패가 있으면 "일부 DNS 또는 WHOIS 정보는 조회 시점에 확인되지 않았습니다." 문장을 유지한다.
@@ -95,7 +98,9 @@ ${noticeLines.join("\n")}
 - 최근 발행 글 또는 update_context가 있으면 제목 패턴, H2 흐름, 첫 문단, FAQ 질문이 반복되는지 점검하고 duplicate_risk_check에 반영한다.
 - duplicate_risk_check.unique_fact_score와 최상위 unique_fact_score는 같은 숫자로 둔다.
 - duplicate_risk_check.estimated_duplicate_risk는 고유 데이터가 5개 이상이고 반복 신호가 없으면 low, 일부 반복 또는 고유 데이터 부족이면 medium, 제목/H2/첫 문단/FAQ 반복이 강하거나 고유 데이터가 3개 미만이면 high로 둔다.
-- internal_links는 사이트 상세, 먹튀 제보, 후기, 도메인/DNS 관련 내부 링크를 3개 이상 제안한다. 외부 토토사이트 URL은 넣지 않는다.
+- internal_links는 사이트 상세, 주소·도메인, DNS, 먹튀 제보, 후기 관련 내부 링크를 3개 이상 제안한다. 외부 토토사이트 URL은 넣지 않는다.
+- 같은 내부 URL 또는 같은 사이트 상세 페이지로 연결하더라도 동일한 label을 반복하지 않는다.
+- internal_links label은 placement에 맞게 다르게 작성한다. 예: summary는 "{사이트명} 상세 정보", address_domain_section은 "{사이트명} 주소·도메인 기록", dns_section은 "{사이트명} DNS 조회 결과", reports_section은 "{사이트명} 먹튀 제보 현황", reviews_section은 "{사이트명} 후기 데이터".
 - external_references에는 토토사이트, 가입 페이지, 이벤트 페이지, 충전 페이지, 우회 주소를 넣지 마라. 참고 자료는 ICANN, Cloudflare DNS 설명, 한국도박문제예방치유원 1336 안내 등 신뢰 보강용 자료만 사용하라.
 - Claude draft_markdown, faq, checklist, editor_notes를 모두 검토해 CMS JSON으로 정리한다.
 - 제목, 메타 제목, 메타 설명, FAQ, checklist를 정리한다.
@@ -145,7 +150,7 @@ ${updateContext ? '- 이 출력은 기존 글의 업데이트 초안이다. slug
   "internal_links": [
     {
       "href": "",
-      "label": "",
+      "label": "{사이트명} 상세 정보",
       "placement": "summary",
       "purpose": "source_detail"
     }

@@ -1,20 +1,35 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildBlogImageMetadata,
+  featuredImageMissingWarning,
+  getBlogScreenshotAlt,
+  imageAltForbiddenFailure,
+  imageAltKeywordListWarning,
+  reviewBlogImageSeo,
+  selectBlogVisualImages,
+} from "./blog-visuals";
+import {
   buildBlogKeywords,
   calculateBodySimilarity,
   calculateNormalizedBodySimilarity,
   calculateAverageWordsPerSentence,
   calculateUniqueFactScore,
   detectForbiddenPublicBodyTerms,
+  detectPromotionalBodyEmphasis,
   detectKeywordStuffing,
   detectWeakSeoTermsInImportantFields,
+  getPlacementInternalAnchorText,
   normalizeBodyForSimilarity,
   normalizeH2Pattern,
+  normalizeInternalLinkAnchorTexts,
   normalizeTitlePattern,
+  reviewRenderedBlogInternalAnchors,
   reviewBlogDuplicateRisk,
   validateBlogSeoDraft,
 } from "./blog-seo-review";
+
+process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
 
 const validBody = [
   "# 민속촌 토토사이트 검증 리포트",
@@ -130,6 +145,17 @@ test("detectForbiddenPublicBodyTerms finds internal AI fields", () => {
   assert.deepEqual(
     matches.map((match) => match.term),
     ["검색 의도", "claim_map", "Source Snapshot"],
+  );
+});
+
+test("detectPromotionalBodyEmphasis finds emphasized observation promo terms", () => {
+  const matches = detectPromotionalBodyEmphasis(
+    "본문에서 가입하기와 첫충 이벤트 보너스를 추천합니다. 최신 주소 바로가기 안내도 포함했습니다.",
+  );
+
+  assert.deepEqual(
+    Array.from(new Set(matches.map((match) => match.term))),
+    ["가입", "보너스", "이벤트", "추천", "바로가기", "최신 주소", "첫충"],
   );
 });
 
@@ -294,6 +320,252 @@ test("validateBlogSeoDraft allows the same href with different internal anchor t
     false,
   );
   assert.deepEqual(result.keywordChecks.duplicateInternalAnchorTexts, []);
+});
+
+test("validateBlogSeoDraft warns on rendered body internal anchor text repeats", () => {
+  const result = validateBlogSeoDraft({
+    ...validDraft,
+    bodyMd: `${validBody}\n\n[민속촌 상세 정보](/sites/minsokchon)`,
+    internalLinks: [
+      { href: "/sites/minsokchon#dns", label: "민속촌 상세 정보" },
+      { href: "/sites/minsokchon#reports", label: "민속촌 먹튀 제보 현황" },
+      { href: "/sites/minsokchon#reviews", label: "민속촌 후기 데이터" },
+    ],
+  });
+
+  assert.equal(result.seoReviewStatus, "warning");
+  assert.ok(
+    result.adminWarnings.some((warning) =>
+      warning.includes("본문 내부 링크에서 동일한 내부 링크 앵커 텍스트"),
+    ),
+  );
+  assert.deepEqual(result.keywordChecks.duplicateInternalAnchorTexts, [
+    { anchor: "민속촌 상세 정보", count: 2 },
+  ]);
+});
+
+test("reviewRenderedBlogInternalAnchors checks rendered page anchor sources", () => {
+  const navLinks = [
+    { href: "/", label: "홈" },
+    { href: "/sites", label: "사이트 목록" },
+    { href: "/blog", label: "블로그" },
+  ];
+  const review = reviewRenderedBlogInternalAnchors({
+    headerNavLinkSets: [navLinks, navLinks],
+    breadcrumbLinks: [
+      { href: "/", label: "홈" },
+      { href: "/blog", label: "블로그" },
+      { href: "/blog/category/site-reports", label: "토토사이트 정보 리포트" },
+    ],
+    bodyMd: "[민속촌 상세 정보](/sites/minsokchon)",
+    bodyInternalLinks: [
+      { href: "/sites/minsokchon#dns", label: "민속촌 상세 정보" },
+    ],
+    relatedPostLinks: [
+      { href: "/blog/related-post", label: "민속촌 후기 데이터" },
+    ],
+    footerLinks: [
+      { href: "/blog", label: "블로그" },
+      { href: "/telegram-guide", label: "텔레그램 기능 안내" },
+    ],
+  });
+
+  assert.deepEqual(
+    Array.from(new Set(review.renderedAnchors.map((anchor) => anchor.source))),
+    [
+      "header_nav",
+      "breadcrumb",
+      "body_internal_links",
+      "related_posts",
+      "footer_links",
+    ],
+  );
+  assert.deepEqual(review.duplicateBodyAnchorTexts, [
+    { anchor: "민속촌 상세 정보", count: 2 },
+  ]);
+  assert.equal(review.duplicateHeaderNavSets.length, 1);
+  assert.equal(review.duplicateHeaderNavSets[0]?.count, 2);
+});
+
+test("selectBlogVisualImages uses the first screenshot as featured image", () => {
+  const selection = selectBlogVisualImages({
+    siteName: "민속촌",
+    screenshots: [
+      "https://example.supabase.co/storage/v1/object/public/site-screenshots/captures/main.webp",
+      "https://example.supabase.co/storage/v1/object/public/site-screenshots/captures/thumb.webp",
+    ],
+    faviconUrl:
+      "https://example.supabase.co/storage/v1/object/public/site-screenshots/favicons/favicon.webp",
+    snapshotAt: "2026-05-01T12:00:00.000Z",
+  });
+
+  assert.equal(
+    selection.featuredImageUrl,
+    "https://example.supabase.co/storage/v1/object/public/site-screenshots/captures/main.webp",
+  );
+  assert.equal(
+    selection.siteLogoUrl,
+    "https://example.supabase.co/storage/v1/object/public/site-screenshots/favicons/favicon.webp",
+  );
+});
+
+test("selectBlogVisualImages leaves featured image empty when only favicon exists", () => {
+  const selection = selectBlogVisualImages({
+    siteName: "민속촌",
+    screenshots: [],
+    faviconUrl:
+      "https://example.supabase.co/storage/v1/object/public/site-screenshots/favicons/favicon.webp",
+  });
+
+  assert.equal(selection.featuredImageUrl, null);
+  assert.equal(
+    selection.siteLogoUrl,
+    "https://example.supabase.co/storage/v1/object/public/site-screenshots/favicons/favicon.webp",
+  );
+});
+
+test("getBlogScreenshotAlt generates the expected screenshot alt", () => {
+  assert.equal(
+    getBlogScreenshotAlt({ siteName: "민속촌" }),
+    "민속촌 토토사이트 메인 화면 스크린샷",
+  );
+});
+
+test("reviewBlogImageSeo warns when image alt looks like a keyword list", () => {
+  const review = reviewBlogImageSeo({
+    siteName: "민속촌",
+    featuredImageUrl:
+      "https://example.supabase.co/storage/v1/object/public/site-screenshots/captures/main.webp",
+    featuredImageAlt:
+      "민속촌 토토사이트 민속촌 주소 민속촌 먹튀 민속촌 도메인 민속촌 후기",
+  });
+
+  assert.equal(review.hasKeywordListAlt, true);
+  assert.ok(review.warnings.includes(imageAltKeywordListWarning));
+});
+
+test("reviewBlogImageSeo warns when screenshot exists without featured image", () => {
+  const review = reviewBlogImageSeo({
+    siteName: "민속촌",
+    screenshots: [
+      "https://example.supabase.co/storage/v1/object/public/site-screenshots/captures/main.webp",
+    ],
+    featuredImageUrl: "",
+  });
+
+  assert.ok(review.warnings.includes(featuredImageMissingWarning));
+});
+
+test("reviewBlogImageSeo fails forbidden promotional image alt terms", () => {
+  const review = reviewBlogImageSeo({
+    siteName: "민속촌",
+    featuredImageUrl:
+      "https://example.supabase.co/storage/v1/object/public/site-screenshots/captures/main.webp",
+    featuredImageAlt: "민속촌 추천 안전 바로가기",
+  });
+
+  assert.equal(review.hasForbiddenAlt, true);
+  assert.ok(review.failures.includes(imageAltForbiddenFailure));
+});
+
+test("buildBlogImageMetadata maps featured image to JSON-LD, OG, and Twitter image", () => {
+  const imageUrl =
+    "https://example.supabase.co/storage/v1/object/public/site-screenshots/captures/main.webp";
+  const metadata = buildBlogImageMetadata({
+    featuredImageUrl: imageUrl,
+    featuredImageAlt: "민속촌 토토사이트 메인 화면 스크린샷",
+  });
+
+  assert.deepEqual(metadata.jsonLdImage, [imageUrl]);
+  assert.deepEqual(metadata.openGraphImages, [
+    {
+      url: imageUrl,
+      alt: "민속촌 토토사이트 메인 화면 스크린샷",
+    },
+  ]);
+  assert.deepEqual(metadata.twitterImages, [imageUrl]);
+});
+
+test("getPlacementInternalAnchorText returns section-specific site detail anchors", () => {
+  assert.equal(
+    getPlacementInternalAnchorText({
+      siteName: "민속촌",
+      placement: "summary",
+    }),
+    "민속촌 상세 정보",
+  );
+  assert.equal(
+    getPlacementInternalAnchorText({
+      siteName: "민속촌",
+      placement: "address_domain_section",
+    }),
+    "민속촌 주소·도메인 기록",
+  );
+  assert.equal(
+    getPlacementInternalAnchorText({
+      siteName: "민속촌",
+      placement: "dns_section",
+    }),
+    "민속촌 DNS 조회 결과",
+  );
+  assert.equal(
+    getPlacementInternalAnchorText({
+      siteName: "민속촌",
+      placement: "reports_section",
+    }),
+    "민속촌 먹튀 제보 현황",
+  );
+  assert.equal(
+    getPlacementInternalAnchorText({
+      siteName: "민속촌",
+      placement: "reviews_section",
+    }),
+    "민속촌 후기 데이터",
+  );
+});
+
+test("normalizeInternalLinkAnchorTexts rewrites repeated same-site anchors by placement", () => {
+  const links = normalizeInternalLinkAnchorTexts({
+    siteName: "민속촌",
+    internalLinks: [
+      {
+        href: "/sites/minsokchon",
+        label: "민속촌 상세 정보",
+        placement: "summary",
+      },
+      {
+        href: "/sites/minsokchon#dns",
+        label: "민속촌 상세 정보",
+        placement: "address_domain_section",
+      },
+      {
+        href: "/sites/minsokchon#dns",
+        label: "민속촌 상세 정보",
+        placement: "dns_section",
+      },
+      {
+        href: "/sites/minsokchon#reports",
+        label: "민속촌 상세 정보",
+        placement: "reports_section",
+      },
+      {
+        href: "/sites/minsokchon#reviews",
+        label: "민속촌 상세 정보",
+        placement: "reviews_section",
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    links.map((link) => link.label),
+    [
+      "민속촌 상세 정보",
+      "민속촌 주소·도메인 기록",
+      "민속촌 DNS 조회 결과",
+      "민속촌 먹튀 제보 현황",
+      "민속촌 후기 데이터",
+    ],
+  );
 });
 
 test("validateBlogSeoDraft warns when external reference links are empty", () => {
@@ -506,6 +778,21 @@ test("validateBlogSeoDraft fails internal fields, keyword lists, and very low fa
   assert.deepEqual(result.keywordChecks.forbiddenPublicBodyTerms.map((match) => match.term), [
     "검색 의도",
   ]);
+});
+
+test("validateBlogSeoDraft fails when promotional observation flags are emphasized in body", () => {
+  const result = validateBlogSeoDraft({
+    ...validDraft,
+    bodyMd: `${validBody}\n\n가입하기와 첫충 이벤트 보너스를 추천하는 문장은 공개 본문에 남기면 안 됩니다.`,
+  });
+
+  assert.equal(result.seoReviewStatus, "failed");
+  assert.ok(
+    result.adminWarnings.some((warning) =>
+      warning.includes("홍보성 문구가 강조"),
+    ),
+  );
+  assert.ok(result.keywordChecks.promotionalBodyEmphasis.length > 0);
 });
 
 test("reviewBlogDuplicateRisk fails drafts with 80 percent body similarity", () => {

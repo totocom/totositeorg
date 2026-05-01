@@ -1,11 +1,7 @@
 import Link from "next/link";
 import { AdminFooterButton } from "@/app/components/admin-footer-button";
 import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
-
-const footerLinks = [
-  { href: "/blog", label: "블로그" },
-  { href: "/telegram-guide", label: "텔레그램 기능 안내" },
-];
+import { footerNavigationLinks } from "@/app/data/site-navigation";
 
 export function Footer() {
   return (
@@ -22,7 +18,7 @@ export function Footer() {
             </p>
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-2">
-            {footerLinks.map((link) => (
+            {footerNavigationLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}

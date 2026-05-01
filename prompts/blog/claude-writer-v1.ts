@@ -53,6 +53,9 @@ export function buildClaudeWriterPrompt({
 - Cloudflare 사용, WHOIS 비공개, 동일 IP 관측만으로 위험하다고 단정하지 않습니다.
 - 피해 제보가 0건인 경우에도 "먹튀 없음"이라고 쓰지 말고, "조회 시점 기준 승인된 피해 제보는 확인되지 않음"이라고 표현합니다.
 - writing_brief_for_claude와 section_plan을 우선 따르되, Source Snapshot에 없는 사실은 추가하지 마세요.
+- crawl_snapshot 또는 manual_html_snapshot은 원본 페이지의 공개 HTML에서 조회 시점 기준 관측된 정보입니다. 이 정보를 사이트 이용 권유, 가입 유도, 보너스/이벤트 소개, 최신 주소 안내로 사용하지 마세요. 관측 정보는 사이트 식별과 화면 기록 확인 목적의 설명에만 사용하세요.
+- crawl_snapshot의 page_title, h1, observed_* 값은 보조 자료로만 사용하고 원본 사이트 문구를 그대로 복사하지 마세요.
+- crawl_snapshot.promotional_flags_json과 excluded_terms_json에 들어 있는 가입, 입금, 충전, 환전, 보너스, 이벤트, 추천, 바로가기, 최신 주소, 우회 주소 관련 문구는 공개 본문에서 강조하지 마세요.
 - 실제 데이터가 부족한 섹션은 억지로 채우지 말고 "확인되지 않음"으로 처리합니다.
 - 사이트마다 동일한 일반 템플릿 문장을 반복하지 말고, Source Snapshot의 site_specific_verification 값을 문단과 표기 안에 구체적으로 반영합니다.
 - 본문에는 대표 도메인, 추가 도메인 수, DNS 조회 결과, WHOIS 등록일/갱신일/만료일, 승인 리뷰 수, 승인 피해 제보 수를 반드시 포함합니다.
@@ -77,6 +80,7 @@ export function buildClaudeWriterPrompt({
 - draft_markdown 하단의 "## 작성 기준 및 고지" 섹션에는 다음 고지 문구를 그대로 포함합니다:
 ${noticeLines.join("\n")}
 - 외부 토토사이트 URL은 클릭 가능한 Markdown 링크나 HTML 앵커로 만들지 않습니다. 도메인은 필요한 경우 일반 텍스트로만 표기합니다.
+- 내부 Markdown 링크를 사용할 경우 같은 내부 URL 또는 같은 사이트 상세 페이지로 동일한 anchor text를 반복하지 않습니다. placement에 따라 "{사이트명} 상세 정보", "{사이트명} 주소·도메인 기록", "{사이트명} DNS 조회 결과", "{사이트명} 먹튀 제보 현황", "{사이트명} 후기 데이터"처럼 문맥별 anchor를 다르게 씁니다.
 - 가입 페이지, 이벤트 페이지, 충전 페이지, 우회 주소로 연결되는 URL은 쓰지 않습니다.
 - 불가피하게 링크를 언급해야 하는 경우에도 본문에는 클릭 가능한 링크를 만들지 말고, 관리자 검토 메모에만 rel="nofollow ugc noopener noreferrer" 필요성을 적습니다.
 ${hasLookupFailures ? '- 본문에 "일부 DNS 또는 WHOIS 정보는 조회 시점에 확인되지 않았습니다." 문장을 자연스럽게 포함하세요.' : ""}

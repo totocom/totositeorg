@@ -3,12 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AdminSiteObservationPanel } from "@/app/components/admin-site-observation-panel";
 import { useAuth } from "@/app/components/auth-provider";
 import { ScreenshotUploadControl } from "@/app/components/screenshot-upload-control";
+import {
+  automaticCrawlManualHtmlFallbackText,
+  automaticCrawlSupportGuideText,
+} from "@/app/data/automatic-crawl-support";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
+import type { SiteCrawlSnapshotSiteColumns } from "@/app/data/site-crawl-snapshots";
+import { getAllowedStoredImageUrl } from "@/app/data/storage-image-url";
 import { supabase } from "@/lib/supabase/client";
 
-type SiteRow = {
+type SiteRow = SiteCrawlSnapshotSiteColumns & {
   id: string;
   slug: string;
   name: string;
@@ -19,6 +26,7 @@ type SiteRow = {
   screenshot_url: string | null;
   screenshot_thumb_url: string | null;
   favicon_url: string | null;
+  logo_url: string | null;
   status: "pending" | "approved" | "rejected";
   description: string;
 };
@@ -57,6 +65,9 @@ const statusLabels = {
   rejected: "거절됨",
 };
 
+const automaticMetadataFailureFallback = `도메인 정보를 가져오지 못했습니다. ${automaticCrawlManualHtmlFallbackText} ${automaticCrawlSupportGuideText}`;
+const automaticCaptureFailureFallback = `페이지 캡처 이미지를 생성하지 못했습니다. ${automaticCrawlManualHtmlFallbackText} ${automaticCrawlSupportGuideText}`;
+
 type SiteMetadata = {
   title: string;
   description: string;
@@ -65,6 +76,9 @@ type SiteMetadata = {
   faviconUrl: string;
   finalUrl: string;
   statusCode: number;
+  challenge_detected?: boolean;
+  guidance?: string;
+  fallback_available?: "manual_html";
 };
 
 type WhoisInfo = {
@@ -177,7 +191,7 @@ function formatOptionalDate(value: string) {
 
 function DnsRecord({ label, values }: { label: string; values: string[] }) {
   return (
-    <div className="rounded-md bg-white p-3">
+    <div className="rounded-md bg-surface p-3">
       <dt className="text-xs font-semibold text-muted">{label}</dt>
       <dd className="mt-1 break-all text-foreground">
         {values.length > 0 ? values.join(", ") : "없음"}
@@ -208,44 +222,44 @@ function WhoisInfoCard({ whoisInfo }: { whoisInfo: WhoisLookupResult }) {
         </p>
       </div>
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">등록기관</dt>
           <dd className="mt-1 text-foreground">
             {whoisInfo.registrar || "확인 불가"}
           </dd>
         </div>
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">등록일</dt>
           <dd className="mt-1 text-foreground">
             {formatOptionalDate(whoisInfo.creationDate)}
           </dd>
         </div>
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">만료일</dt>
           <dd className="mt-1 text-foreground">
             {formatOptionalDate(whoisInfo.expirationDate)}
           </dd>
         </div>
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">최근 갱신일</dt>
           <dd className="mt-1 text-foreground">
             {formatOptionalDate(whoisInfo.updatedDate)}
           </dd>
         </div>
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">WHOIS 서버</dt>
           <dd className="mt-1 break-all text-foreground">
             {whoisInfo.whoisServer || "확인 불가"}
           </dd>
         </div>
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">DNSSEC</dt>
           <dd className="mt-1 text-foreground">
             {whoisInfo.dnssec || "확인 불가"}
           </dd>
         </div>
       </dl>
-      <div className="rounded-md bg-white p-3">
+      <div className="rounded-md bg-surface p-3">
         <p className="text-xs font-semibold text-muted">네임서버</p>
         <p className="mt-1 break-all text-foreground">
           {whoisInfo.nameServers.length > 0
@@ -292,7 +306,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
       const { data, error } = await supabase
         .from("sites")
-        .select("id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, status, description")
+        .select("id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, status, description, latest_crawl_snapshot_id, content_crawled_at, description_source_snapshot_id, description_generated_at")
         .eq("id", siteId)
         .single();
 
@@ -355,8 +369,19 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         "추가 도메인은 http:// 또는 https://로 시작하는 URL만 입력해주세요.";
     }
 
-    if (values.screenshotUrl.trim() && !isValidUrl(values.screenshotUrl.trim())) {
-      nextErrors.screenshotUrl = "캡처 이미지 URL 형식이 올바르지 않습니다.";
+    const storedScreenshotUrl = getAllowedStoredImageUrl(values.screenshotUrl);
+    const storedScreenshotThumbUrl = getAllowedStoredImageUrl(
+      values.screenshotThumbUrl,
+    );
+
+    if (values.screenshotUrl.trim() && !storedScreenshotUrl) {
+      nextErrors.screenshotUrl =
+        "캡처 이미지는 Supabase Storage 또는 자체 도메인 이미지 URL만 사용할 수 있습니다.";
+    }
+
+    if (values.screenshotThumbUrl.trim() && !storedScreenshotThumbUrl) {
+      nextErrors.screenshotUrl =
+        "캡처 썸네일은 Supabase Storage 또는 자체 도메인 이미지 URL만 사용할 수 있습니다.";
     }
 
     if (values.faviconUrl.trim() && !isValidUrl(values.faviconUrl.trim())) {
@@ -473,7 +498,11 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     setIsFetchingMetadata(false);
 
     if (!response.ok || !result) {
-      setErrorMessage(result?.error ?? "도메인 정보를 가져오지 못했습니다.");
+      setErrorMessage(
+        `${result?.challenge_detected ? "challenge_detected: true · " : ""}${
+          result?.error ?? automaticMetadataFailureFallback
+        }`,
+      );
       return;
     }
 
@@ -482,12 +511,8 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       ...current,
       nameKo: current.nameKo.trim() || result.siteName || result.title,
       faviconUrl: current.faviconUrl.trim() || result.faviconUrl || "",
-      description:
-        current.description.trim().length >= 30
-          ? current.description
-          : result.description || current.description,
     }));
-    setMessage("도메인 정보를 가져왔습니다.");
+    setMessage("도메인 정보를 가져왔습니다. 사이트명과 파비콘 후보를 자동으로 채웠습니다.");
   }
 
   async function fetchWhoisInfo() {
@@ -631,6 +656,9 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
           screenshotThumbUrl?: string;
           source?: "lightsail" | "mshots";
           error?: string;
+          challenge_detected?: boolean;
+          guidance?: string;
+          fallback_available?: "manual_html";
         }
       | null;
 
@@ -638,7 +666,9 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
     if (!response.ok || !result?.ok || !result.screenshotUrl) {
       setErrorMessage(
-        result?.error ?? "페이지 캡처 이미지를 생성하지 못했습니다.",
+        `${result?.challenge_detected ? "challenge_detected: true · " : ""}${
+          result?.error ?? automaticCaptureFailureFallback
+        }`,
       );
       return;
     }
@@ -690,6 +720,11 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       return;
     }
 
+    const storedScreenshotUrl = getAllowedStoredImageUrl(values.screenshotUrl);
+    const storedScreenshotThumbUrl = getAllowedStoredImageUrl(
+      values.screenshotThumbUrl,
+    );
+
     setIsSaving(true);
     setMessage("");
     setErrorMessage("");
@@ -716,8 +751,8 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         name_en: values.nameEn.trim() || null,
         url: values.url.trim(),
         domains: getDomainList(values),
-        screenshot_url: values.screenshotUrl.trim() || null,
-        screenshot_thumb_url: values.screenshotThumbUrl.trim() || null,
+        screenshot_url: storedScreenshotUrl,
+        screenshot_thumb_url: storedScreenshotThumbUrl,
         favicon_url: faviconUrl || null,
         ...(nextStatus ? { status: nextStatus } : {}),
         description: values.description.trim(),
@@ -810,6 +845,14 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       </div>
     );
   }
+
+  const metadataFaviconPreviewUrl = getAllowedStoredImageUrl(
+    metadata?.faviconUrl,
+  );
+  const faviconPreviewUrl = getAllowedStoredImageUrl(values.faviconUrl);
+  const screenshotPreviewUrl =
+    getAllowedStoredImageUrl(values.screenshotThumbUrl) ??
+    getAllowedStoredImageUrl(values.screenshotUrl);
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -923,13 +966,14 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
                   className={`h-9 rounded-md border px-3 text-xs font-semibold transition ${
                     whoisProvider === option.value
                       ? "border-accent bg-accent text-white"
-                      : "border-line bg-white text-foreground hover:bg-background"
+                      : "border-line bg-surface text-foreground hover:bg-background"
                   }`}
                 >
                   {option.label}
                 </button>
               ))}
             </div>
+            <p className="text-xs text-muted">{automaticCrawlSupportGuideText}</p>
             {errors.url ? (
               <span className="text-xs text-red-700">{errors.url}</span>
             ) : null}
@@ -938,10 +982,10 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
           {metadata ? (
             <div className="grid gap-3 rounded-md border border-line bg-background p-4 text-sm">
               <div className="flex items-start gap-3">
-                {metadata.imageUrl || metadata.faviconUrl ? (
+                {metadataFaviconPreviewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={metadata.imageUrl || metadata.faviconUrl}
+                    src={metadataFaviconPreviewUrl}
                     alt=""
                     className="h-16 w-16 rounded-md border border-line object-cover"
                   />
@@ -978,7 +1022,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
                 <h3 className="mt-1 text-base font-bold">{dnsInfo.domain}</h3>
               </div>
               {dnsInfo.errorMessage ? (
-                <p className="rounded-md bg-white p-3 text-muted">
+                <p className="rounded-md bg-surface p-3 text-muted">
                   {dnsInfo.errorMessage}
                 </p>
               ) : null}
@@ -994,6 +1038,30 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
             </div>
           ) : null}
 
+          <AdminSiteObservationPanel
+            siteId={siteId}
+            siteSlug={siteSlug}
+            siteName={getDisplayName(values)}
+            siteUrl={values.url}
+            description={values.description}
+            onDescriptionChange={(description) =>
+              updateField("description", description)
+            }
+            onDescriptionErrorClear={() =>
+              setErrors((current) => ({
+                ...current,
+                description: undefined,
+              }))
+            }
+            onSnapshotApplied={({ snapshotId }) => {
+              setMessage(`관측 snapshot ${snapshotId}의 설명을 반영했습니다.`);
+            }}
+            screenshotUrl={values.screenshotUrl}
+            screenshotThumbUrl={values.screenshotThumbUrl}
+            faviconUrl={values.faviconUrl}
+            descriptionError={errors.description}
+          />
+
           <label className="grid gap-1 text-sm font-medium">
             추가 도메인
             <textarea
@@ -1006,6 +1074,17 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
               <span className="text-xs text-red-700">{errors.domainsText}</span>
             ) : null}
           </label>
+
+          <section className="grid gap-4 rounded-md border border-line bg-background p-4">
+            <div>
+              <p className="text-xs font-semibold uppercase text-accent">
+                스크린샷 영역
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                기존 캡처, 수동 업로드, 파비콘 저장 흐름을 유지합니다. 사이트
+                레코드에는 수정 저장 버튼을 누를 때 확정 반영됩니다.
+              </p>
+            </div>
 
           <div className="grid gap-2 text-sm font-medium">
             파비콘 이미지
@@ -1040,12 +1119,14 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
           {values.faviconUrl ? (
             <div className="flex items-center gap-3 rounded-md border border-line bg-background p-3 text-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={values.faviconUrl}
-                alt="파비콘 미리보기"
-                className="h-10 w-10 rounded-md border border-line bg-white object-contain"
-              />
+              {faviconPreviewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={faviconPreviewUrl}
+                  alt="파비콘 미리보기"
+                  className="h-10 w-10 rounded-md border border-line bg-surface object-contain"
+                />
+              ) : null}
               <span className="break-all text-muted">{values.faviconUrl}</span>
             </div>
           ) : null}
@@ -1068,26 +1149,21 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
           {values.screenshotUrl ? (
             <div className="overflow-hidden rounded-md border border-line bg-background">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={values.screenshotUrl}
-                alt="사이트 캡처 미리보기"
-                className="aspect-video w-full object-cover"
-              />
+              {screenshotPreviewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={screenshotPreviewUrl}
+                  alt="사이트 캡처 미리보기"
+                  className="aspect-video w-full object-cover"
+                />
+              ) : (
+                <p className="px-3 py-2 text-xs text-muted">
+                  저장소 또는 자체 도메인 이미지 URL만 미리보기로 표시합니다.
+                </p>
+              )}
             </div>
           ) : null}
-
-          <label className="grid gap-1 text-sm font-medium">
-            사이트 설명
-            <textarea
-              value={values.description}
-              onChange={(event) => updateField("description", event.target.value)}
-              className="min-h-32 rounded-md border border-line px-3 py-3 text-sm"
-            />
-            {errors.description ? (
-              <span className="text-xs text-red-700">{errors.description}</span>
-            ) : null}
-          </label>
+          </section>
 
           <div className="flex flex-wrap gap-2">
             <button

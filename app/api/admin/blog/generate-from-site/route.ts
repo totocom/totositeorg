@@ -14,6 +14,15 @@ import {
   type BlogVerificationSummary,
 } from "@/app/data/blog-verification";
 import {
+  blogSourceCrawlSnapshotSelect,
+  getBlogSourceCrawlSnapshotJson,
+  toBlogSourceCrawlSnapshot,
+  type BlogSourceCrawlSnapshot,
+  type BlogSourceCrawlSnapshotRow,
+} from "@/app/data/blog-source-crawl-snapshot";
+import { selectBlogVisualImages } from "@/app/data/blog-visuals";
+import type { SiteCrawlSnapshotSiteColumns } from "@/app/data/site-crawl-snapshots";
+import {
   blogCategorySlugs,
   getBlogCategoryLabel,
   getBlogTagSlug,
@@ -23,10 +32,14 @@ import {
   type BlogSeoReviewStatus,
 } from "@/app/data/blog-posts";
 import {
+  getPlacementInternalAnchorText,
+  normalizeInternalLinkAnchorTexts,
   reviewBlogDuplicateRisk,
   validateBlogSeoDraft,
+  type BlogRenderedInternalAnchorInput,
   type BlogDuplicateComparisonPost,
   type BlogDuplicateRiskReview,
+  type InternalAnchorPlacement,
 } from "@/app/data/blog-seo-review";
 import { calculateSiteTrustScore } from "@/app/data/sites";
 import {
@@ -48,7 +61,7 @@ export const runtime = "nodejs";
 
 type BlogPriority = "상" | "중" | "하";
 
-type SiteRow = {
+type SiteRow = SiteCrawlSnapshotSiteColumns & {
   id: string;
   slug: string;
   name: string;
@@ -56,6 +69,7 @@ type SiteRow = {
   name_en: string | null;
   url: string;
   domains: string[] | null;
+  logo_url: string | null;
   favicon_url: string | null;
   screenshot_url: string | null;
   screenshot_thumb_url: string | null;
@@ -240,6 +254,7 @@ type SnapshotSite = {
   display_domain: string;
   description: string | null;
   screenshots: string[] | null;
+  logo_url: string | null;
   favicon_url: string | null;
   trust_score: number | null;
   resolved_ips: string[] | null;
@@ -397,6 +412,7 @@ type SourceSnapshot = {
   generatedAt: string;
   site: SnapshotSite;
   site_detail_path: string;
+  crawl_snapshot: BlogSourceCrawlSnapshot | null;
   domains: SnapshotDomain[];
   dns_records: SnapshotDnsRecord[];
   whois: SnapshotWhoisRecord[];
@@ -442,6 +458,7 @@ type BlogSourceSnapshotRow = {
 
 type StoredBlogSourceSnapshotRow = BlogSourceSnapshotRow & {
   site_json: unknown;
+  crawl_snapshot_json: unknown;
   domains_json: unknown;
   dns_records_json: unknown;
   whois_json: unknown;
@@ -501,7 +518,8 @@ type SeoPlanningOutput = {
       | "whois"
       | "reviews"
       | "scam_reports"
-      | "domain_submissions";
+      | "domain_submissions"
+      | "crawl_snapshot";
     confidence: "high" | "medium" | "low";
   }>;
   writing_brief_for_claude: string;
@@ -555,8 +573,13 @@ type FinalReviewOutput = {
   internal_links: Array<{
     href: string;
     label: string;
-    placement: "summary" | "dns_section" | "reports_section" | "reviews_section";
-    purpose: "source_detail" | "dns_detail" | "report_detail" | "review_detail";
+    placement: InternalAnchorPlacement;
+    purpose:
+      | "source_detail"
+      | "address_domain_detail"
+      | "dns_detail"
+      | "report_detail"
+      | "review_detail";
   }>;
   external_references: Array<{
     url: string;
@@ -604,8 +627,13 @@ type BlogDraft = {
   internal_links: Array<{
     href: string;
     label: string;
-    placement: "summary" | "dns_section" | "reports_section" | "reviews_section";
-    purpose: "source_detail" | "dns_detail" | "report_detail" | "review_detail";
+    placement: InternalAnchorPlacement;
+    purpose:
+      | "source_detail"
+      | "address_domain_detail"
+      | "dns_detail"
+      | "report_detail"
+      | "review_detail";
   }>;
   sections: Array<{
     heading: string;
@@ -881,6 +909,7 @@ const seoPlanningSchema = {
               "reviews",
               "scam_reports",
               "domain_submissions",
+              "crawl_snapshot",
             ],
           },
           confidence: {
@@ -967,11 +996,24 @@ const finalReviewSchema = {
           label: { type: "string" },
           placement: {
             type: "string",
-            enum: ["summary", "dns_section", "reports_section", "reviews_section"],
+            enum: [
+              "summary",
+              "address_domain_section",
+              "dns_section",
+              "reports_section",
+              "reviews_section",
+              "faq",
+            ],
           },
           purpose: {
             type: "string",
-            enum: ["source_detail", "dns_detail", "report_detail", "review_detail"],
+            enum: [
+              "source_detail",
+              "address_domain_detail",
+              "dns_detail",
+              "report_detail",
+              "review_detail",
+            ],
           },
         },
       },
@@ -2160,6 +2202,9 @@ function sourceSnapshotFromStoredRow(
     generatedAt: row.snapshot_at,
     site,
     site_detail_path: `/sites/${site.slug}`,
+    crawl_snapshot: isRecord(row.crawl_snapshot_json)
+      ? (row.crawl_snapshot_json as BlogSourceCrawlSnapshot)
+      : null,
     domains: row.domains_json as SnapshotDomain[],
     dns_records: row.dns_records_json as SnapshotDnsRecord[],
     whois: row.whois_json as SnapshotWhoisRecord[],
@@ -2168,6 +2213,9 @@ function sourceSnapshotFromStoredRow(
     derived_facts: row.derived_facts_json as DerivedFacts,
     site_specific_verification: buildBlogVerificationSummary({
       site,
+      crawl_snapshot: isRecord(row.crawl_snapshot_json)
+        ? row.crawl_snapshot_json
+        : null,
       domains: row.domains_json,
       dns_records: row.dns_records_json,
       whois: row.whois_json,
@@ -2188,6 +2236,7 @@ function sourceSnapshotFromStoredRow(
     dataPolicy: [
       "기존 blog_source_snapshots 테이블에서 복원한 이전 snapshot이다.",
       "이전 snapshot은 업데이트 diff 계산에만 사용한다.",
+      "crawl_snapshot은 조회 시점 기준 공개 HTML 관측 정보이며 이용 권유나 주소 안내 근거로 사용하지 않는다.",
     ],
   };
 }
@@ -2201,7 +2250,7 @@ async function getBlogSourceSnapshotById(
   const { data, error } = await supabase
     .from("blog_source_snapshots")
     .select(
-      "id, snapshot_at, site_json, domains_json, dns_records_json, whois_json, reviews_summary_json, scam_reports_summary_json, derived_facts_json",
+      "id, snapshot_at, site_json, crawl_snapshot_json, domains_json, dns_records_json, whois_json, reviews_summary_json, scam_reports_summary_json, derived_facts_json",
     )
     .eq("id", sourceSnapshotId)
     .maybeSingle<StoredBlogSourceSnapshotRow>();
@@ -3098,6 +3147,7 @@ async function createSourceSnapshot({
     domainSubmissionsResult,
     dnsRecordsResult,
     sameIpSitesResult,
+    crawlSnapshotResult,
   ] = await Promise.all([
     supabase
       .from("reviews")
@@ -3141,6 +3191,14 @@ async function createSourceSnapshot({
           .overlaps("resolved_ips", resolvedIps)
           .limit(20)
       : Promise.resolve({ data: [], error: null }),
+    site.latest_crawl_snapshot_id
+      ? supabase
+          .from("site_crawl_snapshots")
+          .select(blogSourceCrawlSnapshotSelect)
+          .eq("id", site.latest_crawl_snapshot_id)
+          .eq("site_id", site.id)
+          .maybeSingle<BlogSourceCrawlSnapshotRow>()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   if (reviewsResult.error) {
@@ -3161,6 +3219,10 @@ async function createSourceSnapshot({
 
   if (sameIpSitesResult.error) {
     throw new Error("동일 IP 관측 데이터를 불러오지 못했습니다.");
+  }
+
+  if (crawlSnapshotResult.error) {
+    throw new Error("최신 원본 사이트 관측 정보를 불러오지 못했습니다.");
   }
 
   const approvedReviews = ((reviewsResult.data ?? []) as ReviewDbRow[]).map(
@@ -3231,6 +3293,7 @@ async function createSourceSnapshot({
     display_domain: formatDisplayDomain(getSnapshotDomain(site)),
     description: site.description || null,
     screenshots: getScreenshotUrls(site),
+    logo_url: site.logo_url,
     favicon_url: site.favicon_url,
     trust_score: calculateSnapshotTrustScore({
       reviews: approvedReviews,
@@ -3272,6 +3335,7 @@ async function createSourceSnapshot({
     generatedAt,
     site: snapshotSite,
     site_detail_path: `/sites/${site.slug}`,
+    crawl_snapshot: toBlogSourceCrawlSnapshot(crawlSnapshotResult.data ?? null),
     domains,
     dns_records: dnsRecords,
     whois: whoisRecords,
@@ -3294,6 +3358,9 @@ async function createSourceSnapshot({
       "일부 DNS 또는 WHOIS 조회가 실패하면 조회 시점에 확인되지 않은 정보로 표현한다.",
       "리뷰와 피해 제보 샘플은 AI 전달 전에 개인정보 마스킹과 긴 본문 요약을 적용한다.",
       "피해 제보 증빙 이미지와 스크린샷 OCR 원문은 Source Snapshot에 포함하지 않는다.",
+      "crawl_snapshot 또는 manual_html_snapshot은 원본 페이지의 공개 HTML에서 조회 시점 기준 관측된 정보이며 사이트 식별과 화면 기록 확인의 보조 자료로만 사용한다.",
+      "crawl_snapshot의 promotional_flags_json과 excluded_terms_json은 AI 입력에는 포함하지만 공개 본문에서는 가입, 입금, 충전, 환전, 보너스, 이벤트, 추천, 바로가기, 최신 주소, 우회 주소를 강조하지 않는다.",
+      "crawl_snapshot에 raw HTML 또는 raw_html_storage_path는 포함하지 않는다.",
       "모든 글은 가입 또는 이용 권유가 아닌 공개 데이터 기반 정보 정리로 작성한다.",
     ],
   };
@@ -3309,6 +3376,7 @@ async function saveBlogSourceSnapshot(
     .insert({
       site_id: siteId,
       site_json: snapshot.site,
+      crawl_snapshot_json: getBlogSourceCrawlSnapshotJson(snapshot),
       domains_json: snapshot.domains,
       dns_records_json: snapshot.dns_records,
       whois_json: snapshot.whois,
@@ -3435,14 +3503,7 @@ function normalizeDraft(draft: BlogDraft, preferredSlug: string): BlogDraft {
     recommended_title_pattern: draft.recommended_title_pattern.trim() || "정보 검증 리포트형",
     summary: draft.summary.trim(),
     reading_minutes: Math.max(1, Math.min(30, Math.round(draft.reading_minutes || 5))),
-    internal_links: draft.internal_links
-      .map((link) => ({
-        href: link.href.trim(),
-        label: link.label.trim(),
-        placement: link.placement,
-        purpose: link.purpose,
-      }))
-      .filter((link) => link.href.startsWith("/") && link.label),
+    internal_links: normalizeBlogInternalLinks(draft),
     sections,
     checklist: draft.checklist.map((item) => item.trim()).filter(Boolean),
     faqs: draft.faqs
@@ -3453,6 +3514,110 @@ function normalizeDraft(draft: BlogDraft, preferredSlug: string): BlogDraft {
       .filter((faq) => faq.question && faq.answer),
     safety_notes: draft.safety_notes.map((item) => item.trim()).filter(Boolean),
   };
+}
+
+function normalizeBlogInternalLinks(draft: BlogDraft): BlogDraft["internal_links"] {
+  const siteName =
+    draft.primary_keyword.replace(/\s*토토사이트\s*$/u, "").trim() ||
+    draft.title.replace(/\s*토토사이트[\s\S]*$/u, "").trim() ||
+    "{사이트명}";
+
+  return normalizeInternalLinkAnchorTexts({
+    siteName,
+    internalLinks: draft.internal_links.map((link) => ({
+      href: link.href.trim(),
+      label: link.label.trim(),
+      placement: link.placement,
+      purpose: link.purpose,
+    })),
+  }).flatMap((link) => {
+    const href = typeof link.href === "string" ? link.href.trim() : "";
+    const label = typeof link.label === "string" ? link.label.trim() : "";
+    const placement = normalizeBlogInternalLinkPlacement(link.placement);
+    const purpose = normalizeBlogInternalLinkPurpose(link.purpose);
+
+    if (!href.startsWith("/") || href.startsWith("//") || !label) {
+      return [];
+    }
+
+    return [
+      {
+        href,
+        label,
+        placement,
+        purpose,
+      },
+    ];
+  });
+}
+
+function buildRenderedBlogDetailInternalAnchors({
+  draft,
+  site,
+}: {
+  draft: BlogDraft;
+  site: SiteRow;
+}): BlogRenderedInternalAnchorInput {
+  const primaryCategoryLabel = getBlogCategoryLabel(draft.primary_category);
+  const sourceSiteHref =
+    draft.internal_links.find((link) => link.purpose === "source_detail")?.href ??
+    `/sites/${site.slug}`;
+
+  return {
+    breadcrumbLinks: [
+      { href: "/", label: "홈" },
+      { href: "/blog", label: "블로그" },
+      {
+        href: `/blog/category/${draft.primary_category}`,
+        label: `${primaryCategoryLabel} 카테고리`,
+      },
+    ],
+    bodyInternalLinks: [
+      {
+        href: `/blog/category/${draft.primary_category}`,
+        label: primaryCategoryLabel,
+      },
+      {
+        href: sourceSiteHref,
+        label: `${site.name} 확인 데이터`,
+      },
+      ...draft.internal_links,
+      { href: "/blog", label: "전체 글 보기" },
+    ],
+  };
+}
+
+function normalizeBlogInternalLinkPlacement(
+  value: string | null | undefined,
+): InternalAnchorPlacement {
+  if (
+    value === "summary" ||
+    value === "address_domain_section" ||
+    value === "dns_section" ||
+    value === "reports_section" ||
+    value === "reviews_section" ||
+    value === "faq"
+  ) {
+    return value;
+  }
+
+  return "summary";
+}
+
+function normalizeBlogInternalLinkPurpose(
+  value: string | null | undefined,
+): BlogDraft["internal_links"][number]["purpose"] {
+  if (
+    value === "source_detail" ||
+    value === "address_domain_detail" ||
+    value === "dns_detail" ||
+    value === "report_detail" ||
+    value === "review_detail"
+  ) {
+    return value;
+  }
+
+  return "source_detail";
 }
 
 function getSeoKeywords(snapshot: SourceSnapshot) {
@@ -3807,25 +3972,46 @@ function buildSiteInternalLinks(snapshot: SourceSnapshot): BlogDraft["internal_l
 
   return [
     {
-      label: `${siteName} 상세 정보 페이지`,
+      label: getPlacementInternalAnchorText({
+        siteName,
+        placement: "summary",
+      }),
       href: siteHref,
       placement: "summary",
       purpose: "source_detail",
     },
     {
-      label: `${siteName} 도메인·DNS 정보`,
+      label: getPlacementInternalAnchorText({
+        siteName,
+        placement: "address_domain_section",
+      }),
+      href: `${siteHref}#dns`,
+      placement: "address_domain_section",
+      purpose: "address_domain_detail",
+    },
+    {
+      label: getPlacementInternalAnchorText({
+        siteName,
+        placement: "dns_section",
+      }),
       href: `${siteHref}#dns`,
       placement: "dns_section",
       purpose: "dns_detail",
     },
     {
-      label: `${siteName} 먹튀 제보 현황`,
+      label: getPlacementInternalAnchorText({
+        siteName,
+        placement: "reports_section",
+      }),
       href: `${siteHref}#reports`,
       placement: "reports_section",
       purpose: "report_detail",
     },
     {
-      label: `${siteName} 승인 리뷰 현황`,
+      label: getPlacementInternalAnchorText({
+        siteName,
+        placement: "reviews_section",
+      }),
       href: `${siteHref}#reviews`,
       placement: "reviews_section",
       purpose: "review_detail",
@@ -4317,6 +4503,162 @@ function sanitizeExternalLinksInMarkdown(markdown: string) {
     .replace(/https?:\/\/[^\s<>"']+/gi, replaceRawExternalUrl);
 }
 
+function rewriteRepeatedInternalMarkdownAnchors(markdown: string, h1: string) {
+  const siteName = extractSiteNameFromH1(h1);
+  const usedAnchorsByHref = new Map<string, Set<string>>();
+  let currentHeading = "";
+
+  return markdown
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => {
+      const headingMatch = line.trim().match(/^#{1,6}\s+(.+)$/);
+
+      if (headingMatch) {
+        currentHeading = headingMatch[1]?.trim() ?? "";
+      }
+
+      return line.replace(
+        /(^|[^!])\[([^\]\n]+)\]\((\/[^)\s]+)(?:\s+["'][^"']*["'])?\)/g,
+        (match, prefix: string, label: string, href: string) => {
+          if (href.startsWith("//")) return match;
+
+          const hrefKey = normalizeInternalMarkdownHrefKey(href);
+          const usedAnchors =
+            usedAnchorsByHref.get(hrefKey) ?? new Set<string>();
+          const placement = getMarkdownInternalAnchorPlacement({
+            href,
+            heading: currentHeading,
+          });
+          let nextLabel = label.trim();
+          let normalizedLabel = normalizeInternalAnchorLabel(nextLabel);
+
+          if (
+            usedAnchors.has(normalizedLabel) ||
+            (placement !== "summary" &&
+              isGenericSiteDetailAnchor(nextLabel, siteName))
+          ) {
+            nextLabel = getPlacementInternalAnchorText({ siteName, placement });
+            normalizedLabel = normalizeInternalAnchorLabel(nextLabel);
+          }
+
+          if (usedAnchors.has(normalizedLabel)) {
+            nextLabel = `${nextLabel} ${usedAnchors.size + 1}`;
+            normalizedLabel = normalizeInternalAnchorLabel(nextLabel);
+          }
+
+          usedAnchors.add(normalizedLabel);
+          usedAnchorsByHref.set(hrefKey, usedAnchors);
+
+          return `${prefix}[${nextLabel}](${href})`;
+        },
+      );
+    })
+    .join("\n");
+}
+
+function extractSiteNameFromH1(h1: string) {
+  const normalized = h1.replace(/^#\s+/, "").trim();
+  const siteNameMatch = normalized.match(/^(.+?)\s*토토사이트/u);
+
+  return siteNameMatch?.[1]?.trim() || "{사이트명}";
+}
+
+function normalizeInternalMarkdownHrefKey(href: string) {
+  const normalizedHref = href.trim();
+
+  if (/^\/sites\/[^/?#]+(?:[?#].*)?$/i.test(normalizedHref)) {
+    return normalizedHref.split("#")[0]?.split("?")[0] ?? normalizedHref;
+  }
+
+  return normalizedHref;
+}
+
+function normalizeInternalAnchorLabel(label: string) {
+  return label.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function getMarkdownInternalAnchorPlacement({
+  href,
+  heading,
+}: {
+  href: string;
+  heading: string;
+}): InternalAnchorPlacement {
+  const hash = href.split("#")[1]?.trim().toLowerCase() ?? "";
+  const normalizedHeading = heading.toLowerCase();
+
+  if (hash === "reports" || hash === "scam-reports") {
+    return "reports_section";
+  }
+
+  if (hash === "reviews") {
+    return "reviews_section";
+  }
+
+  if (
+    hash === "dns" &&
+    (normalizedHeading.includes("주소") ||
+      normalizedHeading.includes("도메인")) &&
+    !isDnsSpecificHeading(normalizedHeading)
+  ) {
+    return "address_domain_section";
+  }
+
+  if (hash === "dns" || isDnsSpecificHeading(normalizedHeading)) {
+    return "dns_section";
+  }
+
+  if (
+    normalizedHeading.includes("피해") ||
+    normalizedHeading.includes("제보") ||
+    normalizedHeading.includes("먹튀")
+  ) {
+    return "reports_section";
+  }
+
+  if (
+    normalizedHeading.includes("리뷰") ||
+    normalizedHeading.includes("후기") ||
+    normalizedHeading.includes("이용 경험")
+  ) {
+    return "reviews_section";
+  }
+
+  if (
+    normalizedHeading.includes("주소") ||
+    normalizedHeading.includes("도메인")
+  ) {
+    return "address_domain_section";
+  }
+
+  return "summary";
+}
+
+function isDnsSpecificHeading(heading: string) {
+  return (
+    heading.includes("dns") ||
+    heading.includes("whois") ||
+    heading.includes("네임서버") ||
+    heading.includes("ip")
+  );
+}
+
+function isGenericSiteDetailAnchor(label: string, siteName: string) {
+  const normalizedLabel = normalizeInternalAnchorLabel(label);
+  const normalizedSiteName = normalizeInternalAnchorLabel(siteName);
+  const genericLabels = [
+    `${normalizedSiteName} 상세`,
+    `${normalizedSiteName} 상세 정보`,
+    `${normalizedSiteName} 상세 정보 페이지`,
+    "상세",
+    "상세 정보",
+    "상세 정보 페이지",
+  ];
+
+  return genericLabels.includes(normalizedLabel);
+}
+
 function withoutExactNoticeLines(markdown: string) {
   return markdown
     .replace(/\r\n/g, "\n")
@@ -4414,7 +4756,12 @@ function normalizeBlogMarkdown(
   verificationSummary?: BlogVerificationSummary | null,
 ) {
   const normalized = normalizeMarkdownTitle(
-    stripInternalPlanningMarkdown(sanitizeExternalLinksInMarkdown(markdown)),
+    stripInternalPlanningMarkdown(
+      rewriteRepeatedInternalMarkdownAnchors(
+        sanitizeExternalLinksInMarkdown(markdown),
+        h1,
+      ),
+    ),
     h1,
   );
   const withVerification = verificationSummary
@@ -5065,7 +5412,7 @@ export async function POST(request: Request) {
   const siteQuery = supabase
     .from("sites")
     .select(
-      "id, slug, name, name_ko, name_en, url, domains, favicon_url, screenshot_url, screenshot_thumb_url, status, description, resolved_ips, dns_checked_at, created_at, updated_at",
+      "id, slug, name, name_ko, name_en, url, domains, logo_url, favicon_url, screenshot_url, screenshot_thumb_url, status, description, latest_crawl_snapshot_id, content_crawled_at, description_source_snapshot_id, description_generated_at, resolved_ips, dns_checked_at, created_at, updated_at",
     )
     .limit(1);
   const siteResult = siteId
@@ -5273,6 +5620,13 @@ export async function POST(request: Request) {
       h1,
       verificationSummary: persistedSnapshot.site_specific_verification,
     });
+    const blogVisualImages = selectBlogVisualImages({
+      siteName: site.name,
+      screenshots: persistedSnapshot.site.screenshots,
+      logoUrl: persistedSnapshot.site.logo_url,
+      faviconUrl: persistedSnapshot.site.favicon_url,
+      snapshotAt: persistedSnapshot.snapshot_at ?? persistedSnapshot.generatedAt,
+    });
     const seoDraftValidation = validateBlogSeoDraft({
       siteName: site.name,
       slug: finalSlug,
@@ -5285,6 +5639,16 @@ export async function POST(request: Request) {
       internalLinks: generated.finalDraft.internal_links,
       externalLinks: generated.finalReview.external_references,
       facts: generated.finalReview.summary.confirmed_facts,
+      renderedInternalAnchors: buildRenderedBlogDetailInternalAnchors({
+        draft: generated.finalDraft,
+        site,
+      }),
+      imageSeo: {
+        screenshots: persistedSnapshot.site.screenshots,
+        featuredImageUrl: blogVisualImages.featuredImageUrl,
+        featuredImageAlt: blogVisualImages.featuredImageAlt,
+        logoUrl: blogVisualImages.siteLogoUrl,
+      },
     });
     const duplicateComparisonPosts = await getDuplicateComparisonPosts({
       supabase,
@@ -5349,6 +5713,12 @@ export async function POST(request: Request) {
       meta_title: generated.finalDraft.meta_title,
       meta_description: generated.finalDraft.description,
       description: generated.finalDraft.description,
+      featured_image_url: blogVisualImages.featuredImageUrl,
+      featured_image_alt: blogVisualImages.featuredImageAlt,
+      featured_image_caption: blogVisualImages.featuredImageCaption,
+      featured_image_captured_at: blogVisualImages.featuredImageCapturedAt,
+      site_logo_url: blogVisualImages.siteLogoUrl,
+      site_logo_alt: blogVisualImages.siteLogoAlt,
       primary_keyword: generated.finalDraft.primary_keyword,
       secondary_keywords: generated.finalDraft.secondary_keywords,
       body_md: finalBodyMarkdown,
@@ -5404,6 +5774,7 @@ export async function POST(request: Request) {
         titleQualityReview,
         seoDraftValidation,
         duplicateRiskReview: duplicateReview,
+        blogVisualImages,
         duplicateRisk,
         uniqueFactScore,
         allowAdditionalPostForSameSite,

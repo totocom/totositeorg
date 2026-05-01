@@ -7,6 +7,7 @@ import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote"
 import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
+import { SiteObservationSnapshotCard } from "@/app/components/site-observation-snapshot-card";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
 import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
@@ -168,7 +169,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     type: typeof slug,
   });
 
-  const { site, reviews, scamReports, errorMessage, source } =
+  const { site, reviews, scamReports, observationSnapshot, errorMessage, source } =
     await getPublicSiteDetail(slug);
 
   if (!site) {
@@ -462,6 +463,17 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </Link>
           </section>
         ) : null}
+
+        <SiteObservationSnapshotCard
+          snapshot={observationSnapshot}
+          assets={{
+            siteName: site.siteName,
+            screenshotUrl: site.screenshotUrl,
+            screenshotThumbUrl: site.screenshotThumbUrl,
+            faviconUrl: site.faviconUrl,
+            logoUrl: site.logoUrl,
+          }}
+        />
 
         {/* 도메인 & DNS */}
         <DomainInfoTabs items={domainInfoTabs} />

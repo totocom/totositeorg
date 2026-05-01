@@ -89,6 +89,12 @@ export type BlogPost = {
   metaTitle: string;
   metaDescription?: string;
   description: string;
+  featuredImageUrl?: string | null;
+  featuredImageAlt?: string | null;
+  featuredImageCaption?: string | null;
+  featuredImageCapturedAt?: string | null;
+  siteLogoUrl?: string | null;
+  siteLogoAlt?: string | null;
   primaryKeyword: string;
   secondaryKeywords: string[];
   seoReviewStatus?: BlogSeoReviewStatus;

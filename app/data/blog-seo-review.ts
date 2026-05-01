@@ -1,3 +1,12 @@
+import {
+  footerNavigationLinks,
+  primaryNavigationLinks,
+} from "./site-navigation";
+import {
+  reviewBlogImageSeo,
+  type BlogImageSeoReview,
+} from "./blog-visuals";
+
 export type BlogSeoReviewStatus =
   | "not_reviewed"
   | "passed"
@@ -22,6 +31,44 @@ export type BlogSeoDraftLink = {
   label?: string | null;
   anchor?: string | null;
   text?: string | null;
+  placement?: string | null;
+  purpose?: string | null;
+};
+
+export type BlogRenderedInternalAnchorSource =
+  | "header_nav"
+  | "breadcrumb"
+  | "body_internal_links"
+  | "related_posts"
+  | "footer_links";
+
+export type BlogRenderedInternalAnchor = {
+  source: BlogRenderedInternalAnchorSource;
+  href: string;
+  label: string;
+  setIndex?: number;
+};
+
+export type BlogRenderedHeaderNavSetDuplicate = {
+  signature: string;
+  count: number;
+  setIndexes: number[];
+  links: BlogSeoDraftLink[];
+};
+
+export type BlogRenderedInternalAnchorInput = {
+  headerNavLinkSets?: BlogSeoDraftLink[][];
+  breadcrumbLinks?: BlogSeoDraftLink[];
+  bodyInternalLinks?: BlogSeoDraftLink[];
+  relatedPostLinks?: BlogSeoDraftLink[];
+  footerLinks?: BlogSeoDraftLink[];
+  bodyMd?: string | null;
+};
+
+export type BlogRenderedInternalAnchorReview = {
+  renderedAnchors: BlogRenderedInternalAnchor[];
+  duplicateBodyAnchorTexts: DuplicateInternalAnchorText[];
+  duplicateHeaderNavSets: BlogRenderedHeaderNavSetDuplicate[];
 };
 
 export type BlogSeoDraftInput = {
@@ -36,6 +83,13 @@ export type BlogSeoDraftInput = {
   internalLinks: BlogSeoDraftLink[];
   externalLinks: BlogSeoDraftLink[];
   facts: unknown;
+  renderedInternalAnchors?: BlogRenderedInternalAnchorInput;
+  imageSeo?: {
+    screenshots?: Array<string | null | undefined> | null;
+    featuredImageUrl?: string | null;
+    featuredImageAlt?: string | null;
+    logoUrl?: string | null;
+  };
 };
 
 export type BlogKeywordSet = {
@@ -44,6 +98,11 @@ export type BlogKeywordSet = {
 };
 
 export type ForbiddenPublicBodyTermMatch = {
+  term: string;
+  sample: string;
+};
+
+export type PromotionalBodyEmphasisMatch = {
   term: string;
   sample: string;
 };
@@ -70,6 +129,14 @@ export type DuplicateInternalAnchorText = {
   anchor: string;
   count: number;
 };
+
+export type InternalAnchorPlacement =
+  | "summary"
+  | "address_domain_section"
+  | "dns_section"
+  | "reports_section"
+  | "reviews_section"
+  | "faq";
 
 export type SecondaryKeywordCoverage = {
   missing: string[];
@@ -115,8 +182,11 @@ export type BlogKeywordChecks = {
   secondaryKeywordCoverage: SecondaryKeywordCoverage;
   h2KeywordCoverage: H2KeywordCoverage;
   duplicateInternalAnchorTexts: DuplicateInternalAnchorText[];
+  renderedInternalAnchorReview: BlogRenderedInternalAnchorReview;
+  imageSeoReview: BlogImageSeoReview;
   externalReferenceReview: ExternalReferenceReview;
   forbiddenPublicBodyTerms: ForbiddenPublicBodyTermMatch[];
+  promotionalBodyEmphasis: PromotionalBodyEmphasisMatch[];
   weakSeoTerms: WeakSeoTermMatch[];
   keywordStuffing: KeywordStuffingReview;
   slugQuality: SlugQualityReview;
@@ -173,6 +243,25 @@ const forbiddenPublicBodyTerms = [
   "primary_keyword",
 ];
 
+const promotionalBodyEmphasisPatterns: Array<{
+  term: string;
+  pattern: RegExp;
+}> = [
+  { term: "가입", pattern: /가입\s*(?:하기|하세요|하시면|혜택|코드|페이지|링크)/g },
+  { term: "입금", pattern: /입금\s*(?:보너스|혜택|이벤트|방법|링크|페이지|안내|추천)/g },
+  { term: "충전", pattern: /충전\s*(?:보너스|혜택|이벤트|방법|링크|페이지|안내|추천)/g },
+  { term: "환전", pattern: /환전\s*(?:보너스|혜택|이벤트|방법|링크|페이지|안내|추천)/g },
+  { term: "보너스", pattern: /보너스\s*(?:혜택|지급|제공|소개|확인|받기|이벤트)?/g },
+  { term: "이벤트", pattern: /이벤트\s*(?:혜택|지급|제공|소개|참여|확인|받기|진행|안내)?/g },
+  { term: "추천", pattern: /추천(?:합니다|드립니다|목록|사이트|코드)?/g },
+  { term: "바로가기", pattern: /바로\s*가기|바로가기/g },
+  { term: "최신 주소", pattern: /최신\s*주소/g },
+  { term: "우회 주소", pattern: /우회\s*주소/g },
+  { term: "첫충", pattern: /첫충/g },
+  { term: "매충", pattern: /매충/g },
+  { term: "쿠폰", pattern: /쿠폰/g },
+];
+
 const weakImportantFieldTerms = [
   "공개 제보",
   "공개 피해",
@@ -183,7 +272,13 @@ const weakImportantFieldTerms = [
 const shortAverageSentenceWordThreshold = 7;
 
 const duplicateInternalAnchorWarning =
-  "동일한 내부 링크 앵커 텍스트가 반복되고 있습니다. 같은 URL이라도 문맥에 맞는 다른 앵커를 사용하세요.";
+  "본문 내부 링크에서 동일한 내부 링크 앵커 텍스트가 반복되고 있습니다. 같은 URL이라도 문맥에 맞는 다른 앵커를 사용하세요.";
+
+const duplicateHeaderNavSetWarning =
+  "블로그 상세 페이지의 상단 nav 링크 세트가 DOM에 2회 이상 렌더링될 수 있습니다. 모바일 메뉴는 열기 전 DOM에 렌더링하지 말고 header 안의 같은 nav 세트를 1회만 유지하세요.";
+
+const imageSeoFailureWarning =
+  "블로그 이미지 SEO 검수에서 실패 항목이 확인되었습니다.";
 
 const missingExternalReferenceWarning =
   "참고 자료용 외부 링크가 없습니다. ICANN, DNS 설명 자료, 도박문제 상담 안내 등 신뢰 보강용 참고 링크를 1개 이상 추가하세요.";
@@ -511,6 +606,24 @@ export function detectForbiddenPublicBodyTerms(
     });
 }
 
+export function detectPromotionalBodyEmphasis(
+  body: string,
+): PromotionalBodyEmphasisMatch[] {
+  return promotionalBodyEmphasisPatterns.flatMap(({ term, pattern }) => {
+    pattern.lastIndex = 0;
+    const match = pattern.exec(body);
+
+    if (!match) return [];
+
+    return [
+      {
+        term,
+        sample: getTextSample(body, match.index),
+      },
+    ];
+  });
+}
+
 export function detectWeakSeoTermsInImportantFields({
   title,
   metaTitle,
@@ -629,6 +742,114 @@ export function detectDuplicateInternalAnchorTexts(
   return Array.from(counts.entries())
     .filter(([, count]) => count >= 2)
     .map(([anchor, count]) => ({ anchor, count }));
+}
+
+export function reviewRenderedBlogInternalAnchors({
+  headerNavLinkSets = [primaryNavigationLinks],
+  breadcrumbLinks = [],
+  bodyInternalLinks = [],
+  relatedPostLinks = [],
+  footerLinks = footerNavigationLinks,
+  bodyMd = "",
+}: BlogRenderedInternalAnchorInput = {}): BlogRenderedInternalAnchorReview {
+  const bodyLinks = [
+    ...bodyInternalLinks,
+    ...extractMarkdownInternalLinks(bodyMd ?? ""),
+  ];
+  const renderedAnchors = [
+    ...headerNavLinkSets.flatMap((links, setIndex) =>
+      toRenderedInternalAnchors("header_nav", links, setIndex),
+    ),
+    ...toRenderedInternalAnchors("breadcrumb", breadcrumbLinks),
+    ...toRenderedInternalAnchors("body_internal_links", bodyLinks),
+    ...toRenderedInternalAnchors("related_posts", relatedPostLinks),
+    ...toRenderedInternalAnchors("footer_links", footerLinks),
+  ];
+
+  return {
+    renderedAnchors,
+    duplicateBodyAnchorTexts: detectDuplicateInternalAnchorTexts(bodyLinks),
+    duplicateHeaderNavSets: detectDuplicateHeaderNavSets(headerNavLinkSets),
+  };
+}
+
+export function getPlacementInternalAnchorText({
+  siteName,
+  placement,
+}: {
+  siteName: string;
+  placement: InternalAnchorPlacement;
+}) {
+  const normalizedSiteName = normalizeWhitespace(siteName) || "{사이트명}";
+
+  switch (placement) {
+    case "address_domain_section":
+      return `${normalizedSiteName} 주소·도메인 기록`;
+    case "dns_section":
+      return `${normalizedSiteName} DNS 조회 결과`;
+    case "reports_section":
+      return `${normalizedSiteName} 먹튀 제보 현황`;
+    case "reviews_section":
+      return `${normalizedSiteName} 후기 데이터`;
+    case "faq":
+      return `${normalizedSiteName} 자주 묻는 질문`;
+    case "summary":
+    default:
+      return `${normalizedSiteName} 상세 정보`;
+  }
+}
+
+export function normalizeInternalLinkAnchorTexts({
+  siteName,
+  internalLinks,
+}: {
+  siteName: string;
+  internalLinks: BlogSeoDraftLink[];
+}) {
+  const usedAnchorsByHref = new Map<string, Set<string>>();
+
+  return internalLinks.map((link, index) => {
+    const href = getLinkHref(link);
+    const anchor = getLinkAnchorText(link);
+
+    if (!href.startsWith("/") || href.startsWith("//") || !anchor) {
+      return link;
+    }
+
+    const hrefKey = normalizeInternalHrefForAnchorDeduplication(href);
+    const usedAnchors = usedAnchorsByHref.get(hrefKey) ?? new Set<string>();
+    const normalizedAnchor = normalizeAnchorForDeduplication(anchor);
+    const placement = getInternalAnchorPlacement(link, href, index);
+    let nextAnchor = anchor;
+
+    if (usedAnchors.has(normalizedAnchor)) {
+      nextAnchor = getPlacementInternalAnchorText({ siteName, placement });
+    }
+
+    let nextNormalizedAnchor = normalizeAnchorForDeduplication(nextAnchor);
+
+    if (usedAnchors.has(nextNormalizedAnchor)) {
+      nextAnchor = getFallbackInternalAnchorText({
+        siteName,
+        href,
+        index,
+      });
+      nextNormalizedAnchor = normalizeAnchorForDeduplication(nextAnchor);
+    }
+
+    if (usedAnchors.has(nextNormalizedAnchor)) {
+      nextAnchor = `${nextAnchor} ${usedAnchors.size + 1}`;
+      nextNormalizedAnchor = normalizeAnchorForDeduplication(nextAnchor);
+    }
+
+    usedAnchors.add(nextNormalizedAnchor);
+    usedAnchorsByHref.set(hrefKey, usedAnchors);
+
+    return {
+      ...link,
+      label: nextAnchor,
+    };
+  });
 }
 
 export function extractMarkdownH2Headings(body: string) {
@@ -870,10 +1091,23 @@ export function validateBlogSeoDraft(
     siteName: input.siteName,
   });
   const forbiddenPublicBodyTerms = detectForbiddenPublicBodyTerms(input.bodyMd);
+  const promotionalBodyEmphasis = detectPromotionalBodyEmphasis(input.bodyMd);
   const keywordStuffing = detectKeywordStuffing(input.bodyMd, input.siteName);
-  const duplicateInternalAnchorTexts = detectDuplicateInternalAnchorTexts(
-    input.internalLinks,
-  );
+  const renderedInternalAnchorReview = reviewRenderedBlogInternalAnchors({
+    ...input.renderedInternalAnchors,
+    bodyMd: input.bodyMd,
+    bodyInternalLinks:
+      input.renderedInternalAnchors?.bodyInternalLinks ?? input.internalLinks,
+  });
+  const imageSeoReview = reviewBlogImageSeo({
+    siteName: input.siteName,
+    screenshots: input.imageSeo?.screenshots,
+    featuredImageUrl: input.imageSeo?.featuredImageUrl,
+    featuredImageAlt: input.imageSeo?.featuredImageAlt,
+    logoUrl: input.imageSeo?.logoUrl,
+  });
+  const duplicateInternalAnchorTexts =
+    renderedInternalAnchorReview.duplicateBodyAnchorTexts;
   const secondaryKeywordCoverage = validateSecondaryKeywordCoverage({
     siteName: input.siteName,
     title: input.title,
@@ -920,6 +1154,16 @@ export function validateBlogSeoDraft(
     );
   }
 
+  if (promotionalBodyEmphasis.length > 0) {
+    hasFailure = true;
+    adminWarnings.push(
+      `공개 body_md에 원본 관측 정보의 홍보성 문구가 강조되어 있습니다: ${promotionalBodyEmphasis
+        .map((match) => match.term)
+        .join(", ")}`,
+    );
+    duplicateRiskHints.push("promotional_observation_terms_emphasized");
+  }
+
   if (keywordStuffing.hasKeywordStuffing) {
     hasFailure = true;
     adminWarnings.push(...keywordStuffing.warnings);
@@ -941,8 +1185,21 @@ export function validateBlogSeoDraft(
     adminWarnings.push(duplicateInternalAnchorWarning);
   }
 
+  if (renderedInternalAnchorReview.duplicateHeaderNavSets.length > 0) {
+    adminWarnings.push(duplicateHeaderNavSetWarning);
+    duplicateRiskHints.push("duplicate_header_nav_set");
+  }
+
   if (externalReferenceReview.linkCount === 0) {
     adminWarnings.push(missingExternalReferenceWarning);
+  }
+
+  adminWarnings.push(...imageSeoReview.warnings);
+
+  if (imageSeoReview.failures.length > 0) {
+    hasFailure = true;
+    adminWarnings.push(imageSeoFailureWarning, ...imageSeoReview.failures);
+    duplicateRiskHints.push("image_seo_failed");
   }
 
   if (externalReferenceReview.untrustedLinks.length > 0) {
@@ -1014,8 +1271,11 @@ export function validateBlogSeoDraft(
       secondaryKeywordCoverage,
       h2KeywordCoverage,
       duplicateInternalAnchorTexts,
+      renderedInternalAnchorReview,
+      imageSeoReview,
       externalReferenceReview,
       forbiddenPublicBodyTerms,
+      promotionalBodyEmphasis,
       weakSeoTerms: importantFieldReview.weakTermMatches,
       keywordStuffing,
       slugQuality,
@@ -1050,6 +1310,164 @@ function getLinkAnchorText(link: BlogSeoDraftLink) {
 
 function getLinkHref(link: BlogSeoDraftLink) {
   return normalizeWhitespace(link.href ?? link.url ?? "");
+}
+
+function getInternalAnchorPlacement(
+  link: BlogSeoDraftLink,
+  href: string,
+  index: number,
+): InternalAnchorPlacement {
+  const placement = normalizeWhitespace(link.placement ?? "");
+  const purpose = normalizeWhitespace(link.purpose ?? "");
+  const hash = getInternalHrefHash(href);
+
+  if (isInternalAnchorPlacement(placement)) return placement;
+  if (purpose === "address_domain_detail") return "address_domain_section";
+  if (purpose === "dns_detail") return "dns_section";
+  if (purpose === "report_detail") return "reports_section";
+  if (purpose === "review_detail") return "reviews_section";
+  if (purpose === "source_detail") return "summary";
+  if (hash === "reports" || hash === "scam-reports") return "reports_section";
+  if (hash === "reviews") return "reviews_section";
+  if (hash === "dns") return "dns_section";
+
+  return index === 0 ? "summary" : "summary";
+}
+
+function isInternalAnchorPlacement(
+  value: string,
+): value is InternalAnchorPlacement {
+  return (
+    value === "summary" ||
+    value === "address_domain_section" ||
+    value === "dns_section" ||
+    value === "reports_section" ||
+    value === "reviews_section" ||
+    value === "faq"
+  );
+}
+
+function getInternalHrefHash(href: string) {
+  return href.split("#")[1]?.trim().toLowerCase() ?? "";
+}
+
+function normalizeInternalHrefForAnchorDeduplication(href: string) {
+  const normalizedHref = normalizeWhitespace(href);
+
+  if (/^\/sites\/[^/?#]+(?:[?#].*)?$/i.test(normalizedHref)) {
+    return normalizedHref.split("#")[0]?.split("?")[0] ?? normalizedHref;
+  }
+
+  return normalizedHref;
+}
+
+function normalizeAnchorForDeduplication(value: string) {
+  return normalizeWhitespace(value).toLowerCase();
+}
+
+function getFallbackInternalAnchorText({
+  siteName,
+  href,
+  index,
+}: {
+  siteName: string;
+  href: string;
+  index: number;
+}) {
+  const placement = getInternalAnchorPlacement({}, href, index);
+
+  return getPlacementInternalAnchorText({ siteName, placement });
+}
+
+function toRenderedInternalAnchors(
+  source: BlogRenderedInternalAnchorSource,
+  links: BlogSeoDraftLink[],
+  setIndex?: number,
+): BlogRenderedInternalAnchor[] {
+  return links.flatMap((link) => {
+    const href = getLinkHref(link);
+    const label = getLinkAnchorText(link);
+
+    if (!href.startsWith("/") || href.startsWith("//") || !label) {
+      return [];
+    }
+
+    return [
+      {
+        source,
+        href,
+        label,
+        ...(typeof setIndex === "number" ? { setIndex } : {}),
+      },
+    ];
+  });
+}
+
+function detectDuplicateHeaderNavSets(
+  headerNavLinkSets: BlogSeoDraftLink[][],
+): BlogRenderedHeaderNavSetDuplicate[] {
+  const navSetCounts = new Map<
+    string,
+    {
+      count: number;
+      setIndexes: number[];
+      links: BlogSeoDraftLink[];
+    }
+  >();
+
+  headerNavLinkSets.forEach((links, setIndex) => {
+    const signature = getNavigationSetSignature(links);
+
+    if (!signature) return;
+
+    const current = navSetCounts.get(signature);
+
+    if (current) {
+      current.count += 1;
+      current.setIndexes.push(setIndex);
+    } else {
+      navSetCounts.set(signature, {
+        count: 1,
+        setIndexes: [setIndex],
+        links,
+      });
+    }
+  });
+
+  return Array.from(navSetCounts.entries())
+    .filter(([, value]) => value.count >= 2)
+    .map(([signature, value]) => ({
+      signature,
+      count: value.count,
+      setIndexes: value.setIndexes,
+      links: value.links,
+    }));
+}
+
+function getNavigationSetSignature(links: BlogSeoDraftLink[]) {
+  return toRenderedInternalAnchors("header_nav", links)
+    .map((link) => `${link.href}\t${normalizeAnchorForDeduplication(link.label)}`)
+    .join("\n");
+}
+
+function extractMarkdownInternalLinks(bodyMd: string): BlogSeoDraftLink[] {
+  const markdownWithoutCodeBlocks = bodyMd.replace(/```[\s\S]*?```/g, "");
+  const links: BlogSeoDraftLink[] = [];
+
+  for (const match of markdownWithoutCodeBlocks.matchAll(
+    /\[([^\]]+)\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g,
+  )) {
+    const label = normalizeWhitespace(match[1] ?? "");
+    const href = normalizeWhitespace(match[2] ?? "");
+
+    if (!href.startsWith("/") || href.startsWith("//") || !label) {
+      continue;
+    }
+
+    links.push({ href, label });
+  }
+
+  return links;
 }
 
 function isDisallowedExternalReference(href: string, label: string) {

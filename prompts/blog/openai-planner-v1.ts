@@ -101,13 +101,17 @@ export function buildOpenAiPlannerPrompt({
 - section_plan은 H2/H3 작성에 바로 사용할 수 있는 구조로 만든다.
 - section_plan의 주요 H2는 "공개 제보", "공개 피해", "공개 데이터", "공개 먹튀 제보"를 쓰지 않고 주소, 도메인, 먹튀 제보, 후기, DNS, WHOIS처럼 실제 검색 표현과 데이터 항목을 중심으로 작성한다.
 - confirmed_facts, inferences, unknowns를 분리한다.
-- claim_map.source는 sites, dns, whois, reviews, scam_reports, domain_submissions 중 하나만 사용한다.
+- claim_map.source는 sites, dns, whois, reviews, scam_reports, domain_submissions, crawl_snapshot 중 하나만 사용한다.
 - search_intent, confirmed_facts, inferences, unknowns, claim_map, writing_brief_for_claude, primary_keyword, secondary_keywords, prohibited_phrase_check는 내부 JSON 또는 관리자 검토용 항목이며 공개 본문에 그대로 노출하지 않도록 계획한다.
 - section_plan과 writing_brief_for_claude는 공개 본문이 자연스러운 제목, 요약, 본문, 표 형식 설명, FAQ, 체크리스트, 고지문으로만 구성되도록 지시한다.
 - writing_brief_for_claude에는 공개 body_md 안에 primary_keyword, secondary_keywords, search_intent, claim_map, confirmed_facts, inferences, unknowns, writing_brief 같은 내부 필드명이 절대 나오지 않도록 지시한다.
 - writing_brief_for_claude에는 키워드 목록, 검색어 목록, 키워드 나열 섹션을 만들지 말고 문맥 속 자연스러운 표현만 쓰라고 지시한다.
 - confidence는 근거가 직접 있으면 high, 집계/간접 관측이면 medium, 조회 실패/부재/불명확하면 low를 사용한다.
 - 모든 글에는 Source Snapshot의 site_specific_verification 값을 고유 데이터로 반영한다.
+- crawl_snapshot 또는 manual_html_snapshot은 원본 페이지의 공개 HTML에서 조회 시점 기준 관측된 정보입니다. 이 정보를 사이트 이용 권유, 가입 유도, 보너스/이벤트 소개, 최신 주소 안내로 사용하지 마세요. 관측 정보는 사이트 식별과 화면 기록 확인 목적의 설명에만 사용하세요.
+- crawl_snapshot의 page_title, h1, observed_* 값은 보조 자료로만 쓰고, 원본 사이트 문구를 그대로 복사하지 않는다.
+- crawl_snapshot.promotional_flags_json과 excluded_terms_json에 있는 표현은 AI 입력에는 포함되더라도 공개 본문, 제목, FAQ, checklist에서 강조하지 않는다.
+- 블로그 본문에서도 가입, 입금, 충전, 환전, 보너스, 이벤트, 추천, 바로가기, 최신 주소, 우회 주소를 소개하거나 강조하지 않는다.
 - 모든 글은 사이트별 고유 데이터 최소 5개 이상을 반영해야 한다. 예: 대표 도메인, 추가 도메인 수, DNS 레코드 유형, WHOIS 날짜, 네임서버, 승인 리뷰 수, 먹튀 제보 수, 마지막 조회 시각, 동일 IP 관측 여부.
 - 글마다 같은 템플릿 문장을 반복하지 말고, 대표 도메인, 추가 도메인 수, DNS 조회 결과, WHOIS 날짜, 리뷰 수, 피해 제보 수, 마지막 정보 확인 시각을 해당 사이트 값으로 구체화한다.
 - 최근 발행 글 또는 update_context가 제공되면 제목 패턴, H2 흐름, 첫 문단, FAQ 질문이 반복되지 않도록 section_plan과 writing_brief_for_claude에 차별화 지침을 포함한다.
@@ -119,6 +123,7 @@ export function buildOpenAiPlannerPrompt({
 - writing_brief_for_claude에는 본문 하단 "작성 기준 및 고지" 섹션에 다음 고지를 그대로 포함하라고 적는다:
 ${noticeLines.join("\n")}
 - 외부 토토사이트 URL은 Markdown 링크나 HTML 앵커로 만들지 않는다. 도메인은 필요한 경우 일반 텍스트로만 쓴다.
+- 내부 링크를 계획할 때 같은 URL 또는 같은 사이트 상세 페이지의 anchor text를 반복하지 않는다. summary, 주소·도메인, DNS, 먹튀 제보, 후기 placement마다 서로 다른 anchor text를 쓰도록 지시한다.
 - 가입 페이지, 이벤트 페이지, 충전 페이지, 우회 주소로 이어지는 URL 또는 링크는 생성하지 않는다.
 - 불가피하게 외부 링크가 필요하다고 판단되는 경우에도 rel="nofollow ugc noopener noreferrer" 원칙을 risk_warnings에 남긴다.
 - DNS/WHOIS 조회 실패가 있으면 "일부 DNS 또는 WHOIS 정보는 조회 시점에 확인되지 않았습니다." 취지를 포함한다.

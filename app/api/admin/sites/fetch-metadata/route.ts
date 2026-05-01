@@ -4,6 +4,10 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
+import {
+  buildAutomaticCrawlFailureBody,
+  detectAutomaticAccessChallenge,
+} from "@/app/data/automatic-crawl-support";
 
 export const runtime = "nodejs";
 
@@ -16,6 +20,7 @@ type MetadataResponse = {
   finalUrl: string;
   statusCode: number;
   source?: "metadata-api" | "direct";
+  challenge_detected?: boolean;
 };
 
 type ExternalMetadataResponse = Partial<{
@@ -37,6 +42,8 @@ type ExternalMetadataResponse = Partial<{
   statusCode: unknown;
   status_code: unknown;
   status: unknown;
+  challenge_detected: unknown;
+  challengeDetected: unknown;
   error: unknown;
 }>;
 
@@ -253,6 +260,13 @@ function normalizeExternalMetadata(
   ) || getDefaultFaviconUrl(finalUrl);
   const statusCode =
     firstNumber(result.statusCode, result.status_code, result.status) || 200;
+  const challengeDetected = detectAutomaticAccessChallenge({
+    statusCode,
+    title,
+    description,
+    explicitChallengeDetected:
+      result.challenge_detected === true || result.challengeDetected === true,
+  });
 
   if (isBlockedMetadata(statusCode, title, description)) {
     return null;
@@ -271,6 +285,7 @@ function normalizeExternalMetadata(
     finalUrl,
     statusCode,
     source: "metadata-api",
+    challenge_detected: challengeDetected,
   };
 }
 
@@ -491,12 +506,26 @@ async function fetchMetadataWithProxy(targetUrl: string) {
     const result = (await response.json().catch(() => null)) as
       | ExternalMetadataResponse
       | null;
+    const challengeDetected = detectAutomaticAccessChallenge({
+      statusCode: response.status,
+      headers: response.headers,
+      explicitChallengeDetected:
+        result?.challenge_detected === true || result?.challengeDetected === true,
+    });
 
     if (!response.ok || !result) {
-      return null;
+      return {
+        metadata: null,
+        challengeDetected,
+      };
     }
 
-    return normalizeExternalMetadata(result, targetUrl);
+    const metadata = normalizeExternalMetadata(result, targetUrl);
+
+    return {
+      metadata,
+      challengeDetected: challengeDetected || metadata?.challenge_detected === true,
+    };
   } catch {
     return null;
   }
@@ -549,10 +578,21 @@ export async function POST(request: Request) {
   try {
     await assertPublicHost(targetUrl);
 
-    const proxyMetadata = await fetchMetadataWithProxy(targetUrl.toString());
+    const proxyMetadataResult = await fetchMetadataWithProxy(targetUrl.toString());
+    const proxyMetadata = proxyMetadataResult?.metadata ?? null;
 
     if (proxyMetadata) {
       return NextResponse.json(await localizeMetadataFavicon(proxyMetadata), { status: 200 });
+    }
+
+    if (proxyMetadataResult?.challengeDetected) {
+      return NextResponse.json(
+        buildAutomaticCrawlFailureBody(
+          "자동 메타데이터 조회가 접근 제한 또는 challenge 응답을 받았습니다.",
+          true,
+        ),
+        { status: 400 },
+      );
     }
 
     const response = await fetchWithTimeout(
@@ -568,40 +608,56 @@ export async function POST(request: Request) {
     );
 
     const contentType = response.headers.get("content-type") ?? "";
+    let challengeDetected = detectAutomaticAccessChallenge({
+      statusCode: response.status,
+      headers: response.headers,
+    });
+
     if (!contentType.toLowerCase().includes("text/html")) {
       return NextResponse.json(
-        {
-          error:
-            "자동으로 메타정보를 가져오지 못했습니다. 사이트명, 설명, 이미지는 수동으로 입력하거나 페이지 캡처를 사용해주세요.",
-        },
+        buildAutomaticCrawlFailureBody(
+          "자동으로 메타정보를 가져오지 못했습니다. 사이트명, 설명, 이미지는 수동으로 입력하거나 페이지 캡처를 사용해주세요.",
+          challengeDetected,
+        ),
         { status: 415 },
       );
     }
 
     const html = (await response.text()).slice(0, 500_000);
     const metadata = extractMetadata(html, response.url, response.status);
+    challengeDetected = detectAutomaticAccessChallenge({
+      statusCode: response.status,
+      headers: response.headers,
+      title: metadata.title,
+      description: metadata.description,
+      bodyText: html.slice(0, 20_000),
+    });
 
     if (isBlockedMetadata(metadata.statusCode, metadata.title, metadata.description)) {
       return NextResponse.json(
-        {
-          error:
-            "보안 페이지 또는 차단 페이지가 감지되어 메타정보를 자동 반영하지 않았습니다. 사이트명, 설명, 이미지는 수동으로 입력하거나 페이지 캡처를 사용해주세요.",
-        },
+        buildAutomaticCrawlFailureBody(
+          "보안 페이지 또는 차단 페이지가 감지되어 메타정보를 자동 반영하지 않았습니다. 사이트명, 설명, 이미지는 수동으로 입력하거나 페이지 캡처를 사용해주세요.",
+          challengeDetected,
+        ),
         { status: 400 },
       );
     }
 
     return NextResponse.json(
-      await localizeMetadataFavicon(metadata),
+      await localizeMetadataFavicon({
+        ...metadata,
+        challenge_detected: challengeDetected,
+      }),
       { status: 200 },
     );
   } catch (error) {
     const message = getFetchErrorMessage(error);
 
     return NextResponse.json(
-      {
-        error: `${message} 사이트명, 설명, 이미지는 수동으로 입력하거나 페이지 캡처를 사용해주세요.`,
-      },
+      buildAutomaticCrawlFailureBody(
+        `${message} 사이트명, 설명, 이미지는 수동으로 입력하거나 페이지 캡처를 사용해주세요.`,
+        false,
+      ),
       { status: 400 },
     );
   }

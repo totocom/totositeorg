@@ -13,6 +13,10 @@ import {
   type BlogPostExternalReference,
 } from "@/app/data/blog-posts";
 import { buildBlogVerificationSummary } from "@/app/data/blog-verification";
+import {
+  isAllowedBlogImageUrl,
+  selectBlogVisualImages,
+} from "@/app/data/blog-visuals";
 import { supabase } from "@/lib/supabase/client";
 
 export type { PublicBlogPost };
@@ -167,6 +171,51 @@ function buildBlogSourceSite(rawSnapshot: unknown): BlogPost["sourceSite"] {
     name,
     href,
   };
+}
+
+function getSnapshotSiteVisualInput(rawSnapshot: unknown) {
+  const snapshot = getWrappedSnapshot(rawSnapshot);
+  const site = isRecord(snapshot?.site) ? snapshot.site : null;
+
+  return {
+    siteName: getString(site?.name_ko) || getString(site?.name) || "사이트",
+    screenshots: normalizeStringArray(site?.screenshots),
+    logoUrl: getString(site?.logo_url),
+    faviconUrl: getString(site?.favicon_url),
+    snapshotAt: getString(snapshot?.snapshot_at) || getString(snapshot?.generatedAt),
+  };
+}
+
+function buildBlogVisualFields(
+  row: BlogPostRow,
+  sourceSite: BlogPost["sourceSite"],
+) {
+  const snapshotVisualInput = getSnapshotSiteVisualInput(row.source_snapshot);
+  const snapshotVisuals = selectBlogVisualImages({
+    ...snapshotVisualInput,
+    siteName: sourceSite?.name || snapshotVisualInput.siteName,
+  });
+  const featuredImageUrl = getAllowedImageUrl(snapshotVisuals.featuredImageUrl);
+  const siteLogoUrl = getAllowedImageUrl(snapshotVisuals.siteLogoUrl);
+
+  return {
+    featuredImageUrl,
+    featuredImageAlt: featuredImageUrl
+      ? snapshotVisuals.featuredImageAlt
+      : null,
+    featuredImageCaption: featuredImageUrl
+      ? snapshotVisuals.featuredImageCaption
+      : null,
+    featuredImageCapturedAt: snapshotVisuals.featuredImageCapturedAt,
+    siteLogoUrl,
+    siteLogoAlt: siteLogoUrl ? snapshotVisuals.siteLogoAlt : null,
+  };
+}
+
+function getAllowedImageUrl(value: string | null | undefined) {
+  const imageUrl = getString(value);
+
+  return isAllowedBlogImageUrl(imageUrl) ? imageUrl : null;
 }
 
 function normalizeDate(value: string | null | undefined, fallback: string) {
@@ -507,6 +556,7 @@ function mapBlogPostRow(row: BlogPostRow): PublicBlogPost {
   const metaDescription = formatDisplayDomainText(
     normalizePublicSeoText(row.meta_description || row.description),
   );
+  const visualFields = buildBlogVisualFields(row, sourceSite);
 
   return {
     slug: row.slug,
@@ -531,6 +581,7 @@ function mapBlogPostRow(row: BlogPostRow): PublicBlogPost {
     metaTitle,
     metaDescription,
     description,
+    ...visualFields,
     summary: formatDisplayDomainText(sanitizePublicText(row.summary, description)),
     publishedAt,
     updatedAt: normalizeDate(row.content_updated_at, row.updated_at),

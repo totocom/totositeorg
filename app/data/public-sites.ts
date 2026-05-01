@@ -9,10 +9,13 @@ import {
 } from "@/app/data/sites";
 import type { PublicDnsInfo } from "@/app/data/domain-dns";
 import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
+import type { PublicSiteObservationSnapshot } from "@/app/data/public-site-observation-snapshot";
+import type { SiteCrawlSnapshotSiteColumns } from "@/app/data/site-crawl-snapshots";
+import { getAllowedStoredImageUrl } from "@/app/data/storage-image-url";
 import { supabase } from "@/lib/supabase/client";
 import { unstable_cache } from "next/cache";
 
-type PublicSiteRow = {
+type PublicSiteRow = SiteCrawlSnapshotSiteColumns & {
   id: string;
   slug: string | null;
   name: string;
@@ -23,6 +26,7 @@ type PublicSiteRow = {
   screenshot_url?: string | null;
   screenshot_thumb_url?: string | null;
   favicon_url?: string | null;
+  logo_url?: string | null;
   category: string;
   available_states: string[];
   license_info: string;
@@ -64,6 +68,7 @@ type PublicSiteDetailResult = {
   reviews: SiteReview[];
   scamReports: ScamReport[];
   dnsRecords: PublicSiteDnsRecord[];
+  observationSnapshot: PublicSiteObservationSnapshot | null;
   errorMessage: string;
   source: "supabase" | "fallback" | "none";
 };
@@ -187,9 +192,10 @@ function mapSiteRow(
     siteNameEn: site.name_en ?? null,
     siteUrl: site.url,
     domains,
-    screenshotUrl: site.screenshot_url ?? null,
-    screenshotThumbUrl: site.screenshot_thumb_url ?? null,
-    faviconUrl: site.favicon_url ?? null,
+    screenshotUrl: getAllowedStoredImageUrl(site.screenshot_url),
+    screenshotThumbUrl: getAllowedStoredImageUrl(site.screenshot_thumb_url),
+    faviconUrl: getAllowedStoredImageUrl(site.favicon_url),
+    logoUrl: getAllowedStoredImageUrl(site.logo_url),
     category: site.category,
     availableStates: site.available_states,
     licenseInfo: site.license_info,
@@ -325,7 +331,7 @@ async function getPublicSitesUncached(): Promise<PublicSitesResult> {
     supabase
       .from("sites")
       .select(
-        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, category, available_states, license_info, resolved_ips, dns_checked_at, description",
+        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, category, available_states, license_info, resolved_ips, dns_checked_at, description",
       )
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
@@ -406,6 +412,7 @@ async function getPublicSiteDetailUncached(
       reviews: fallbackSite ? getApprovedReviewsBySiteId(fallbackSite.id) : [],
       scamReports: [],
       dnsRecords: [],
+      observationSnapshot: null,
       errorMessage: fallbackSite
         ? "Supabase 사이트 상세 정보를 불러오지 못해 개발용 더미 데이터를 표시하고 있습니다."
         : "사이트 정보를 불러오지 못했습니다.",
@@ -413,7 +420,8 @@ async function getPublicSiteDetailUncached(
     };
   }
 
-  const [reviewsResult, scamReportsResult] = await Promise.all([
+  const [reviewsResult, scamReportsResult, observationSnapshotResult] =
+    await Promise.all([
     supabase
       .from("reviews")
       .select("id, site_id, user_id, reviewer_name, rating, title, experience, issue_type, helpful_count, not_helpful_count, created_at")
@@ -429,6 +437,15 @@ async function getPublicSiteDetailUncached(
       .eq("review_status", "approved")
       .eq("is_published", true)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("site_crawl_snapshot_public")
+      .select(
+        "id, site_id, source_type, html_input_type, source_url, final_url, domain, page_title, meta_description, h1, observed_menu_labels, observed_account_features, observed_betting_features, observed_payment_flags, observed_notice_items, observed_event_items, observed_footer_text, observed_badges, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, ai_detail_description_md, ai_observation_summary_json, collected_at, created_at, updated_at",
+      )
+      .eq("site_id", siteResult.data.id)
+      .order("collected_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (reviewsResult.error) {
@@ -443,6 +460,9 @@ async function getPublicSiteDetailUncached(
       reviews: [],
       scamReports: [],
       dnsRecords: [],
+      observationSnapshot: observationSnapshotResult.error
+        ? null
+        : ((observationSnapshotResult.data ?? null) as PublicSiteObservationSnapshot | null),
       errorMessage: "승인된 리뷰 목록을 불러오지 못했습니다.",
       source: "supabase",
     };
@@ -464,6 +484,9 @@ async function getPublicSiteDetailUncached(
       mapScamReportRow(report, nicknameMap),
     ),
     dnsRecords: [],
+    observationSnapshot: observationSnapshotResult.error
+      ? null
+      : ((observationSnapshotResult.data ?? null) as PublicSiteObservationSnapshot | null),
     errorMessage: "",
     source: "supabase",
   };
@@ -476,7 +499,7 @@ async function getPublicReviewListUncached(): Promise<
     supabase
       .from("sites")
       .select(
-        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, category, available_states, license_info, resolved_ips, dns_checked_at, description",
+        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, category, available_states, license_info, resolved_ips, dns_checked_at, description",
       )
       .eq("status", "approved"),
     supabase
@@ -547,7 +570,7 @@ async function getPublicScamReportListUncached(): Promise<
     supabase
       .from("sites")
       .select(
-        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, category, available_states, license_info, resolved_ips, dns_checked_at, description",
+        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, category, available_states, license_info, resolved_ips, dns_checked_at, description",
       )
       .eq("status", "approved"),
     supabase

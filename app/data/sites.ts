@@ -27,6 +27,7 @@ export type ReviewTarget = {
   screenshotUrl: string | null;
   screenshotThumbUrl?: string | null;
   faviconUrl?: string | null;
+  logoUrl?: string | null;
   category: string;
   availableStates: string[];
   licenseInfo: string;

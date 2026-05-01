@@ -4,13 +4,29 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
+import {
+  buildAutomaticCrawlFailureBody,
+  detectAutomaticAccessChallenge,
+} from "@/app/data/automatic-crawl-support";
 import { buildSiteScreenshotUrl } from "@/app/data/site-screenshot";
 
 export const runtime = "nodejs";
 
 type CaptureResponse = {
   imageUrl?: unknown;
+  challenge_detected?: unknown;
+  challengeDetected?: unknown;
 };
+
+class CaptureApiError extends Error {
+  challengeDetected: boolean;
+
+  constructor(message: string, challengeDetected: boolean) {
+    super(message);
+    this.name = "CaptureApiError";
+    this.challengeDetected = challengeDetected;
+  }
+}
 
 const PRIVATE_IPV4_RANGES = [
   /^0\./,
@@ -147,9 +163,18 @@ async function captureWithLightsail(targetUrl: string) {
     45_000,
   );
   const result = (await response.json().catch(() => null)) as CaptureResponse | null;
+  const challengeDetected = detectAutomaticAccessChallenge({
+    statusCode: response.status,
+    headers: response.headers,
+    explicitChallengeDetected:
+      result?.challenge_detected === true || result?.challengeDetected === true,
+  });
 
   if (!response.ok || typeof result?.imageUrl !== "string") {
-    throw new Error("Lightsail 캡처 API 응답이 올바르지 않습니다.");
+    throw new CaptureApiError(
+      "Lightsail 캡처 API 응답이 올바르지 않습니다.",
+      challengeDetected,
+    );
   }
 
   return result.imageUrl;
@@ -241,7 +266,11 @@ export async function POST(request: Request) {
 
     try {
       temporaryImageUrl = await captureWithLightsail(targetUrl.toString());
-    } catch {
+    } catch (error) {
+      if (error instanceof CaptureApiError && error.challengeDetected) {
+        throw error;
+      }
+
       source = "mshots";
       temporaryImageUrl = buildSiteScreenshotUrl(targetUrl.toString());
     }
@@ -256,14 +285,16 @@ export async function POST(request: Request) {
       source,
     });
   } catch (error) {
+    const challengeDetected =
+      error instanceof CaptureApiError ? error.challengeDetected : false;
+
     return NextResponse.json(
-      {
-        ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "사이트 캡처 중 문제가 발생했습니다.",
-      },
+      buildAutomaticCrawlFailureBody(
+        error instanceof Error
+          ? error.message
+          : "사이트 캡처 중 문제가 발생했습니다.",
+        challengeDetected,
+      ),
       { status: 400 },
     );
   }

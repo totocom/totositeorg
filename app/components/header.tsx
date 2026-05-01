@@ -1,21 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthNav } from "@/app/components/auth-nav";
 import { ThemeToggle } from "@/app/components/theme-toggle";
-
-const navItems = [
-  { href: "/", label: "홈" },
-  { href: "/sites", label: "사이트 목록" },
-  { href: "/blog", label: "블로그" },
-  { href: "/reviews", label: "만족도 평가" },
-  { href: "/scam-reports", label: "먹튀 제보" },
-  { href: "/site-registration", label: "사이트 등록" },
-];
+import { primaryNavigationLinks } from "@/app/data/site-navigation";
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(true);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const syncViewport = () => {
+      setIsDesktopViewport(mediaQuery.matches);
+
+      if (mediaQuery.matches) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    syncViewport();
+    mediaQuery.addEventListener("change", syncViewport);
+
+    return () => {
+      mediaQuery.removeEventListener("change", syncViewport);
+    };
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[#111111]">
@@ -40,7 +51,7 @@ export function Header() {
             type="button"
             onClick={() => setIsMenuOpen((current) => !current)}
             aria-expanded={isMenuOpen}
-            aria-controls="mobile-navigation"
+            aria-controls={isMenuOpen ? "mobile-navigation" : undefined}
             aria-label={isMenuOpen ? "메뉴 닫기" : "메뉴 열기"}
             className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-white/20 text-white transition hover:bg-white/10 md:hidden"
           >
@@ -63,46 +74,49 @@ export function Header() {
             </span>
           </button>
 
-          <nav className="hidden items-center gap-1 md:flex">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded-md px-3 py-2 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
-              >
-                {item.label}
-              </Link>
-            ))}
-            <div className="ml-1 flex items-center gap-1 [&_a]:text-white/70 [&_a:hover]:text-white [&_button]:text-white/70 [&_button:hover]:text-white">
+          {isDesktopViewport ? (
+            <nav className="hidden items-center gap-1 md:flex" aria-label="주요 메뉴">
+              {primaryNavigationLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-md px-3 py-2 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <div className="ml-1 flex items-center gap-1 [&_a]:text-white/70 [&_a:hover]:text-white [&_button]:text-white/70 [&_button:hover]:text-white">
+                <AuthNav />
+                <ThemeToggle />
+              </div>
+            </nav>
+          ) : null}
+        </div>
+
+        {!isDesktopViewport && isMenuOpen ? (
+          <nav
+            id="mobile-navigation"
+            className="mt-3 grid gap-2 rounded-lg border border-white/10 bg-[#1a1a1a] p-3 md:hidden [&_a]:flex [&_a]:min-h-11 [&_a]:items-center [&_a]:rounded-md [&_a]:px-3 [&_a]:py-2 [&_button]:flex [&_button]:min-h-11 [&_button]:items-center [&_button]:rounded-md [&_button]:px-3 [&_button]:py-2"
+            aria-label="모바일 주요 메뉴"
+          >
+            <div className="grid gap-1">
+              {primaryNavigationLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+            <div className="grid gap-1 border-t border-white/10 pt-2 [&_a]:text-white/70 [&_a:hover]:text-white [&_button]:text-white/70 [&_button:hover]:text-white">
               <AuthNav />
               <ThemeToggle />
             </div>
           </nav>
-        </div>
-
-        <nav
-          id="mobile-navigation"
-          className={`md:hidden ${
-            isMenuOpen ? "grid" : "hidden"
-          } mt-3 gap-2 rounded-lg border border-white/10 bg-[#1a1a1a] p-3 [&_a]:flex [&_a]:min-h-11 [&_a]:items-center [&_a]:rounded-md [&_a]:px-3 [&_a]:py-2 [&_button]:flex [&_button]:min-h-11 [&_button]:items-center [&_button]:rounded-md [&_button]:px-3 [&_button]:py-2`}
-        >
-          <div className="grid gap-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setIsMenuOpen(false)}
-                className="text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-          <div className="grid gap-1 border-t border-white/10 pt-2 [&_a]:text-white/70 [&_a:hover]:text-white [&_button]:text-white/70 [&_button:hover]:text-white">
-            <AuthNav />
-            <ThemeToggle />
-          </div>
-        </nav>
+        ) : null}
       </div>
     </header>
   );

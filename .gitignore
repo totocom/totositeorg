@@ -23,6 +23,9 @@
 # misc
 .DS_Store
 *.pem
+.claude/settings.local.json
+supabase-remote-backup-before-migration.sql
+/supabase/.temp/
 
 # debug
 npm-debug.log*

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SiteBlogVisualSummary } from "@/app/components/site-blog-visual-summary";
 import {
   getBlogCategoryLabel,
   getBlogPrimaryCategoryFromLabel,
@@ -14,6 +15,7 @@ import {
   getPublicBlogPosts,
   type PublicBlogPost,
 } from "@/app/data/public-blog-posts";
+import { buildBlogImageMetadata } from "@/app/data/blog-visuals";
 import { siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 300;
@@ -62,12 +64,20 @@ function hasIdenticalTitleMetaH1(post: PublicBlogPost) {
 function getSectionInternalLinkPlacements(heading: string) {
   const normalizedHeading = heading.toLowerCase();
   const placements: string[] = [];
-
-  if (
-    normalizedHeading.includes("도메인") ||
+  const hasAddressOrDomain =
+    normalizedHeading.includes("주소") ||
+    normalizedHeading.includes("도메인");
+  const hasDnsOrWhois =
     normalizedHeading.includes("dns") ||
-    normalizedHeading.includes("whois")
-  ) {
+    normalizedHeading.includes("whois") ||
+    normalizedHeading.includes("네임서버") ||
+    normalizedHeading.includes("ip");
+
+  if (hasAddressOrDomain) {
+    placements.push("address_domain_section");
+  }
+
+  if (hasDnsOrWhois) {
     placements.push("dns_section");
   }
 
@@ -190,12 +200,10 @@ function BlogPostInternalLinkHub({
   primaryCategory,
   primaryCategoryLabel,
   sourceSite,
-  relatedPosts,
 }: {
   primaryCategory: BlogCategorySlug;
   primaryCategoryLabel: string;
   sourceSite: PublicBlogPost["sourceSite"];
-  relatedPosts: PublicBlogPost[];
 }) {
   return (
     <section className="border-b border-line py-6">
@@ -207,9 +215,9 @@ function BlogPostInternalLinkHub({
             href={`/blog/category/${primaryCategory}`}
             className="font-bold text-foreground underline decoration-accent/40 underline-offset-4 transition hover:text-accent"
           >
-            {primaryCategoryLabel}
+            {primaryCategoryLabel} 카테고리
           </Link>{" "}
-          카테고리에 포함된 조회 데이터 기반 정보 정리입니다.
+          에 포함된 조회 데이터 기반 정보 정리입니다.
         </p>
         {sourceSite ? (
           <p>
@@ -218,31 +226,13 @@ function BlogPostInternalLinkHub({
               href={sourceSite.href}
               className="font-bold text-foreground underline decoration-accent/40 underline-offset-4 transition hover:text-accent"
             >
-              {sourceSite.name} 상세 정보 페이지
+              {sourceSite.name} 확인 데이터
             </Link>
             에서 확인할 수 있습니다.
           </p>
         ) : null}
       </div>
 
-      {relatedPosts.length > 0 ? (
-        <div className="mt-5">
-          <h3 className="text-sm font-bold uppercase text-muted">
-            관련 블로그 글
-          </h3>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {relatedPosts.slice(0, 4).map((relatedPost) => (
-              <Link
-                key={relatedPost.slug}
-                href={`/blog/${relatedPost.slug}`}
-                className="rounded-md border border-line bg-background px-3 py-2 text-sm font-semibold leading-6 text-foreground transition hover:border-accent hover:text-accent"
-              >
-                {relatedPost.title}
-              </Link>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -274,6 +264,10 @@ export async function generateMetadata({
 
   const canonicalUrl = `${siteUrl}/blog/${post.slug}`;
   const metaDescription = getPostMetaDescription(post);
+  const imageMetadata = buildBlogImageMetadata({
+    featuredImageUrl: post.featuredImageUrl,
+    featuredImageAlt: post.featuredImageAlt,
+  });
 
   return {
     title: post.metaTitle || post.title,
@@ -290,11 +284,13 @@ export async function generateMetadata({
       publishedTime: post.publishedAt,
       modifiedTime: post.updatedAt,
       authors: [siteName],
+      images: imageMetadata.openGraphImages,
     },
     twitter: {
       card: "summary_large_image",
       title: post.metaTitle || post.title,
       description: metaDescription,
+      images: imageMetadata.twitterImages,
     },
   };
 }
@@ -310,6 +306,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const articleUrl = `${siteUrl}/blog/${post.slug}`;
   const h1 = post.h1 || post.title;
   const metaDescription = getPostMetaDescription(post);
+  const imageMetadata = buildBlogImageMetadata({
+    featuredImageUrl: post.featuredImageUrl,
+    featuredImageAlt: post.featuredImageAlt,
+  });
   const titleMetaH1Warnings = hasIdenticalTitleMetaH1(post)
     ? ["관리자 경고: title, meta_title, h1이 모두 동일합니다."]
     : [];
@@ -382,6 +382,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       name: siteName,
     },
     articleSection: primaryCategoryLabel,
+    ...(imageMetadata.jsonLdImage ? { image: imageMetadata.jsonLdImage } : {}),
   };
 
   const breadcrumbJsonLd = {
@@ -483,6 +484,17 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <h1 className="mt-4 text-3xl font-extrabold leading-tight text-foreground sm:text-4xl">
               {h1}
             </h1>
+            {post.sourceSite ? (
+              <SiteBlogVisualSummary
+                siteName={post.sourceSite.name}
+                siteHref={post.sourceSite.href}
+                logoUrl={post.siteLogoUrl}
+                logoAlt={post.siteLogoAlt}
+                screenshotUrl={post.featuredImageUrl}
+                screenshotAlt={post.featuredImageAlt}
+                screenshotCaption={post.featuredImageCaption}
+              />
+            ) : null}
             <p className="mt-4 text-base leading-7 text-muted">
               {post.description}
             </p>
@@ -510,7 +522,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             primaryCategory={primaryCategory}
             primaryCategoryLabel={primaryCategoryLabel}
             sourceSite={post.sourceSite}
-            relatedPosts={relatedPosts}
           />
 
           <section className="border-b border-line py-6">

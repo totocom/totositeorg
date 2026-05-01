@@ -2,10 +2,20 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { AdminBlogManager } from "@/app/components/admin-blog-manager";
+import {
+  AdminSiteObservationPanel,
+  type AdminSiteObservationDraft,
+} from "@/app/components/admin-site-observation-panel";
 import { useAuth } from "@/app/components/auth-provider";
 import { ReviewSummary } from "@/app/components/review-summary";
 import { ScreenshotUploadControl } from "@/app/components/screenshot-upload-control";
+import {
+  automaticCrawlManualHtmlFallbackText,
+  automaticCrawlSupportGuideText,
+} from "@/app/data/automatic-crawl-support";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
+import type { SiteCrawlSnapshotSiteColumns } from "@/app/data/site-crawl-snapshots";
+import { getAllowedStoredImageUrl } from "@/app/data/storage-image-url";
 import {
   formatRatingScore,
   issueTypeLabels,
@@ -26,7 +36,7 @@ export type AdminSection =
   | "rejected-reviews"
   | "surveys";
 
-type SiteRow = {
+type SiteRow = SiteCrawlSnapshotSiteColumns & {
   id: string;
   slug: string;
   name: string;
@@ -151,6 +161,9 @@ type SiteMetadata = {
   faviconUrl: string;
   finalUrl: string;
   statusCode: number;
+  challenge_detected?: boolean;
+  guidance?: string;
+  fallback_available?: "manual_html";
 };
 
 type WhoisInfo = {
@@ -209,6 +222,8 @@ type AdminDataResult =
 const adminStatusLabels = moderationStatusLabels;
 const defaultSiteCategory = "기타 베팅";
 const defaultLicenseInfo = "관리자 등록 사이트";
+const automaticMetadataFailureFallback = `도메인 정보를 가져오지 못했습니다. ${automaticCrawlManualHtmlFallbackText} ${automaticCrawlSupportGuideText}`;
+const automaticCaptureFailureFallback = `페이지 캡처 이미지를 생성하지 못했습니다. ${automaticCrawlManualHtmlFallbackText} ${automaticCrawlSupportGuideText}`;
 
 const initialAdminSiteFormValues: AdminSiteFormValues = {
   nameKo: "",
@@ -422,6 +437,8 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
   const [isStoringFavicon, setIsStoringFavicon] = useState(false);
   const [pageCaptureMessage, setPageCaptureMessage] = useState("");
   const [pageCaptureErrorMessage, setPageCaptureErrorMessage] = useState("");
+  const [siteObservationDraft, setSiteObservationDraft] =
+    useState<AdminSiteObservationDraft | null>(null);
 
   const pendingSites = useMemo(
     () => sites.filter((site) => site.status === "pending"),
@@ -1020,6 +1037,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setDnsErrorMessage("");
     if (key === "url") {
       setPendingPageCaptureUrl("");
+      setSiteObservationDraft(null);
     }
     setPageCaptureMessage("");
     setPageCaptureErrorMessage("");
@@ -1103,7 +1121,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
 
     if (!response.ok || !result) {
       setMetadataErrorMessage(
-        result?.error ?? "도메인 정보를 가져오지 못했습니다.",
+        `${result?.challenge_detected ? "challenge_detected: true · " : ""}${
+          result?.error ?? automaticMetadataFailureFallback
+        }`,
       );
       return;
     }
@@ -1113,13 +1133,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       ...current,
       nameKo: current.nameKo.trim() || result.siteName || result.title,
       faviconUrl: current.faviconUrl.trim() || result.faviconUrl || "",
-      description:
-        current.description.trim().length >= 30
-          ? current.description
-          : result.description || current.description,
     }));
     setMetadataMessage(
-      "도메인 정보를 가져왔습니다. 비어 있거나 짧은 항목을 자동으로 채웠습니다.",
+      "도메인 정보를 가져왔습니다. 사이트명과 파비콘 후보를 자동으로 채웠습니다.",
     );
   }
 
@@ -1279,6 +1295,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
           screenshotThumbUrl?: string;
           source?: "lightsail" | "mshots";
           error?: string;
+          challenge_detected?: boolean;
+          guidance?: string;
+          fallback_available?: "manual_html";
         }
       | null;
 
@@ -1286,7 +1305,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
 
     if (!response.ok || !result?.ok || !result.screenshotUrl) {
       setPageCaptureErrorMessage(
-        result?.error ?? "페이지 캡처 이미지를 생성하지 못했습니다.",
+        `${result?.challenge_detected ? "challenge_detected: true · " : ""}${
+          result?.error ?? automaticCaptureFailureFallback
+        }`,
       );
       return;
     }
@@ -1324,6 +1345,51 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setPageCaptureErrorMessage("");
   }
 
+  async function savePendingObservationSnapshot(
+    siteId: string,
+    draft: AdminSiteObservationDraft,
+    faviconUrl: string,
+  ) {
+    const token = await getAdminToken();
+
+    if (!token) {
+      throw new Error("관리자 로그인 세션을 확인하지 못했습니다.");
+    }
+
+    const response = await fetch("/api/admin/sites/crawl-snapshots", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        siteId,
+        sourceType: "manual_html",
+        htmlInputType: draft.htmlInputType,
+        sourceUrl: draft.sourceUrl,
+        finalUrl: draft.finalUrl,
+        domain: draft.domain,
+        collectedAt: draft.collectedAt,
+        observation: draft.observation,
+        aiDetailDescriptionMd: draft.aiDetailDescriptionMd,
+        aiObservationSummaryJson: draft.aiObservationSummaryJson,
+        screenshotUrl: pageCaptureUrl,
+        screenshotThumbUrl: pageCaptureThumbUrl,
+        faviconUrl,
+        snapshotStatus: draft.snapshotStatus,
+      }),
+    });
+    const result = (await response.json().catch(() => null)) as
+      | { snapshotId?: string; error?: string }
+      | null;
+
+    if (!response.ok || !result?.snapshotId) {
+      throw new Error(result?.error ?? "관측 snapshot을 저장하지 못했습니다.");
+    }
+
+    return result.snapshotId;
+  }
+
   async function createSite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -1334,8 +1400,21 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       return;
     }
 
-    if (pageCaptureUrl.trim() && !isValidUrl(pageCaptureUrl.trim())) {
-      setSiteFormErrorMessage("수동 캡처 이미지 URL 형식이 올바르지 않습니다.");
+    const storedPageCaptureUrl = getAllowedStoredImageUrl(pageCaptureUrl);
+    const storedPageCaptureThumbUrl =
+      getAllowedStoredImageUrl(pageCaptureThumbUrl);
+
+    if (pageCaptureUrl.trim() && !storedPageCaptureUrl) {
+      setSiteFormErrorMessage(
+        "수동 캡처 이미지는 Supabase Storage 또는 자체 도메인 이미지 URL만 사용할 수 있습니다.",
+      );
+      return;
+    }
+
+    if (pageCaptureThumbUrl.trim() && !storedPageCaptureThumbUrl) {
+      setSiteFormErrorMessage(
+        "수동 캡처 썸네일은 Supabase Storage 또는 자체 도메인 이미지 URL만 사용할 수 있습니다.",
+      );
       return;
     }
 
@@ -1367,8 +1446,8 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
         name_en: siteFormValues.nameEn.trim() || null,
         url: siteFormValues.url.trim(),
         domains: getDomainList(siteFormValues),
-        screenshot_url: pageCaptureUrl.trim() || null,
-        screenshot_thumb_url: pageCaptureThumbUrl.trim() || null,
+        screenshot_url: storedPageCaptureUrl,
+        screenshot_thumb_url: storedPageCaptureThumbUrl,
         favicon_url: faviconUrl || null,
         category: defaultSiteCategory,
         available_states: ["전체"],
@@ -1418,8 +1497,41 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
       return;
     }
 
+    let snapshotWarning = "";
+
+    if (siteObservationDraft) {
+      try {
+        const snapshotId = await savePendingObservationSnapshot(
+          insertedSite.id,
+          siteObservationDraft,
+          faviconUrl,
+        );
+
+        if (siteObservationDraft.descriptionApplied) {
+          const { error: descriptionSourceError } = await supabase
+            .from("sites")
+            .update({
+              description_source_snapshot_id: snapshotId,
+              description_generated_at: new Date().toISOString(),
+            })
+            .eq("id", insertedSite.id);
+
+          if (descriptionSourceError) {
+            snapshotWarning =
+              "설명 출처 snapshot 참조 저장에 실패했습니다. 수정 화면에서 다시 반영해주세요.";
+          }
+        }
+      } catch (error) {
+        snapshotWarning =
+          error instanceof Error
+            ? `관측 snapshot 저장에 실패했습니다. ${error.message}`
+            : "관측 snapshot 저장에 실패했습니다.";
+      }
+    }
+
     setIsCreatingSite(false);
     setSiteFormValues(initialAdminSiteFormValues);
+    setSiteObservationDraft(null);
     setMetadata(null);
     setMetadataMessage("");
     setMetadataErrorMessage("");
@@ -1435,7 +1547,9 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setPendingPageCaptureThumbUrl("");
     setPageCaptureMessage("");
     setPageCaptureErrorMessage("");
-    setSiteFormMessage("사이트가 등록되었습니다.");
+    setSiteFormMessage(
+      snapshotWarning ? `사이트가 등록되었습니다. ${snapshotWarning}` : "사이트가 등록되었습니다.",
+    );
     await loadAdminData();
   }
 
@@ -1466,6 +1580,19 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     showReviews ||
     showScamReports ||
     showRejectedReviews;
+  const metadataFaviconPreviewUrl = getAllowedStoredImageUrl(
+    metadata?.faviconUrl,
+  );
+  const siteFaviconPreviewUrl = getAllowedStoredImageUrl(
+    siteFormValues.faviconUrl,
+  );
+  const pendingPageCapturePreviewUrl =
+    getAllowedStoredImageUrl(pendingPageCaptureThumbUrl) ??
+    getAllowedStoredImageUrl(pendingPageCaptureUrl);
+  const pageCapturePreviewUrl =
+    getAllowedStoredImageUrl(pageCaptureThumbUrl) ??
+    getAllowedStoredImageUrl(pageCaptureUrl);
+
   return (
     <div className="grid w-full gap-5">
       {errorMessage ? (
@@ -1662,13 +1789,14 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
                     className={`h-9 rounded-md border px-3 text-xs font-semibold transition ${
                       whoisProvider === option.value
                         ? "border-accent bg-accent text-white"
-                        : "border-line bg-white text-foreground hover:bg-background"
+                        : "border-line bg-surface text-foreground hover:bg-background"
                     }`}
                   >
                     {option.label}
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-muted">{automaticCrawlSupportGuideText}</p>
               {siteFormErrors.url ? (
                 <span className="text-xs text-red-700">{siteFormErrors.url}</span>
               ) : null}
@@ -1690,10 +1818,10 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
           {metadata ? (
             <div className="grid gap-3 rounded-md border border-line bg-background p-4 text-sm">
               <div className="flex items-start gap-3">
-                {metadata.imageUrl || metadata.faviconUrl ? (
+                {metadataFaviconPreviewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={metadata.imageUrl || metadata.faviconUrl}
+                    src={metadataFaviconPreviewUrl}
                     alt=""
                     className="h-16 w-16 rounded-md border border-line object-cover"
                   />
@@ -1712,6 +1840,40 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
               </div>
             </div>
           ) : null}
+
+          <AdminSiteObservationPanel
+            siteName={getDisplayName(
+              siteFormValues.nameKo,
+              siteFormValues.nameEn,
+            )}
+            siteUrl={siteFormValues.url}
+            description={siteFormValues.description}
+            onDescriptionChange={(description) =>
+              updateSiteForm("description", description)
+            }
+            onDescriptionErrorClear={() =>
+              setSiteFormErrors((current) => ({
+                ...current,
+                description: undefined,
+              }))
+            }
+            onPendingSnapshotChange={setSiteObservationDraft}
+            screenshotUrl={pageCaptureUrl}
+            screenshotThumbUrl={pageCaptureThumbUrl}
+            faviconUrl={siteFormValues.faviconUrl}
+            descriptionError={siteFormErrors.description}
+          />
+
+          <section className="grid gap-4 rounded-md border border-line bg-background p-4">
+            <div>
+              <p className="text-xs font-semibold uppercase text-accent">
+                스크린샷 영역
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                기존 캡처, 수동 업로드, 파비콘 저장 흐름을 유지합니다. 사이트
+                레코드에는 등록 버튼을 누를 때 확정 반영됩니다.
+              </p>
+            </div>
 
           <div className="grid gap-2 text-sm font-medium">
             파비콘 이미지
@@ -1748,12 +1910,14 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
 
           {siteFormValues.faviconUrl ? (
             <div className="flex items-center gap-3 rounded-md border border-line bg-background p-3 text-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={siteFormValues.faviconUrl}
-                alt="파비콘 미리보기"
-                className="h-10 w-10 rounded-md border border-line bg-white object-contain"
-              />
+              {siteFaviconPreviewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={siteFaviconPreviewUrl}
+                  alt="파비콘 미리보기"
+                  className="h-10 w-10 rounded-md border border-line bg-surface object-contain"
+                />
+              ) : null}
               <span className="break-all text-muted">
                 {siteFormValues.faviconUrl}
               </span>
@@ -1786,12 +1950,14 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
                   이 이미지를 사이트 목록에 사용할지 확인해주세요.
                 </p>
               </div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={pendingPageCaptureThumbUrl || pendingPageCaptureUrl}
-                alt="입력한 사이트의 페이지 캡처 미리보기"
-                className="aspect-video w-full rounded-md border border-line bg-white object-cover"
-              />
+              {pendingPageCapturePreviewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={pendingPageCapturePreviewUrl}
+                  alt="입력한 사이트의 페이지 캡처 미리보기"
+                  className="aspect-video w-full rounded-md border border-line bg-surface object-cover"
+                />
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -1821,16 +1987,22 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
                   사이트 등록 완료 시 이 이미지가 사이트 목록과 상세 화면에 표시됩니다.
                 </p>
               </div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={pageCaptureThumbUrl || pageCaptureUrl}
-                alt="저장할 사이트 캡처 이미지"
-                className="aspect-video w-full rounded-md border border-line bg-white object-cover"
-              />
+              {pageCapturePreviewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={pageCapturePreviewUrl}
+                  alt="저장할 사이트 캡처 이미지"
+                  className="aspect-video w-full rounded-md border border-line bg-surface object-cover"
+                />
+              ) : (
+                <p className="rounded-md border border-line bg-surface px-3 py-2 text-xs text-muted">
+                  저장소 또는 자체 도메인 이미지 URL만 미리보기로 표시합니다.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={cancelPageCapturePreview}
-                className="h-10 w-fit rounded-md border border-line bg-white px-4 text-sm font-semibold transition hover:bg-background"
+                className="h-10 w-fit rounded-md border border-line bg-surface px-4 text-sm font-semibold transition hover:bg-background"
               >
                 이미지 선택 취소
               </button>
@@ -1848,6 +2020,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
               {pageCaptureErrorMessage}
             </div>
           ) : null}
+          </section>
 
           <label className="grid gap-1 text-sm font-medium">
             추가 도메인
@@ -1910,7 +2083,7 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
                 <h3 className="mt-1 text-base font-bold">{dnsInfo.domain}</h3>
               </div>
               {dnsInfo.errorMessage ? (
-                <p className="rounded-md bg-white p-3 text-muted">
+                <p className="rounded-md bg-surface p-3 text-muted">
                   {dnsInfo.errorMessage}
                 </p>
               ) : null}
@@ -1925,23 +2098,6 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
               </dl>
             </div>
           ) : null}
-
-          <label className="grid gap-1 text-sm font-medium">
-            사이트 설명
-            <textarea
-              value={siteFormValues.description}
-              onChange={(event) =>
-                updateSiteForm("description", event.target.value)
-              }
-              className="min-h-28 rounded-md border border-line px-3 py-3 text-sm"
-              placeholder="사이트의 서비스 범위와 확인이 필요한 정보를 작성해주세요."
-            />
-            {siteFormErrors.description ? (
-              <span className="text-xs text-red-700">
-                {siteFormErrors.description}
-              </span>
-            ) : null}
-          </label>
 
           <button
             type="submit"
@@ -2253,7 +2409,7 @@ function SummaryCard({
 
 function DnsRecord({ label, values }: { label: string; values: string[] }) {
   return (
-    <div className="rounded-md bg-white p-3">
+    <div className="rounded-md bg-surface p-3">
       <dt className="text-xs font-semibold text-muted">{label}</dt>
       <dd className="mt-1 break-all text-foreground">
         {values.length > 0 ? values.join(", ") : "없음"}
@@ -2284,44 +2440,44 @@ function WhoisInfoCard({ whoisInfo }: { whoisInfo: WhoisLookupResult }) {
         </p>
       </div>
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">등록기관</dt>
           <dd className="mt-1 text-foreground">
             {whoisInfo.registrar || "확인 불가"}
           </dd>
         </div>
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">등록일</dt>
           <dd className="mt-1 text-foreground">
             {formatOptionalDate(whoisInfo.creationDate)}
           </dd>
         </div>
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">만료일</dt>
           <dd className="mt-1 text-foreground">
             {formatOptionalDate(whoisInfo.expirationDate)}
           </dd>
         </div>
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">최근 갱신일</dt>
           <dd className="mt-1 text-foreground">
             {formatOptionalDate(whoisInfo.updatedDate)}
           </dd>
         </div>
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">WHOIS 서버</dt>
           <dd className="mt-1 break-all text-foreground">
             {whoisInfo.whoisServer || "확인 불가"}
           </dd>
         </div>
-        <div className="rounded-md bg-white p-3">
+        <div className="rounded-md bg-surface p-3">
           <dt className="text-xs font-semibold text-muted">DNSSEC</dt>
           <dd className="mt-1 text-foreground">
             {whoisInfo.dnssec || "확인 불가"}
           </dd>
         </div>
       </dl>
-      <div className="rounded-md bg-white p-3">
+      <div className="rounded-md bg-surface p-3">
         <p className="text-xs font-semibold text-muted">네임서버</p>
         <p className="mt-1 break-all text-foreground">
           {whoisInfo.nameServers.length > 0
