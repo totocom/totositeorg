@@ -55,12 +55,12 @@ export async function generateMetadata({
 
   return {
     title: `${tag.label} 태그 글 | 블로그`,
-    description: `${tag.label} 태그로 묶인 공개 블로그 글 목록입니다.`,
+    description: `${tag.label} 태그로 묶인 발행 블로그 글 목록입니다.`,
     alternates: { canonical: canonicalUrl },
     openGraph: {
       url: canonicalUrl,
       title: `${tag.label} 태그 글 | ${siteName}`,
-      description: `${tag.label} 태그로 묶인 공개 블로그 글 목록입니다.`,
+      description: `${tag.label} 태그로 묶인 발행 블로그 글 목록입니다.`,
     },
   };
 }
@@ -79,7 +79,7 @@ export default async function BlogTagPage({ params }: BlogTagPageProps) {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     name: `${tag.label} 태그 글`,
-    description: `${tag.label} 태그로 묶인 공개 블로그 글 목록입니다.`,
+    description: `${tag.label} 태그로 묶인 발행 블로그 글 목록입니다.`,
     url: `${siteUrl}/blog/tag/${encodeURIComponent(tag.slug)}`,
     mainEntity: posts.map((post, index) => ({
       "@type": "ListItem",
@@ -113,10 +113,10 @@ export default async function BlogTagPage({ params }: BlogTagPageProps) {
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">
             태그는 사이트명, DNS, WHOIS, 먹튀 피해 제보처럼 글의 세부
-            키워드를 묶습니다. 큰 주제 분류는 카테고리에서 관리합니다.
+            주제를 묶습니다. 큰 주제 분류는 카테고리에서 관리합니다.
           </p>
           <p className="mt-3 text-sm font-semibold text-muted">
-            공개 글 {posts.length}개
+            발행 글 {posts.length}개
           </p>
         </header>
 

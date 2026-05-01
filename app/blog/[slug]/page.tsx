@@ -6,13 +6,13 @@ import {
   getBlogPrimaryCategoryFromLabel,
   getBlogTagSlug,
   type BlogCategorySlug,
-  type BlogPost,
 } from "@/app/data/blog-posts";
 import {
   canIndexBlogPostState,
   getBlogPostIndexStateBySlug,
   getPublicBlogPostBySlug,
   getPublicBlogPosts,
+  type PublicBlogPost,
 } from "@/app/data/public-blog-posts";
 import { siteName, siteUrl } from "@/lib/config";
 
@@ -96,8 +96,8 @@ function BlogPostInternalLinkHub({
 }: {
   primaryCategory: BlogCategorySlug;
   primaryCategoryLabel: string;
-  sourceSite: BlogPost["sourceSite"];
-  relatedPosts: BlogPost[];
+  sourceSite: PublicBlogPost["sourceSite"];
+  relatedPosts: PublicBlogPost[];
 }) {
   return (
     <section className="border-b border-line py-6">
@@ -111,7 +111,7 @@ function BlogPostInternalLinkHub({
           >
             {primaryCategoryLabel}
           </Link>{" "}
-          카테고리에 포함된 공개 데이터 기반 정보 정리입니다.
+          카테고리에 포함된 조회 데이터 기반 정보 정리입니다.
         </p>
         {sourceSite ? (
           <p>
@@ -175,12 +175,10 @@ export async function generateMetadata({
   }
 
   const canonicalUrl = `${siteUrl}/blog/${post.slug}`;
-  const keywords = [post.primaryKeyword, ...post.secondaryKeywords];
 
   return {
     title: post.metaTitle,
     description: post.description,
-    keywords,
     robots,
     alternates: {
       canonical: canonicalUrl,
@@ -206,7 +204,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   }
 
   const articleUrl = `${siteUrl}/blog/${post.slug}`;
-  const keywords = [post.primaryKeyword, ...post.secondaryKeywords];
   const primaryCategory =
     post.primaryCategory ?? getBlogPrimaryCategoryFromLabel(post.category);
   const primaryCategoryLabel = getBlogCategoryLabel(primaryCategory);
@@ -269,7 +266,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       name: siteName,
     },
     articleSection: primaryCategoryLabel,
-    keywords: keywords.join(", "),
   };
 
   const breadcrumbJsonLd = {
@@ -355,9 +351,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 {primaryCategoryLabel}
               </span>
               <span className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-muted">
-                우선순위 {post.priority}
-              </span>
-              <span className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-muted">
                 {post.readingMinutes}분 읽기
               </span>
             </div>
@@ -385,18 +378,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 ))}
               </div>
             ) : null}
-            <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-              <div className="rounded-lg border border-line bg-background p-4">
-                <dt className="font-bold text-foreground">핵심 키워드</dt>
-                <dd className="mt-1 text-muted">{post.primaryKeyword}</dd>
-              </div>
-              <div className="rounded-lg border border-line bg-background p-4">
-                <dt className="font-bold text-foreground">검색 의도</dt>
-                <dd className="mt-1 leading-6 text-muted">
-                  {post.searchIntent}
-                </dd>
-              </div>
-            </dl>
           </header>
 
           <BlogPostInternalLinkHub
@@ -408,14 +389,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
           <section className="border-b border-line py-6">
             <h2 className="text-xl font-bold text-foreground">
-              이 글의 작성 방향
+              요약
             </h2>
             <p className="mt-3 text-sm leading-7 text-muted">
               {post.summary}
-            </p>
-            <p className="mt-3 text-sm leading-7 text-muted">
-              독자가 실제로 궁금해하는 질문은 “{post.readerQuestion}”입니다.
-              제목과 본문은 이 질문에 바로 답하도록 구성하세요.
             </p>
             <InternalDataLinks links={summaryInternalLinks} />
           </section>
@@ -456,7 +433,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
           <section className="rounded-lg border border-line bg-background p-5">
             <h2 className="text-xl font-bold text-foreground">
-              글 작성 체크리스트
+              체크리스트
             </h2>
             <ul className="mt-4 grid gap-2 text-sm leading-6 text-muted">
               {post.checklist.map((item) => (
@@ -489,26 +466,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         </article>
 
         <aside className="grid content-start gap-4">
-          <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
-            <h2 className="text-sm font-bold uppercase text-muted">
-              보조 키워드
-            </h2>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {post.secondaryKeywords.map((keyword) => (
-                <span
-                  key={keyword}
-                  className="rounded-md border border-line bg-background px-2 py-1 text-xs font-semibold text-muted"
-                >
-                  {keyword}
-                </span>
-              ))}
-            </div>
-          </section>
-
           {post.verificationSummary ? (
             <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
               <h2 className="text-sm font-bold uppercase text-muted">
-                확인 데이터
+                확인 데이터 요약
               </h2>
               <dl className="mt-3 grid gap-3 text-sm">
                 <div>
@@ -540,7 +501,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   </dd>
                 </div>
                 <div>
-                  <dt className="font-bold text-foreground">공개 승인 데이터</dt>
+                  <dt className="font-bold text-foreground">승인 데이터</dt>
                   <dd className="mt-1 leading-6 text-muted">
                     리뷰 {post.verificationSummary.approvedReviewCount}개
                     <br />
@@ -594,7 +555,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             href="/blog"
             className="inline-flex min-h-11 items-center justify-center rounded-md bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/90"
           >
-            전체 글감 보기
+            전체 글 보기
           </Link>
         </aside>
       </main>

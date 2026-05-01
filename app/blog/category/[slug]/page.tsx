@@ -10,9 +10,11 @@ import {
   getBlogTagSlug,
   type BlogCategory,
   type BlogCategorySlug,
-  type BlogPost,
 } from "@/app/data/blog-posts";
-import { getPublicBlogPostsByCategory } from "@/app/data/public-blog-posts";
+import {
+  getPublicBlogPostsByCategory,
+  type PublicBlogPost,
+} from "@/app/data/public-blog-posts";
 import { siteName, siteUrl } from "@/lib/config";
 
 type BlogCategoryPageProps = {
@@ -30,7 +32,7 @@ export function generateStaticParams() {
   }));
 }
 
-const categoryPagePriorityRank: Record<BlogPost["priority"], number> = {
+const categoryPagePriorityRank: Record<PublicBlogPost["priority"], number> = {
   상: 0,
   중: 1,
   하: 2,
@@ -44,8 +46,8 @@ function getDateTime(value: string | null | undefined) {
 }
 
 function sortPostsByTimeDesc(
-  posts: BlogPost[],
-  getValue: (post: BlogPost) => string | null | undefined,
+  posts: PublicBlogPost[],
+  getValue: (post: PublicBlogPost) => string | null | undefined,
 ) {
   return [...posts].sort((a, b) => {
     const timeDiff = getDateTime(getValue(b)) - getDateTime(getValue(a));
@@ -55,7 +57,7 @@ function sortPostsByTimeDesc(
   });
 }
 
-function getPublicSignalScore(post: BlogPost) {
+function getPublicSignalScore(post: PublicBlogPost) {
   const summary = post.verificationSummary;
 
   if (!summary) return 0;
@@ -67,7 +69,7 @@ function getPublicSignalScore(post: BlogPost) {
   );
 }
 
-function getCategoryPageSections(category: BlogCategory, posts: BlogPost[]) {
+function getCategoryPageSections(category: BlogCategory, posts: PublicBlogPost[]) {
   const latestReports = sortPostsByTimeDesc(
     posts,
     (post) => post.publishedAt || post.updatedAt,
@@ -106,16 +108,16 @@ function getCategoryPageSections(category: BlogCategory, posts: BlogPost[]) {
           ? "최신 사이트 정보 리포트"
           : `최신 ${category.name}`,
       description:
-        "최근 공개된 글을 기준으로 이 카테고리의 최신 리포트를 정리합니다.",
+        "최근 발행된 글을 기준으로 이 카테고리의 최신 리포트를 정리합니다.",
       posts: latestReports,
-      emptyMessage: "아직 공개된 최신 리포트가 없습니다.",
+      emptyMessage: "아직 발행된 최신 리포트가 없습니다.",
     },
     {
-      title: "공개 리뷰·먹튀 제보가 있는 리포트",
+      title: "리뷰·먹튀 제보가 있는 리포트",
       description:
-        "승인된 이용자 리뷰나 공개 먹튀 피해 제보가 연결된 글을 우선 표시합니다.",
+        "승인된 이용자 리뷰나 먹튀 피해 제보가 연결된 글을 우선 표시합니다.",
       posts: publicSignalReports,
-      emptyMessage: "공개 리뷰나 먹튀 제보가 연결된 리포트가 아직 없습니다.",
+      emptyMessage: "리뷰나 먹튀 제보가 연결된 리포트가 아직 없습니다.",
     },
     {
       title: "최근 DNS/WHOIS가 갱신된 리포트",
@@ -127,14 +129,14 @@ function getCategoryPageSections(category: BlogCategory, posts: BlogPost[]) {
     {
       title: "많이 조회된 리포트",
       description:
-        "조회 데이터가 부족한 경우 우선순위와 공개 데이터가 풍부한 글을 먼저 표시합니다.",
+        "조회 데이터가 부족한 경우 우선순위와 확인 데이터가 풍부한 글을 먼저 표시합니다.",
       posts: popularReports,
       emptyMessage: "표시할 리포트가 아직 없습니다.",
     },
   ];
 }
 
-function CategoryPostCard({ post }: { post: BlogPost }) {
+function CategoryPostCard({ post }: { post: PublicBlogPost }) {
   const postPrimaryCategory =
     post.primaryCategory ?? getBlogPrimaryCategoryFromLabel(post.category);
   const verificationSummary = post.verificationSummary;
@@ -170,7 +172,7 @@ function CategoryPostCard({ post }: { post: BlogPost }) {
 
       {verificationSummary ? (
         <div className="mt-4 grid gap-2 text-xs font-semibold text-muted sm:grid-cols-2">
-          <span>공개 리뷰 {verificationSummary.approvedReviewCount}개</span>
+          <span>리뷰 {verificationSummary.approvedReviewCount}개</span>
           <span>
             먹튀 제보 {verificationSummary.approvedPublicScamReportCount}개
           </span>
@@ -204,7 +206,7 @@ function CategoryPostSection({
 }: {
   title: string;
   description: string;
-  posts: BlogPost[];
+  posts: PublicBlogPost[];
   emptyMessage: string;
 }) {
   return (
@@ -320,7 +322,7 @@ export default async function BlogCategoryPage({
             {category.description}
           </p>
           <p className="mt-3 text-sm font-semibold text-muted">
-            {category.purpose} · 공개 글 {posts.length}개
+            {category.purpose} · 발행 글 {posts.length}개
           </p>
         </header>
 

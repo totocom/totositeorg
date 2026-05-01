@@ -7,21 +7,24 @@ import {
   isBlogCategoryValue,
   getBlogPrimaryCategoryFromLabel,
   type BlogPost,
+  type PublicBlogPost,
   type BlogCategorySlug,
   type BlogPostSection,
 } from "@/app/data/blog-posts";
 import { buildBlogVerificationSummary } from "@/app/data/blog-verification";
 import { supabase } from "@/lib/supabase/client";
 
+export type { PublicBlogPost };
+
 type PublicBlogPostsResult = {
-  posts: BlogPost[];
+  posts: PublicBlogPost[];
   errorMessage: string;
   source: "supabase" | "fallback";
 };
 
 type PublicBlogPostResult = PublicBlogPostsResult & {
-  post: BlogPost | null;
-  relatedPosts: BlogPost[];
+  post: PublicBlogPost | null;
+  relatedPosts: PublicBlogPost[];
 };
 
 export type PublicBlogTagSummary = {
@@ -42,11 +45,6 @@ type BlogPostRow = {
   title: string;
   meta_title: string;
   description: string;
-  primary_keyword: string;
-  secondary_keywords: string[] | null;
-  search_intent: string | null;
-  reader_question: string | null;
-  recommended_title_pattern: string | null;
   summary: string | null;
   published_at: string | null;
   content_updated_at: string | null;
@@ -72,7 +70,7 @@ type SiteBlogBacklinkRow = {
   updated_at: string | null;
 };
 
-const priorityRank: Record<BlogPost["priority"], number> = {
+const priorityRank: Record<PublicBlogPost["priority"], number> = {
   상: 0,
   중: 1,
   하: 2,
@@ -90,11 +88,6 @@ const blogPostSelect = [
   "title",
   "meta_title",
   "description",
-  "primary_keyword",
-  "secondary_keywords",
-  "search_intent",
-  "reader_question",
-  "recommended_title_pattern",
   "summary",
   "published_at",
   "content_updated_at",
@@ -108,7 +101,7 @@ const blogPostSelect = [
   "updated_at",
 ].join(", ");
 
-export function sortBlogPosts(posts: BlogPost[]) {
+export function sortBlogPosts(posts: PublicBlogPost[]) {
   return [...posts].sort((a, b) => {
     const priorityDiff = priorityRank[a.priority] - priorityRank[b.priority];
 
@@ -119,7 +112,7 @@ export function sortBlogPosts(posts: BlogPost[]) {
 
 function fallbackBlogPosts(errorMessage = ""): PublicBlogPostsResult {
   return {
-    posts: sortBlogPosts(blogPosts),
+    posts: sortBlogPosts(blogPosts.map(toPublicBlogPost)),
     errorMessage,
     source: "fallback",
   };
@@ -211,6 +204,131 @@ function normalizeStringArray(value: unknown) {
     : [];
 }
 
+const internalPublicContentPatterns = [
+  /\bai\s*planner\b/i,
+  /\bwriting\s*brief\b/i,
+  /\bsearch\s*intent\b/i,
+  /\bconfirmed\s*facts?\b/i,
+  /\binferences?\b/i,
+  /\bunknowns?\b/i,
+  /\bclaim\s*map\b/i,
+  /\bkeyword\s*list\b/i,
+  /\bprimary_keyword\b/i,
+  /\bsecondary_keywords\b/i,
+  /\bsearch_intent\b/i,
+  /\bconfirmed_facts\b/i,
+  /\bwriting_brief\b/i,
+  /\bprohibited_phrase_check\b/i,
+  /검색\s*의도/,
+  /확인된\s*사실/,
+  /추정\s*[:：]/,
+  /미확인\s*항목/,
+  /클레임\s*맵/,
+  /키워드\s*(목록|리스트)/,
+  /작성\s*브리프/,
+];
+
+function normalizePublicSeoText(value: string) {
+  return value
+    .replace(/공개\s*승인된?\s*먹튀\s*피해\s*제보/g, "먹튀 피해 제보")
+    .replace(/공개\s*먹튀\s*피해\s*제보/g, "먹튀 피해 제보")
+    .replace(/공개\s*먹튀\s*제보/g, "먹튀 제보")
+    .replace(/공개\s*제보\s*현황/g, "먹튀 제보 현황")
+    .replace(/공개\s*승인된?\s*데이터/g, "승인 데이터")
+    .replace(/공개\s*승인\s*데이터/g, "승인 데이터")
+    .replace(/공개\s*승인된?\s*피해\s*제보/g, "피해 제보")
+    .replace(/공개\s*승인\s*피해\s*제보/g, "피해 제보")
+    .replace(/공개\s*피해/g, "피해")
+    .replace(/공개\s*승인된?\s*이용자\s*리뷰/g, "이용자 후기")
+    .replace(/공개\s*승인된?\s*리뷰/g, "리뷰")
+    .replace(/공개\s*승인\s*리뷰/g, "리뷰")
+    .replace(/공개\s*데이터/g, "확인 데이터")
+    .replace(/공개\s*제보/g, "제보")
+    .replace(
+      /Source Snapshot의\s+domains\s+배열에서\s+approved\s+상태로\s+(확인|기록)된\s+도메인은/g,
+      "조회 데이터에서 $1된 도메인은",
+    )
+    .replace(
+      /Source Snapshot의\s+sameIpSites\s+항목은\s+빈\s+배열로\s+제공되었습니다\.\s*이는\s+해당\s+스냅샷의\s+조회\s+범위에서/g,
+      "이번 조회에서는",
+    )
+    .replace(/Source Snapshot\s*기준/g, "조회 데이터 기준")
+    .replace(/Source Snapshot/g, "조회 데이터")
+    .replace(/derived_facts\.name_servers에는/g, "네임서버 조회값에는")
+    .replace(/\bdomains\s+배열/g, "도메인 목록")
+    .replace(/approved\s+상태/g, "승인 상태")
+    .replace(/privacy_protected/g, "개인정보 보호 표시")
+    .replace(
+      /lookup_status는\s+success로\s+기록되어\s+있습니다/g,
+      "조회 상태는 정상으로 기록되어 있습니다",
+    )
+    .replace(/\s{2,}/g, " ")
+    .replace(/·\s*·/g, "·")
+    .trim();
+}
+
+function ensurePrimaryKeywordInTitle(value: string, sourceSiteName?: string | null) {
+  const text = normalizePublicSeoText(value);
+  const siteName = sourceSiteName?.trim();
+
+  if (!siteName || text.includes(`${siteName} 토토사이트`)) return text;
+  if (!text.startsWith(siteName)) return text;
+
+  return `${siteName} 토토사이트${text.slice(siteName.length)}`;
+}
+
+function isInternalPublicContent(value: string) {
+  const text = value.trim();
+
+  if (!text) return true;
+  return internalPublicContentPatterns.some((pattern) => pattern.test(text));
+}
+
+function sanitizePublicText(value: unknown, fallback = "") {
+  const lines = getString(value)
+    .split(/\r?\n/)
+    .map((line) => normalizePublicSeoText(line.trim()))
+    .filter((line) => line && !isInternalPublicContent(line));
+
+  return lines.join(" ").trim() || normalizePublicSeoText(fallback);
+}
+
+function sanitizePublicStringArray(value: unknown) {
+  return normalizeStringArray(value)
+    .map((item) => sanitizePublicText(item))
+    .filter(Boolean);
+}
+
+function toPublicBlogPost(post: BlogPost): PublicBlogPost {
+  const {
+    primaryKeyword: _primaryKeyword,
+    secondaryKeywords: _secondaryKeywords,
+    searchIntent: _searchIntent,
+    readerQuestion: _readerQuestion,
+    recommendedTitlePattern: _recommendedTitlePattern,
+    ...publicPost
+  } = post;
+  void _primaryKeyword;
+  void _secondaryKeywords;
+  void _searchIntent;
+  void _readerQuestion;
+  void _recommendedTitlePattern;
+
+  return {
+    ...publicPost,
+    title: ensurePrimaryKeywordInTitle(publicPost.title, publicPost.sourceSite?.name),
+    metaTitle: ensurePrimaryKeywordInTitle(
+      publicPost.metaTitle,
+      publicPost.sourceSite?.name,
+    ),
+    description: normalizePublicSeoText(publicPost.description),
+    summary: sanitizePublicText(publicPost.summary, publicPost.description),
+    sections: normalizeSections(publicPost.sections),
+    checklist: sanitizePublicStringArray(publicPost.checklist),
+    faqs: normalizeFaqs(publicPost.faqs),
+  };
+}
+
 function normalizeInternalLinks(value: unknown): BlogPost["internalLinks"] {
   if (!Array.isArray(value)) return [];
 
@@ -227,7 +345,7 @@ function normalizeInternalLinks(value: unknown): BlogPost["internalLinks"] {
       if (!href.startsWith("/") || href.startsWith("//")) return null;
       return {
         href,
-        label: formatDisplayDomainText(label),
+        label: formatDisplayDomainText(normalizePublicSeoText(label)),
         ...(placement ? { placement } : {}),
         ...(purpose ? { purpose } : {}),
       };
@@ -242,11 +360,13 @@ function normalizeSections(value: unknown): BlogPostSection[] {
     .map((item) => {
       if (!isRecord(item)) return null;
 
-      const heading = getString(item.heading);
-      const paragraphs = normalizeStringArray(item.paragraphs);
-      const bullets = normalizeStringArray(item.bullets);
+      const heading = sanitizePublicText(item.heading);
+      const paragraphs = sanitizePublicStringArray(item.paragraphs);
+      const bullets = sanitizePublicStringArray(item.bullets);
 
-      if (!heading || paragraphs.length === 0) return null;
+      if (!heading || isInternalPublicContent(heading) || paragraphs.length === 0) {
+        return null;
+      }
 
       return {
         heading: formatDisplayDomainText(heading),
@@ -266,8 +386,8 @@ function normalizeFaqs(value: unknown): BlogPost["faqs"] {
     .map((item) => {
       if (!isRecord(item)) return null;
 
-      const question = getString(item.question);
-      const answer = getString(item.answer);
+      const question = sanitizePublicText(item.question);
+      const answer = sanitizePublicText(item.answer);
 
       if (!question || !answer) return null;
       return {
@@ -278,9 +398,13 @@ function normalizeFaqs(value: unknown): BlogPost["faqs"] {
     .filter((item): item is BlogPost["faqs"][number] => Boolean(item));
 }
 
-function mapBlogPostRow(row: BlogPostRow): BlogPost {
+function mapBlogPostRow(row: BlogPostRow): PublicBlogPost {
   const createdDate = normalizeDate(row.created_at, new Date().toISOString());
   const publishedAt = normalizeDate(row.published_at, createdDate);
+  const sourceSite = buildBlogSourceSite(row.source_snapshot);
+  const description = formatDisplayDomainText(
+    normalizePublicSeoText(row.description),
+  );
 
   return {
     slug: row.slug,
@@ -294,25 +418,24 @@ function mapBlogPostRow(row: BlogPostRow): BlogPost {
       (tag) => !isBlogCategoryValue(tag),
     ),
     priority: normalizePriority(row.priority),
-    title: formatDisplayDomainText(row.title),
-    metaTitle: formatDisplayDomainText(row.meta_title),
-    description: formatDisplayDomainText(row.description),
-    primaryKeyword: formatDisplayDomainText(row.primary_keyword),
-    secondaryKeywords: (row.secondary_keywords ?? []).map(formatDisplayDomainText),
-    searchIntent: formatDisplayDomainText(row.search_intent ?? ""),
-    readerQuestion: formatDisplayDomainText(row.reader_question ?? ""),
-    recommendedTitlePattern: formatDisplayDomainText(
-      row.recommended_title_pattern ?? "",
+    title: formatDisplayDomainText(
+      ensurePrimaryKeywordInTitle(row.title, sourceSite?.name),
     ),
-    summary: formatDisplayDomainText(row.summary ?? ""),
+    metaTitle: formatDisplayDomainText(
+      ensurePrimaryKeywordInTitle(row.meta_title, sourceSite?.name),
+    ),
+    description,
+    summary: formatDisplayDomainText(sanitizePublicText(row.summary, description)),
     publishedAt,
     updatedAt: normalizeDate(row.content_updated_at, row.updated_at),
     readingMinutes: row.reading_minutes ?? 3,
     internalLinks: normalizeInternalLinks(row.internal_links),
     sections: normalizeSections(row.sections),
-    checklist: (row.checklist ?? []).map(formatDisplayDomainText),
+    checklist: sanitizePublicStringArray(row.checklist).map(
+      formatDisplayDomainText,
+    ),
     faqs: normalizeFaqs(row.faqs),
-    sourceSite: buildBlogSourceSite(row.source_snapshot),
+    sourceSite,
     verificationSummary: buildBlogVerificationSummary(row.source_snapshot),
   };
 }
@@ -347,7 +470,7 @@ async function getPublicBlogPostsUncached(): Promise<PublicBlogPostsResult> {
 
 export const getPublicBlogPosts = unstable_cache(
   getPublicBlogPostsUncached,
-  ["public-blog-posts"],
+  ["public-blog-posts", "public-seo-output-v3"],
   {
     revalidate: 300,
   },
@@ -416,7 +539,7 @@ export async function getPublicBlogPostsByCategory(slug: BlogCategorySlug) {
   };
 }
 
-export function getPublicBlogTagsFromPosts(posts: BlogPost[]) {
+export function getPublicBlogTagsFromPosts(posts: PublicBlogPost[]) {
   const tagMap = new Map<string, PublicBlogTagSummary>();
 
   for (const post of posts) {

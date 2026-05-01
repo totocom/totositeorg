@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   blogCategories,
-  blogTitlePatterns,
   getBlogCategoryLabel,
   getBlogPrimaryCategoryFromLabel,
   getBlogTagSlug,
@@ -16,15 +15,15 @@ import { siteDescription, siteName, siteUrl } from "@/lib/config";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "키워드 블로그 전략",
+  title: "블로그",
   description:
-    "토토사이트 추천, 검증, 후기, 먹튀 제보 키워드를 확보하기 위한 블로그 글감과 제목 전략을 확인하세요.",
+    "토토사이트 도메인·DNS 정보, 이용자 리뷰와 먹튀 피해 제보를 바탕으로 정리한 정보 글을 확인하세요.",
   alternates: {
     canonical: `${siteUrl}/blog`,
   },
   openGraph: {
     url: `${siteUrl}/blog`,
-    title: `키워드 블로그 전략 | ${siteName}`,
+    title: `블로그 | ${siteName}`,
     description: siteDescription,
   },
 };
@@ -58,20 +57,19 @@ export default async function BlogPage() {
                 />
               </picture>
               <p className="text-sm font-semibold text-white/60">
-                키워드 콘텐츠 허브
+                정보 리포트
               </p>
             </div>
             <h1 className="mt-4 max-w-3xl text-3xl font-extrabold leading-tight sm:text-4xl">
-              검색 유입을 만들 블로그 글감과 제목 전략
+              도메인과 제보로 살펴보는 토토사이트 정보
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-white/60">
-              추천 키워드만 반복하지 않고 검증 기준, 피해 예방, 후기 해석,
-              운영 정보를 나누어 작성하면 검색 유입과 사이트 신뢰도를 함께
-              키울 수 있습니다.
+              도메인·DNS 기록, 승인된 리뷰, 먹튀 피해 제보, 이용 전
+              확인할 체크리스트를 한곳에서 읽기 쉽게 정리합니다.
             </p>
           </div>
           <div className="grid content-start gap-3 rounded-lg border border-white/10 bg-white/5 p-4">
-            <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="grid grid-cols-2 gap-2 text-center">
               <div>
                 <p className="text-2xl font-bold text-accent">
                   {blogCategories.length}
@@ -83,12 +81,6 @@ export default async function BlogPage() {
                   {posts.length}
                 </p>
                 <p className="mt-1 text-xs text-white/50">블로그 글</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-accent">
-                  {blogTitlePatterns.length}
-                </p>
-                <p className="mt-1 text-xs text-white/50">제목 공식</p>
               </div>
             </div>
             <Link
@@ -144,12 +136,12 @@ export default async function BlogPage() {
                 태그
               </p>
               <h2 className="mt-2 text-2xl font-bold text-foreground">
-                사이트명과 세부 키워드
+                주제별 모음
               </h2>
             </div>
             <p className="max-w-xl text-sm leading-6 text-muted">
-              카테고리는 큰 주제만 다루고, 사이트명과 DNS·WHOIS 같은 세부
-              키워드는 태그로 묶습니다.
+              사이트명, DNS, WHOIS, 먹튀 제보처럼 함께 확인하면 좋은 세부
+              주제를 태그로 묶었습니다.
             </p>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -171,15 +163,15 @@ export default async function BlogPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-accent">
-              우선 작성할 글
+              최신 글
             </p>
             <h2 className="mt-2 text-2xl font-bold text-foreground">
-              키워드별 블로그 글 목록
+              블로그 글 목록
             </h2>
           </div>
           <p className="max-w-xl text-sm leading-6 text-muted">
-            우선순위가 높은 글부터 발행하고, 각 글에서 사이트 목록, 후기,
-            먹튀 제보 페이지로 내부 링크를 연결하세요.
+            각 글은 도메인·DNS 데이터와 이용자 제보를 바탕으로 확인할 내용과
+            주의할 지점을 자연스럽게 정리합니다.
           </p>
         </div>
 
@@ -187,7 +179,7 @@ export default async function BlogPage() {
           {posts.map((post) => (
             <article
               key={post.slug}
-              className="grid gap-4 rounded-lg border border-line bg-background p-4 lg:grid-cols-[1fr_260px]"
+              className="rounded-lg border border-line bg-background p-4"
             >
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -205,9 +197,6 @@ export default async function BlogPage() {
                     </Link>
                   </span>
                   <span className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-muted">
-                    우선순위 {post.priority}
-                  </span>
-                  <span className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-muted">
                     {post.readingMinutes}분 글
                   </span>
                 </div>
@@ -222,118 +211,46 @@ export default async function BlogPage() {
                 <p className="mt-2 text-sm leading-6 text-muted">
                   {post.summary}
                 </p>
-                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                  <div>
-                    <dt className="font-bold text-foreground">검색 의도</dt>
-                    <dd className="mt-1 leading-6 text-muted">
-                      {post.searchIntent}
-                    </dd>
+                {post.tags?.length ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {post.tags.slice(0, 4).map((tag) => (
+                      <Link
+                        key={tag}
+                        href={`/blog/tag/${encodeURIComponent(
+                          getBlogTagSlug(tag),
+                        )}`}
+                        className="rounded-md border border-line bg-surface px-2 py-1 text-xs font-semibold text-muted transition hover:text-accent"
+                      >
+                        {tag}
+                      </Link>
+                    ))}
                   </div>
-                  <div>
-                    <dt className="font-bold text-foreground">제목 공식</dt>
-                    <dd className="mt-1 leading-6 text-muted">
-                      {post.recommendedTitlePattern}
-                    </dd>
-                  </div>
-                </dl>
+                ) : null}
               </div>
-              <aside className="rounded-lg border border-line bg-surface p-4">
-                <p className="text-xs font-bold uppercase text-muted">
-                  Primary Keyword
-                </p>
-                <p className="mt-2 text-base font-bold text-foreground">
-                  {post.primaryKeyword}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {post.tags?.length
-                    ? post.tags.slice(0, 4).map((keyword) => (
-                        <Link
-                          key={keyword}
-                          href={`/blog/tag/${encodeURIComponent(
-                            getBlogTagSlug(keyword),
-                          )}`}
-                          className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-muted transition hover:text-accent"
-                        >
-                          {keyword}
-                        </Link>
-                      ))
-                    : post.secondaryKeywords.slice(0, 4).map((keyword) => (
-                        <span
-                          key={keyword}
-                          className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-muted"
-                        >
-                          {keyword}
-                        </span>
-                      ))}
-                </div>
-              </aside>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-        <div className="rounded-lg border border-line bg-surface p-5 shadow-sm">
-          <p className="text-sm font-semibold uppercase text-accent">
-            제목 만드는 법
-          </p>
-          <h2 className="mt-2 text-2xl font-bold text-foreground">
-            반복해서 쓸 제목 공식
-          </h2>
-          <div className="mt-5 grid gap-4">
-            {blogTitlePatterns.map((pattern) => (
-              <article
-                key={pattern.name}
-                className="rounded-lg border border-line bg-background p-4"
-              >
-                <h3 className="text-sm font-bold text-foreground">
-                  {pattern.name}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  {pattern.formula}
-                </p>
-                <p className="mt-2 text-sm font-semibold text-accent">
-                  {pattern.example}
-                </p>
-              </article>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-line bg-surface p-5 shadow-sm">
-          <p className="text-sm font-semibold uppercase text-accent">
-            운영 방향
-          </p>
-          <h2 className="mt-2 text-2xl font-bold text-foreground">
-            어떤 글을 계속 작성할까
-          </h2>
-          <ol className="mt-5 grid gap-4 text-sm leading-6 text-muted">
-            <li>
-              <span className="font-bold text-foreground">1. 핵심 허브 글</span>
-              <br />
-              안전한 토토사이트, 토토사이트 순위, 먹튀사이트 확인처럼 검색량이
-              큰 주제는 기준 설명 글로 작성합니다.
-            </li>
-            <li>
-              <span className="font-bold text-foreground">2. 문제 해결 글</span>
-              <br />
-              출금 지연, 도메인 변경, 피해 제보처럼 사용자가 급하게 찾는
-              키워드는 체크리스트 구조로 작성합니다.
-            </li>
-            <li>
-              <span className="font-bold text-foreground">3. 상세 페이지 보강 글</span>
-              <br />
-              라이선스, WHOIS, DNS, 후기 해석 글은 사이트 상세 페이지의
-              신뢰 점수와 함께 연결합니다.
-            </li>
-            <li>
-              <span className="font-bold text-foreground">4. 책임 있는 이용 글</span>
-              <br />
-              정보 제공 플랫폼의 신뢰도를 위해 19세 이상, 과몰입 예방, 도움
-              요청 기준을 주기적으로 연결합니다.
-            </li>
-          </ol>
-        </div>
+      <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
+        <p className="text-sm font-semibold uppercase text-accent">고지</p>
+        <h2 className="mt-2 text-2xl font-bold text-foreground">
+          블로그 글을 읽기 전 확인할 점
+        </h2>
+        <ul className="mt-5 grid gap-3 text-sm leading-6 text-muted">
+          <li>
+            이 블로그는 승인된 리뷰와 제보, 도메인·DNS·WHOIS 조회
+            결과를 기준으로 정보를 정리합니다.
+          </li>
+          <li>
+            조회 데이터가 없거나 확인되지 않은 항목은 단정하지 않으며, 글마다
+            조회 시점의 한계를 함께 안내합니다.
+          </li>
+          <li>
+            사이트 이용, 가입, 충전, 베팅을 권유하지 않으며 정보 확인 목적의
+            참고 자료로만 제공합니다.
+          </li>
+        </ul>
       </section>
     </main>
   );

@@ -76,12 +76,21 @@ export type BlogPost = {
   verificationSummary?: BlogVerificationSummary | null;
 };
 
+export type PublicBlogPost = Omit<
+  BlogPost,
+  | "primaryKeyword"
+  | "secondaryKeywords"
+  | "searchIntent"
+  | "readerQuestion"
+  | "recommendedTitlePattern"
+>;
+
 export const blogCategories: BlogCategory[] = [
   {
     name: "토토사이트 정보 리포트",
     slug: "site-reports",
     description:
-      "이 카테고리는 개별 사이트의 도메인, DNS, WHOIS, 공개 승인된 리뷰와 먹튀 피해 제보 현황을 종합 정리한 정보 리포트를 모아둔 페이지입니다.",
+      "이 카테고리는 개별 사이트의 도메인, DNS, WHOIS, 승인된 리뷰와 먹튀 피해 제보 현황을 종합 정리한 정보 리포트를 모아둔 페이지입니다.",
     purpose: "개별 사이트 종합 정보 글",
     is_active: true,
   },
@@ -89,7 +98,7 @@ export const blogCategories: BlogCategory[] = [
     name: "도메인·DNS 분석",
     slug: "domain-dns",
     description:
-      "도메인, DNS 레코드, WHOIS 등록 정보, 네임서버, IP 관측값처럼 기술적으로 확인 가능한 공개 데이터를 기준으로 사이트별 변화를 정리합니다.",
+      "도메인, DNS 레코드, WHOIS 등록 정보, 네임서버, IP 관측값처럼 기술적으로 확인 가능한 데이터를 기준으로 사이트별 변화를 정리합니다.",
     purpose: "도메인, DNS, WHOIS 중심 글",
     is_active: true,
   },
@@ -97,7 +106,7 @@ export const blogCategories: BlogCategory[] = [
     name: "먹튀 제보 현황",
     slug: "scam-reports",
     description:
-      "공개 승인된 먹튀 피해 제보와 관련 집계, 피해 유형, 접수 시점 정보를 모아 사이트 이용 전 확인할 수 있는 제보 현황을 정리합니다.",
+      "승인된 먹튀 피해 제보와 관련 집계, 피해 유형, 접수 시점 정보를 모아 사이트 이용 전 확인할 수 있는 제보 현황을 정리합니다.",
     purpose: "승인된 먹튀 제보 요약 글",
     is_active: true,
   },
@@ -113,7 +122,7 @@ export const blogCategories: BlogCategory[] = [
     name: "변경 이력 리포트",
     slug: "change-history",
     description:
-      "도메인 추가, DNS/WHOIS 갱신, 공개 리뷰와 먹튀 제보 증가처럼 사이트 정보가 바뀐 항목을 시간순으로 추적해 변화 흐름을 정리합니다.",
+      "도메인 추가, DNS/WHOIS 갱신, 승인 리뷰와 먹튀 제보 증가처럼 사이트 정보가 바뀐 항목을 시간순으로 추적해 변화 흐름을 정리합니다.",
     purpose: "도메인, DNS, 리뷰, 먹튀 제보 변경 사항 정리",
     is_active: true,
   },
@@ -121,7 +130,7 @@ export const blogCategories: BlogCategory[] = [
     name: "검증 기준 안내",
     slug: "verification-guide",
     description:
-      "리뷰 승인 기준, 먹튀 피해 제보 검토 방식, DNS/WHOIS 조회 기준 등 서비스가 공개 데이터를 수집하고 해석하는 운영 원칙을 안내합니다.",
+      "리뷰 승인 기준, 먹튀 피해 제보 검토 방식, DNS/WHOIS 조회 기준 등 서비스가 확인 데이터를 수집하고 해석하는 운영 원칙을 안내합니다.",
     purpose: "검증 방식, 점수 기준, 제보 승인 기준 안내",
     is_active: true,
   },
@@ -129,7 +138,7 @@ export const blogCategories: BlogCategory[] = [
     name: "이용 전 체크리스트",
     slug: "checklists",
     description:
-      "사이트 이용 전 확인할 도메인, DNS, WHOIS, 공개 리뷰, 먹튀 피해 제보 항목을 단계별 체크리스트로 정리해 사전 확인 흐름을 제공합니다.",
+      "사이트 이용 전 확인할 도메인, DNS, WHOIS, 승인 리뷰, 먹튀 피해 제보 항목을 단계별 체크리스트로 정리해 사전 확인 흐름을 제공합니다.",
     purpose: "정보 확인 체크리스트형 글",
     is_active: true,
   },
@@ -269,7 +278,7 @@ export const blogContentPillars: BlogContentPillar[] = [
 export const blogTitlePatterns: BlogTitlePattern[] = [
   {
     name: "기준형",
-    formula: "{핵심 키워드} 고르는 법: {주요 확인 항목}까지 한 번에 확인",
+    formula: "{중심 주제} 고르는 법: {주요 확인 항목}까지 한 번에 확인",
     example: "안전한 토토사이트 고르는 법: 라이선스부터 먹튀 이력까지",
   },
   {
@@ -391,7 +400,7 @@ export const blogPosts: BlogPost[] = [
     readerQuestion: "가입하기 전에 먹튀 가능성을 어떻게 확인할 수 있을까?",
     recommendedTitlePattern: "위험 신호형",
     summary:
-      "먹튀 관련 키워드를 흡수하는 방어형 콘텐츠입니다. 공개 제보 목록과 제보 작성 페이지로 연결합니다.",
+      "먹튀 관련 검색 수요를 다루는 방어형 콘텐츠입니다. 먹튀 제보 목록과 제보 작성 페이지로 연결합니다.",
     publishedAt: "2026-04-30",
     updatedAt: "2026-04-30",
     readingMinutes: 4,
@@ -405,7 +414,7 @@ export const blogPosts: BlogPost[] = [
         heading: "출금 관련 불만이 반복되는지 확인하세요",
         paragraphs: [
           "먹튀사이트에서 가장 자주 나타나는 신호는 출금 지연, 추가 인증 요구, 보너스 조건을 이유로 한 출금 거부입니다. 한두 건의 지연보다 같은 유형의 불만이 반복되는지가 더 중요합니다.",
-          "특히 고객센터 답변이 계속 바뀌거나 처리 시점을 명확히 말하지 않는다면 주의해야 합니다. 공개 제보의 시점과 내용이 비슷한지도 함께 확인하세요.",
+          "특히 고객센터 답변이 계속 바뀌거나 처리 시점을 명확히 말하지 않는다면 주의해야 합니다. 먹튀 제보의 시점과 내용이 비슷한지도 함께 확인하세요.",
         ],
       },
       {
@@ -419,7 +428,7 @@ export const blogPosts: BlogPost[] = [
         heading: "사칭 도메인과 급한 유도 문구도 살펴보세요",
         paragraphs: [
           "공식 주소가 자주 바뀌거나, 텔레그램 또는 메신저에서만 가입을 유도하는 경우 사칭 위험을 확인해야 합니다. 도메인 철자가 비슷한 가짜 주소도 흔한 위험 요소입니다.",
-          "검증된 정보 페이지, 최근 후기, 공개 제보를 함께 비교하면 단순 홍보 페이지보다 더 현실적인 판단이 가능합니다.",
+          "검증된 정보 페이지, 최근 후기, 먹튀 제보를 함께 비교하면 단순 홍보 페이지보다 더 현실적인 판단이 가능합니다.",
         ],
       },
     ],
@@ -697,9 +706,9 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
-        heading: "반복 지연이면 공개 제보를 확인하세요",
+        heading: "반복 지연이면 먹튀 제보를 확인하세요",
         paragraphs: [
-          "동일 사이트에서 같은 시기에 유사한 출금 지연 제보가 많다면 개별 문제가 아닐 수 있습니다. 공개 제보 목록을 확인하면 위험도를 판단하는 데 도움이 됩니다.",
+          "동일 사이트에서 같은 시기에 유사한 출금 지연 제보가 많다면 개별 문제가 아닐 수 있습니다. 먹튀 제보 목록을 확인하면 위험도를 판단하는 데 도움이 됩니다.",
           "제보를 작성할 때는 과장보다 확인 가능한 사실을 중심으로 정리해야 다른 이용자에게 도움이 됩니다.",
         ],
       },
@@ -880,11 +889,11 @@ export const blogPosts: BlogPost[] = [
       "먹튀 증거",
       "먹튀 제보 작성",
     ],
-    searchIntent: "피해 경험을 정리해 공개 제보를 작성하려는 문제 해결형 검색",
+    searchIntent: "피해 경험을 정리해 먹튀 제보를 작성하려는 문제 해결형 검색",
     readerQuestion: "먹튀 제보에는 어떤 내용을 어떻게 적어야 할까?",
     recommendedTitlePattern: "작성법형",
     summary:
-      "제보 작성 전환을 만드는 글입니다. 양식 작성 페이지와 공개 제보 목록으로 연결합니다.",
+      "제보 작성 전환을 만드는 글입니다. 양식 작성 페이지와 먹튀 제보 목록으로 연결합니다.",
     publishedAt: "2026-04-30",
     updatedAt: "2026-04-30",
     readingMinutes: 4,

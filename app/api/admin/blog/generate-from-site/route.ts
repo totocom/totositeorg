@@ -640,7 +640,7 @@ const existingBlogSelect = [
 
 const piiRedactionVersion = "v1";
 const insufficientSourceDataWarning =
-  "현재 공개 리뷰, 피해 제보, DNS/WHOIS 정보가 충분하지 않아 본문이 얇아질 수 있습니다. 관리자 검토 후 발행 여부를 결정하세요.";
+  "현재 승인 리뷰, 피해 제보, DNS/WHOIS 정보가 충분하지 않아 본문이 얇아질 수 있습니다. 관리자 검토 후 발행 여부를 결정하세요.";
 const insufficientSeoTitleDataWarning =
   "현재 사이트 고유 데이터가 부족해 제목과 본문이 템플릿성 콘텐츠로 보일 수 있습니다. 추가 리뷰, 제보, DNS/WHOIS 데이터 확보 후 발행을 권장합니다.";
 
@@ -940,9 +940,9 @@ const blockedExternalLinkTargetPattern =
 
 const requiredBlogNoticeLines = [
   "이 글은 특정 사이트의 가입, 이용, 충전, 베팅을 권유하기 위한 글이 아닙니다.",
-  "공개 승인된 리뷰, 피해 제보, DNS 및 WHOIS 조회 데이터를 기준으로 작성된 정보 정리입니다.",
+  "승인된 리뷰, 피해 제보, DNS 및 WHOIS 조회 데이터를 기준으로 작성된 정보 정리입니다.",
   "DNS, WHOIS, IP 정보는 조회 시점에 따라 달라질 수 있으며, 특정 기술 정보만으로 운영 주체나 안전성을 단정할 수 없습니다.",
-  "이 글은 수집된 공개 데이터와 내부 승인 데이터를 바탕으로 AI 초안을 생성한 뒤 관리자가 검토하는 방식으로 작성됩니다.",
+  "이 글은 수집된 확인 데이터와 내부 승인 데이터를 바탕으로 AI 초안을 생성한 뒤 관리자가 검토하는 방식으로 작성됩니다.",
 ] as const;
 
 const blogGenerationImplementationPrinciples = [
@@ -952,7 +952,7 @@ const blogGenerationImplementationPrinciples = [
   "생성 시점의 데이터는 blog_source_snapshots에 저장한다.",
   "AI에게 원본 개인정보를 전달하지 않는다.",
   "추천, 홍보, 가입 유도, 보너스, 우회주소 표현을 금지한다.",
-  "먹튀 없음 대신 조회 시점 기준 공개 승인된 먹튀 피해 제보는 확인되지 않음으로 표현한다.",
+  "먹튀 없음 대신 조회 시점 기준 승인된 먹튀 피해 제보는 확인되지 않음으로 표현한다.",
   "Cloudflare, WHOIS 비공개, 동일 IP만으로 위험하다고 단정하지 않는다.",
   "AI 결과는 published가 아니라 draft로 저장한다.",
   "관리자가 검토한 뒤에만 published로 변경한다.",
@@ -1159,10 +1159,6 @@ function getSlugBase(site: SiteRow) {
 function getFallbackBlogSlug(site: SiteRow) {
   const base = getSlugBase(site).replace(/-totosite-report$/g, "");
   return `${base}-totosite-report`;
-}
-
-function toJsonText(value: unknown) {
-  return JSON.stringify(value, null, 2);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1936,7 +1932,7 @@ function compareSourceSnapshots(
 function formatSnapshotChangeSummary(changeSummary: SnapshotChangeSummary) {
   return [
     `새 승인 리뷰 수: ${changeSummary.new_reviews_count}`,
-    `새 공개 승인 피해 제보 수: ${changeSummary.new_scam_reports_count}`,
+    `새 승인 피해 제보 수: ${changeSummary.new_scam_reports_count}`,
     `DNS 변경 여부: ${changeSummary.dns_changed ? "있음" : "없음"}`,
     `WHOIS 변경 여부: ${changeSummary.whois_changed ? "있음" : "없음"}`,
     changeSummary.new_domains.length
@@ -2592,18 +2588,18 @@ function summarizeReviewSentiment(reviews: SnapshotReview[]) {
   const averageRating = getAverageRating(reviews);
 
   if (reviews.length === 0 || averageRating === null) {
-    return "조회 시점 기준 공개 승인된 리뷰는 확인되지 않았습니다.";
+    return "조회 시점 기준 승인된 리뷰는 확인되지 않았습니다.";
   }
 
   if (averageRating >= 4) {
-    return "공개 승인된 리뷰 평점은 높은 편이지만, 개별 경험 차이가 있을 수 있습니다.";
+    return "승인된 리뷰 평점은 높은 편이지만, 개별 경험 차이가 있을 수 있습니다.";
   }
 
   if (averageRating >= 2.5) {
-    return "공개 승인된 리뷰 평점은 중간 수준이며, 긍정과 부정 경험을 함께 검토해야 합니다.";
+    return "승인된 리뷰 평점은 중간 수준이며, 긍정과 부정 경험을 함께 검토해야 합니다.";
   }
 
-  return "공개 승인된 리뷰 평점은 낮은 편이며, 구체적인 불편 사례를 확인할 필요가 있습니다.";
+  return "승인된 리뷰 평점은 낮은 편이며, 구체적인 불편 사례를 확인할 필요가 있습니다.";
 }
 
 function buildReviewsSummary(reviews: SnapshotReview[]): ReviewsSummary {
@@ -2818,8 +2814,8 @@ function buildMinimumPublishCheck({
     !derivedFacts.dns_last_checked_at
       ? "DNS 조회 시각이 확인되지 않았습니다."
       : "",
-    reviewsCount === 0 ? "공개 승인 리뷰가 없습니다." : "",
-    scamReportsCount === 0 ? "공개 승인 피해 제보가 없습니다." : "",
+    reviewsCount === 0 ? "승인 리뷰가 없습니다." : "",
+    scamReportsCount === 0 ? "승인 피해 제보가 없습니다." : "",
     dnsRecordsCount === 0 ? "DNS 레코드가 없습니다." : "",
     !hasWhoisCreatedDate ? "WHOIS 생성일이 확인되지 않았습니다." : "",
   ].filter(Boolean);
@@ -3116,7 +3112,7 @@ async function createSourceSnapshot({
     sameIpSites: (sameIpSitesResult.data ?? []) as SameIpSiteRow[],
     dataPolicy: [
       ...blogGenerationImplementationPrinciples,
-      "공개 승인된 리뷰와 공개 승인된 피해 제보만 본문 근거로 사용한다.",
+      "승인된 리뷰와 승인된 피해 제보만 본문 근거로 사용한다.",
       "AI 입력용 리뷰와 피해 제보는 각각 최근 20개까지만 포함한다.",
       "데이터가 부족하면 자동 발행하지 않고 관리자 경고를 남긴다.",
       "SEO fallback 제목은 데이터가 부족할 때만 사용하고, 실제 title/meta_title/H1은 사이트별 고유 데이터 2~3개를 조합한다.",
@@ -3295,12 +3291,12 @@ function getSeoKeywords(snapshot: SourceSnapshot) {
     siteName,
     primaryKeyword,
     secondaryKeywords: [
-      primaryKeyword,
-      `${siteName} 토토사이트 후기`,
-      `${siteName} 먹튀`,
-      `${siteName} 도메인`,
+      `${siteName} 토토사이트 검증`,
       `${siteName} 주소`,
-      `${siteName} DNS`,
+      `${siteName} 도메인`,
+      `${siteName} 먹튀`,
+      `${siteName} 먹튀 제보`,
+      `${siteName} 후기`,
     ],
   };
 }
@@ -3309,7 +3305,7 @@ function getFallbackSeoTitle(snapshot: SourceSnapshot) {
   const signals = getSeoTitleSignals(snapshot);
   const siteName = signals.site_name || snapshot.site.name;
 
-  return `${siteName} 기본 정보 확인: 공개 먹튀 제보 ${signals.approved_public_scam_report_count}건·리뷰 ${signals.approved_review_count}건·도메인 ${signals.additional_domain_count}개`;
+  return `${siteName} 토토사이트 기본 정보 확인: 먹튀 제보 ${signals.approved_public_scam_report_count}건·후기 ${signals.approved_review_count}건·도메인 ${signals.additional_domain_count}개`;
 }
 
 function getSeoTitleSignals(snapshot: SourceSnapshot): SeoTitleSignals {
@@ -3463,23 +3459,23 @@ function getSeoTitle(snapshot: SourceSnapshot) {
   const whoisSegment = getWhoisTitleSegment(signals);
 
   if (signals.approved_public_scam_report_count > 0) {
-    return `${siteName} 공개 먹튀 제보 ${signals.approved_public_scam_report_count}건·리뷰 ${signals.approved_review_count}건: ${dnsSegment} 현황`;
+    return `${siteName} 토토사이트 먹튀 제보 ${signals.approved_public_scam_report_count}건·후기 ${signals.approved_review_count}건: ${dnsSegment} 현황`;
   }
 
   if (signals.approved_review_count > 0) {
-    return `${siteName} 토토사이트 후기 ${signals.approved_review_count}건·공개 먹튀 제보 0건: ${dnsSegment} 기준`;
+    return `${siteName} 토토사이트 후기 ${signals.approved_review_count}건·먹튀 제보 0건: ${dnsSegment} 기준`;
   }
 
   if (signals.additional_domain_count > 1) {
-    return `${siteName} 도메인 ${signals.additional_domain_count}개·공개 먹튀 제보 0건 관측: ${whoisSegment}`;
+    return `${siteName} 토토사이트 도메인 ${signals.additional_domain_count}개·먹튀 제보 0건: ${whoisSegment}`;
   }
 
   if (signals.has_whois_created_date) {
-    return `${siteName} ${whoisSegment}: ${dnsSegment}·공개 먹튀 제보 0건`;
+    return `${siteName} 토토사이트 ${whoisSegment}: ${dnsSegment}·먹튀 제보 0건`;
   }
 
   if (hasRichDnsTitleData(signals)) {
-    return `${siteName} ${dnsSegment} 분석·IP ${signals.resolved_ip_count}개: 공개 먹튀 제보 0건`;
+    return `${siteName} 토토사이트 ${dnsSegment} 분석·IP ${signals.resolved_ip_count}개: 먹튀 제보 0건`;
   }
 
   return getFallbackSeoTitle(snapshot);
@@ -3497,7 +3493,7 @@ function getSeoTitleStrategy(snapshot: SourceSnapshot, titleSimilarityWarning = 
   ) {
     return {
       selected_pattern: "reviews_and_reports" as const,
-      reason: "공개 먹튀 제보 수와 승인 리뷰 수를 제목의 핵심 차별 데이터로 사용했습니다.",
+      reason: "먹튀 제보 수와 승인 리뷰 수를 제목의 핵심 차별 데이터로 사용했습니다.",
       unique_data_points_used: [
         "approved_review_count",
         "approved_public_scam_report_count",
@@ -3560,7 +3556,7 @@ function getSeoTitleStrategy(snapshot: SourceSnapshot, titleSimilarityWarning = 
 
   return {
     selected_pattern: "low_data" as const,
-    reason: "리뷰, 공개 먹튀 제보, DNS/WHOIS 데이터가 부족해 낮은 데이터용 제목을 사용했습니다.",
+    reason: "리뷰, 먹튀 제보, DNS/WHOIS 데이터가 부족해 낮은 데이터용 제목을 사용했습니다.",
     unique_data_points_used: [
       "approved_review_count",
       "approved_public_scam_report_count",
@@ -3578,26 +3574,26 @@ function getSeoMetaTitle(snapshot: SourceSnapshot) {
   const siteName = signals.site_name || snapshot.site.name;
 
   if (signals.approved_public_scam_report_count > 0) {
-    return `${siteName} 제보 ${signals.approved_public_scam_report_count}건·리뷰 ${signals.approved_review_count}건`;
+    return `${siteName} 토토사이트 | 먹튀 제보 ${signals.approved_public_scam_report_count}건·후기 ${signals.approved_review_count}건`;
   }
 
   if (signals.approved_review_count > 0) {
-    return `${siteName} 후기 ${signals.approved_review_count}건·제보 0건`;
+    return `${siteName} 토토사이트 | 후기 ${signals.approved_review_count}건·제보 0건`;
   }
 
   if (signals.additional_domain_count > 1) {
-    return `${siteName} 도메인 ${signals.additional_domain_count}개·제보 0건`;
+    return `${siteName} 토토사이트 | 도메인 ${signals.additional_domain_count}개·제보 0건`;
   }
 
   if (signals.has_whois_created_date) {
-    return `${siteName} WHOIS 확인·제보 0건`;
+    return `${siteName} 토토사이트 | WHOIS 확인·제보 0건`;
   }
 
   if (hasRichDnsTitleData(signals)) {
-    return `${siteName} DNS ${signals.dns_record_types.length}종·IP ${signals.resolved_ip_count}개`;
+    return `${siteName} 토토사이트 | DNS ${signals.dns_record_types.length}종·IP ${signals.resolved_ip_count}개`;
   }
 
-  return `${siteName} 제보 0건·리뷰 0건`;
+  return `${siteName} 토토사이트 | 제보 0건·후기 0건`;
 }
 
 function getSeoH1(snapshot: SourceSnapshot) {
@@ -3608,18 +3604,18 @@ function getSeoH1(snapshot: SourceSnapshot) {
     signals.approved_review_count > 0 ||
     signals.approved_public_scam_report_count > 0
   ) {
-    return `${siteName} 토토사이트 정보 리포트: 공개 먹튀 제보 ${signals.approved_public_scam_report_count}건, 리뷰 ${signals.approved_review_count}건, DNS 조회 기준`;
+    return `${siteName} 토토사이트 정보 리포트: 먹튀 제보 ${signals.approved_public_scam_report_count}건, 후기 ${signals.approved_review_count}건, DNS 조회 기준`;
   }
 
   if (signals.additional_domain_count > 1 || signals.has_whois_created_date) {
-    return `${siteName} 공개 데이터 리포트: 도메인 ${signals.additional_domain_count}개, ${getWhoisTitleSegment(signals)}, 공개 제보 현황`;
+    return `${siteName} 토토사이트 도메인 리포트: 도메인 ${signals.additional_domain_count}개, ${getWhoisTitleSegment(signals)}, 제보 현황`;
   }
 
   if (hasRichDnsTitleData(signals)) {
-    return `${siteName} 정보 확인 리포트: ${getDnsTitleSegment(signals)}, IP ${signals.resolved_ip_count}개, 공개 제보 기준`;
+    return `${siteName} 토토사이트 정보 확인: ${getDnsTitleSegment(signals)}, IP ${signals.resolved_ip_count}개, 제보 기준`;
   }
 
-  return `${siteName} 기본 정보 리포트: 공개 먹튀 제보 0건, 리뷰 0건, 도메인 ${signals.additional_domain_count}개 기준`;
+  return `${siteName} 토토사이트 기본 정보 리포트: 먹튀 제보 0건, 후기 0건, 도메인 ${signals.additional_domain_count}개 기준`;
 }
 
 function getSeoMetaDescription(snapshot: SourceSnapshot) {
@@ -3630,7 +3626,7 @@ function getSeoMetaDescription(snapshot: SourceSnapshot) {
     formatSeoTitleDate(signals.whois_last_checked_at) ||
     "조회 시점";
 
-  return `${signals.site_name} 토토사이트의 공개 승인 리뷰 ${signals.approved_review_count}건, 피해 제보 ${signals.approved_public_scam_report_count}건, 추가 도메인 ${signals.additional_domain_count}개와 ${dnsTypes}/WHOIS 정보를 ${checkedAt} 기준으로 정리했습니다.`;
+  return `${signals.site_name} 토토사이트의 후기 ${signals.approved_review_count}건, 먹튀 제보 ${signals.approved_public_scam_report_count}건, 추가 도메인 ${signals.additional_domain_count}개와 ${dnsTypes}/WHOIS 정보를 ${checkedAt} 기준으로 정리했습니다.`;
 }
 
 function buildSiteInternalLinks(snapshot: SourceSnapshot): BlogDraft["internal_links"] {
@@ -3651,7 +3647,7 @@ function buildSiteInternalLinks(snapshot: SourceSnapshot): BlogDraft["internal_l
       purpose: "dns_detail",
     },
     {
-      label: `${siteName} 공개 제보 현황`,
+      label: `${siteName} 먹튀 제보 현황`,
       href: `${siteHref}#reports`,
       placement: "reports_section",
       purpose: "report_detail",
@@ -3995,13 +3991,73 @@ function appendRequiredBlogNotices(markdown: string) {
   return `${bodyWithoutDuplicateNotices}\n\n${heading}\n\n${noticeBlock}`.trim();
 }
 
+const internalPlanningContentPatterns = [
+  /\bai\s*planner\b/i,
+  /\bwriting\s*brief\b/i,
+  /\bsearch\s*intent\b/i,
+  /\bconfirmed\s*facts?\b/i,
+  /\binferences?\b/i,
+  /\bunknowns?\b/i,
+  /\bclaim\s*map\b/i,
+  /\bkeyword\s*list\b/i,
+  /\bprimary_keyword\b/i,
+  /\bsecondary_keywords\b/i,
+  /\bsearch_intent\b/i,
+  /\bconfirmed_facts\b/i,
+  /\bwriting_brief\b/i,
+  /\bprohibited_phrase_check\b/i,
+  /검색\s*의도/,
+  /확인된\s*사실/,
+  /미확인\s*항목/,
+  /현재\s*확인되지\s*않은\s*항목/,
+  /클레임\s*맵/,
+  /키워드\s*(목록|리스트)/,
+  /작성\s*브리프/,
+];
+
+function isInternalPlanningContent(value: string) {
+  const text = value
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^[-*]\s+/, "")
+    .trim();
+
+  if (!text) return false;
+  return internalPlanningContentPatterns.some((pattern) => pattern.test(text));
+}
+
+function stripInternalPlanningMarkdown(markdown: string) {
+  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const output: string[] = [];
+  let skipSection = false;
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+
+    if (headingMatch) {
+      skipSection = isInternalPlanningContent(headingMatch[2]);
+      if (skipSection) continue;
+    }
+
+    if (skipSection) continue;
+
+    if (/^[-*]?\s*[^:：]{1,40}[:：]/.test(trimmed) && isInternalPlanningContent(trimmed)) {
+      continue;
+    }
+
+    output.push(rawLine);
+  }
+
+  return output.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function normalizeBlogMarkdown(
   markdown: string,
   h1: string,
   verificationSummary?: BlogVerificationSummary | null,
 ) {
   const normalized = normalizeMarkdownTitle(
-    sanitizeExternalLinksInMarkdown(markdown),
+    stripInternalPlanningMarkdown(sanitizeExternalLinksInMarkdown(markdown)),
     h1,
   );
   const withVerification = verificationSummary
@@ -4259,18 +4315,17 @@ function markdownToSections(markdown: string): BlogDraft["sections"] {
   ];
 }
 
-function finalSummaryToText(summary: FinalReviewOutput["summary"]) {
-  const parts = [
-    summary.confirmed_facts.length
-      ? `확인된 사실: ${summary.confirmed_facts.join(" / ")}`
-      : "",
-    summary.inferences.length ? `추정: ${summary.inferences.join(" / ")}` : "",
-    summary.unknowns.length
-      ? `미확인 항목: ${summary.unknowns.join(" / ")}`
-      : "",
-  ].filter(Boolean);
+function finalSummaryToText(snapshot: SourceSnapshot) {
+  const siteName = snapshot.site.name;
+  const reviewCount = snapshot.reviews_summary.approved_review_count;
+  const reportCount = snapshot.scam_reports_summary.approved_public_report_count;
+  const domainCount = snapshot.derived_facts.additional_domains.length;
+  const checkedAt =
+    formatSeoTitleDate(snapshot.derived_facts.dns_last_checked_at) ||
+    formatSeoTitleDate(snapshot.derived_facts.whois_last_checked_at) ||
+    "조회 시점";
 
-  return parts.join("\n") || "조회 시점 기준 공개 데이터로 확인 가능한 항목을 정리했습니다.";
+  return `${siteName} 토토사이트의 후기 ${reviewCount}건, 먹튀 제보 ${reportCount}건, 추가 도메인 ${domainCount}개와 DNS/WHOIS 정보를 ${checkedAt} 기준으로 정리했습니다.`;
 }
 
 function prohibitedCheckViolations(
@@ -4372,9 +4427,9 @@ function normalizeFinalReviewOutput({
     ]
       .filter(Boolean)
       .join(" / "),
-    reader_question: `${snapshot.site.name} 토토사이트의 공개 제보, 도메인, DNS/WHOIS 정보를 확인하려는 검색자 질문`,
+    reader_question: `${snapshot.site.name} 토토사이트의 먹튀 제보, 주소, 도메인, DNS/WHOIS 정보를 확인하려는 검색자 질문`,
     recommended_title_pattern: "정보 검증 리포트형",
-    summary: finalSummaryToText(output.summary),
+    summary: finalSummaryToText(snapshot),
     reading_minutes: Math.max(3, Math.min(30, Math.ceil(bodyMarkdown.length / 900))),
     internal_links: buildSiteInternalLinks(snapshot),
     sections: markdownToSections(bodyMarkdown),

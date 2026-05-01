@@ -4,9 +4,11 @@ import {
   canIndexBlogCategory,
   getBlogPrimaryCategoryFromLabel,
   type BlogCategorySlug,
-  type BlogPost,
 } from "@/app/data/blog-posts";
-import { getPublishedBlogPostsForSitemap } from "@/app/data/public-blog-posts";
+import {
+  getPublishedBlogPostsForSitemap,
+  type PublicBlogPost,
+} from "@/app/data/public-blog-posts";
 import { getApprovedSites } from "@/app/data/sites";
 import { siteUrl } from "@/lib/config";
 
@@ -15,7 +17,7 @@ export const dynamic = "force-dynamic";
 const isBlogIndexActive = true;
 
 function getPublishedPostCountByCategory(
-  posts: BlogPost[],
+  posts: PublicBlogPost[],
   categorySlug: BlogCategorySlug,
 ) {
   return posts.filter((post) => {
