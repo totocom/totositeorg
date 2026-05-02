@@ -118,6 +118,30 @@ test("site detail page renders the feedback and scam report submission guide", (
   assert.match(siteDetailPageSource, /<SiteFeedbackSubmissionGuide\s+siteId=\{site\.id\}\s+siteName=\{site\.siteName\}\s*\/>/);
 });
 
+test("site detail section action buttons use site-specific review and scam report labels", () => {
+  const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
+  const siteAuthorActionsSource = readFileSync(
+    "app/components/site-author-actions.tsx",
+    "utf8",
+  );
+
+  assert.match(
+    siteDetailPageSource,
+    /<SiteAuthorActions\s+siteId=\{site\.id\}\s+siteName=\{site\.siteName\}\s+kind="scam-report"\s*\/>/,
+  );
+  assert.match(
+    siteDetailPageSource,
+    /<SiteAuthorActions\s+siteId=\{site\.id\}\s+siteName=\{site\.siteName\}\s+kind="review"\s*\/>/,
+  );
+  assert.match(siteAuthorActionsSource, /\$\{normalizedSiteName\} 후기 남기기/);
+  assert.match(
+    siteAuthorActionsSource,
+    /\$\{normalizedSiteName\} 먹튀 피해 제보하기/,
+  );
+  assert.doesNotMatch(siteAuthorActionsSource, /"만족도 평가"/);
+  assert.doesNotMatch(siteAuthorActionsSource, /"먹튀 제보하기"/);
+});
+
 test("feedback submission guide copy and actions use review and report routes", () => {
   const guide = buildSiteFeedbackSubmissionGuide({
     siteId: "site-1",

@@ -534,7 +534,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               <p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력</p>
               <h2 className="mt-1 text-base font-bold">승인된 피해 제보</h2>
             </div>
-            <SiteAuthorActions siteId={site.id} kind="scam-report" />
+            <SiteAuthorActions siteId={site.id} siteName={site.siteName} kind="scam-report" />
           </div>
           {scamReports.length > 0 ? (
             <div className="grid gap-3 p-4">
@@ -591,7 +591,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               <p className="text-xs font-semibold uppercase tracking-wider text-accent">커뮤니티 리뷰</p>
               <h2 className="mt-1 text-base font-bold">최근 이용 경험</h2>
             </div>
-            <SiteAuthorActions siteId={site.id} kind="review" />
+            <SiteAuthorActions siteId={site.id} siteName={site.siteName} kind="review" />
           </div>
           {reviews.length > 0 ? (
             <div className="grid gap-3 p-4">

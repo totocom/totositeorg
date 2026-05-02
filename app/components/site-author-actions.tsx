@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase/client";
 
 type SiteAuthorActionsProps = {
   siteId: string;
+  siteName: string;
   kind?: "all" | "review" | "scam-report";
 };
 
@@ -26,8 +27,13 @@ function getActionHref(targetHref: string, isLoggedIn: boolean) {
   return `/login?redirectTo=${encodeURIComponent(targetHref)}`;
 }
 
+function normalizeSiteName(siteName: string) {
+  return siteName.replace(/\s+/g, " ").trim() || "해당 사이트";
+}
+
 export function SiteAuthorActions({
   siteId,
+  siteName,
   kind = "all",
 }: SiteAuthorActionsProps) {
   const { user, isLoading } = useAuth();
@@ -86,6 +92,15 @@ export function SiteAuthorActions({
   const isLoggedIn = Boolean(user);
   const reviewHref = `/submit-review?siteId=${siteId}`;
   const scamReportHref = `/submit-scam-report?siteId=${siteId}`;
+  const normalizedSiteName = normalizeSiteName(siteName);
+  const reviewLabel =
+    user && contentState.hasReview
+      ? `내 ${normalizedSiteName} 후기 수정`
+      : `${normalizedSiteName} 후기 남기기`;
+  const scamReportLabel =
+    user && contentState.hasScamReport
+      ? `내 ${normalizedSiteName} 먹튀 피해 제보 수정`
+      : `${normalizedSiteName} 먹튀 피해 제보하기`;
 
   return (
     <div className="flex flex-wrap gap-2 sm:justify-end">
@@ -94,7 +109,7 @@ export function SiteAuthorActions({
           href={getActionHref(reviewHref, isLoggedIn)}
           className={actionButtonClassName}
         >
-          {user && contentState.hasReview ? "내 만족도 평가 수정" : "만족도 평가"}
+          {reviewLabel}
         </Link>
       ) : null}
       {showScamReport ? (
@@ -102,7 +117,7 @@ export function SiteAuthorActions({
           href={getActionHref(scamReportHref, isLoggedIn)}
           className={actionButtonClassName}
         >
-          {user && contentState.hasScamReport ? "내 먹튀 제보 수정" : "먹튀 제보하기"}
+          {scamReportLabel}
         </Link>
       ) : null}
     </div>
