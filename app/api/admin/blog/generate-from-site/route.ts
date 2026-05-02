@@ -18,6 +18,10 @@ import {
   resolveBlogDraftTarget,
 } from "@/app/data/blog-draft-target";
 import {
+  aiGenerationJobStaleAfterMs,
+  isActiveAiGenerationJobStale,
+} from "@/app/data/ai-generation-job-status";
+import {
   getRequiredBlogReportHeadings,
   validateRequiredBlogReportSectionCoverage,
 } from "@/app/data/blog-report-sections";
@@ -66,6 +70,7 @@ import {
 } from "@/prompts/blog/openai-validator-v1";
 
 export const runtime = "nodejs";
+export const maxDuration = 900;
 
 type BlogPriority = "상" | "중" | "하";
 
@@ -250,6 +255,8 @@ type AiGenerationJobRow = {
   source_snapshot_id: string | null;
   idempotency_key: string;
   created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
 };
 
 type SnapshotSite = {
@@ -2384,7 +2391,7 @@ async function createAiGenerationJob({
       finished_at: null,
     })
     .select(
-      "id, site_id, post_id, job_type, status, provider, source_snapshot_id, idempotency_key, created_at",
+      "id, site_id, post_id, job_type, status, provider, source_snapshot_id, idempotency_key, created_at, started_at, finished_at",
     )
     .single<AiGenerationJobRow>();
 
@@ -2405,7 +2412,7 @@ async function findActiveAiGenerationJob(
   const { data, error } = await supabase
     .from("ai_generation_jobs")
     .select(
-      "id, site_id, post_id, job_type, status, provider, source_snapshot_id, idempotency_key, created_at",
+      "id, site_id, post_id, job_type, status, provider, source_snapshot_id, idempotency_key, created_at, started_at, finished_at",
     )
     .eq("site_id", siteId)
     .in("status", ["queued", "running"])
@@ -2418,7 +2425,41 @@ async function findActiveAiGenerationJob(
     );
   }
 
-  return data?.[0] ? (data[0] as AiGenerationJobRow) : null;
+  const activeJob = data?.[0] ? (data[0] as AiGenerationJobRow) : null;
+
+  if (!activeJob) {
+    return null;
+  }
+
+  if (
+    !isActiveAiGenerationJobStale({
+      status: activeJob.status,
+      createdAt: activeJob.created_at,
+      startedAt: activeJob.started_at,
+      now: new Date(),
+    })
+  ) {
+    return activeJob;
+  }
+
+  const staleAfterMinutes = Math.round(aiGenerationJobStaleAfterMs / 60000);
+  const { error: updateError } = await supabase
+    .from("ai_generation_jobs")
+    .update({
+      status: "failed",
+      error_message: `stale_ai_generation_job_auto_reset: job exceeded ${staleAfterMinutes} minutes without finishing`,
+      finished_at: new Date().toISOString(),
+    })
+    .eq("id", activeJob.id)
+    .in("status", ["queued", "running"]);
+
+  if (updateError) {
+    throw new Error(
+      "오래된 AI 생성 작업을 정리하지 못했습니다. ai_generation_jobs 테이블을 확인해주세요.",
+    );
+  }
+
+  return null;
 }
 
 async function markAiGenerationJobSucceeded({
@@ -2445,6 +2486,31 @@ async function markAiGenerationJobSucceeded({
 
   if (error) {
     throw new Error("AI 생성 작업 성공 로그를 저장하지 못했습니다.");
+  }
+}
+
+async function markAiGenerationJobSourceSnapshot({
+  supabase,
+  jobId,
+  sourceSnapshotId,
+}: {
+  supabase: SupabaseClient;
+  jobId: string;
+  sourceSnapshotId: string | null;
+}) {
+  if (!sourceSnapshotId) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("ai_generation_jobs")
+    .update({
+      source_snapshot_id: sourceSnapshotId,
+    })
+    .eq("id", jobId);
+
+  if (error) {
+    throw new Error("AI 생성 작업 소스 스냅샷 로그를 저장하지 못했습니다.");
   }
 }
 
@@ -5812,6 +5878,15 @@ export async function POST(request: Request) {
       snapshot,
     );
     persistedSnapshotForFailure = persistedSnapshot;
+    await markAiGenerationJobSourceSnapshot({
+      supabase,
+      jobId: aiJob.id,
+      sourceSnapshotId: persistedSnapshot.source_snapshot_id ?? null,
+    });
+    aiJob = {
+      ...aiJob,
+      source_snapshot_id: persistedSnapshot.source_snapshot_id ?? null,
+    };
     const previousSnapshot =
       existingBlog
         ? (await getBlogSourceSnapshotById(

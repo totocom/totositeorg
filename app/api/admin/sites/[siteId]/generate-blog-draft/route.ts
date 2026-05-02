@@ -1,6 +1,7 @@
 import { POST as generateBlogDraftFromSite } from "@/app/api/admin/blog/generate-from-site/route";
 
 export const runtime = "nodejs";
+export const maxDuration = 900;
 
 type SiteBlogDraftContext = {
   params: Promise<{

@@ -497,7 +497,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           {overviewBlocks.length > 0 ? (
             <div className="px-5 pb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">사이트 개요</p>
-              <SiteDescriptionNotice />
+              <SiteDescriptionNotice siteName={site.siteName} />
               <SafeMarkdown
                 value={site.shortDescription}
                 blocks={overviewBlocks}

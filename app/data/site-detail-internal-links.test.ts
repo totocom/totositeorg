@@ -119,7 +119,7 @@ test("site detail page renders the feedback and scam report submission guide", (
   assert.match(siteDetailPageSource, /<SiteFeedbackSubmissionGuide\s+siteId=\{site\.id\}\s+siteName=\{site\.siteName\}\s*\/>/);
   assert.match(
     siteDetailPageSource,
-    /<SiteDescriptionNotice\s*\/>/,
+    /<SiteDescriptionNotice\s+siteName=\{site\.siteName\}\s*\/>/,
   );
 });
 

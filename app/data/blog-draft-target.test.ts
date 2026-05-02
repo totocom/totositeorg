@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  aiGenerationJobStaleAfterMs,
+  isActiveAiGenerationJobStale,
+} from "./ai-generation-job-status";
+import {
   getPreferredBlogSlug,
   resolveBlogDraftTarget,
   type BlogDraftTargetBlog,
@@ -56,4 +60,47 @@ test("additional post mode can still create a dated slug when explicitly allowed
   assert.equal(result.jobType, "create");
   assert.equal(result.isAdditionalPost, true);
   assert.equal(slug, "minsokchon-totosite-2026-05-02");
+});
+
+test("active ai generation jobs become stale after the threshold", () => {
+  const now = new Date("2026-05-03T00:20:00.000Z");
+
+  assert.equal(
+    isActiveAiGenerationJobStale({
+      status: "running",
+      createdAt: "2026-05-03T00:00:00.000Z",
+      startedAt: "2026-05-03T00:00:00.000Z",
+      now,
+    }),
+    true,
+  );
+});
+
+test("recent active ai generation jobs still block duplicate generation", () => {
+  const now = new Date(
+    new Date("2026-05-03T00:00:00.000Z").getTime() +
+      aiGenerationJobStaleAfterMs -
+      1,
+  );
+
+  assert.equal(
+    isActiveAiGenerationJobStale({
+      status: "queued",
+      createdAt: "2026-05-03T00:00:00.000Z",
+      now,
+    }),
+    false,
+  );
+});
+
+test("completed ai generation jobs are never treated as stale blockers", () => {
+  assert.equal(
+    isActiveAiGenerationJobStale({
+      status: "succeeded",
+      createdAt: "2026-05-03T00:00:00.000Z",
+      startedAt: "2026-05-03T00:00:00.000Z",
+      now: new Date("2026-05-03T02:00:00.000Z"),
+    }),
+    false,
+  );
 });
