@@ -10,7 +10,7 @@ type SiteObservationSnapshotCardProps = {
 };
 
 const observationIntro =
-  "조회 시점 기준 원본 페이지의 공개 HTML에서 확인된 화면 및 주요 표시 정보를 정리했습니다. 이 정보는 사이트 식별과 화면 기록 확인을 위한 자료이며, 가입 또는 이용을 권유하기 위한 목적이 아닙니다.";
+  "원본 페이지의 공개 HTML과 화면 자료에서 확인된 주요 표시 정보를 따로 정리했습니다. 이 정보는 사이트 식별과 화면 기록 확인을 위한 자료이며, 가입 또는 이용을 권유하기 위한 목적이 아닙니다.";
 
 export function SiteObservationSnapshotCard({
   snapshot,

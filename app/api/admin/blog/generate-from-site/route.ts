@@ -14,6 +14,14 @@ import {
   type BlogVerificationSummary,
 } from "@/app/data/blog-verification";
 import {
+  getPreferredBlogSlug,
+  resolveBlogDraftTarget,
+} from "@/app/data/blog-draft-target";
+import {
+  getRequiredBlogReportHeadings,
+  validateRequiredBlogReportSectionCoverage,
+} from "@/app/data/blog-report-sections";
+import {
   blogSourceCrawlSnapshotSelect,
   getBlogSourceCrawlSnapshotJson,
   toBlogSourceCrawlSnapshot,
@@ -253,6 +261,10 @@ type SnapshotSite = {
   domain: string;
   display_domain: string;
   description: string | null;
+  description_source_snapshot_id: string | null;
+  description_generated_at: string | null;
+  screenshot_url: string | null;
+  screenshot_thumb_url: string | null;
   screenshots: string[] | null;
   logo_url: string | null;
   favicon_url: string | null;
@@ -431,6 +443,9 @@ type SnapshotChangeSummary = {
   new_scam_reports_count: number;
   dns_changed: boolean;
   whois_changed: boolean;
+  crawl_snapshot_changed: boolean;
+  previous_crawl_snapshot_id: string | null;
+  next_crawl_snapshot_id: string | null;
   new_domains: string[];
   removed_domains: string[];
   new_resolved_ips: string[];
@@ -2048,7 +2063,9 @@ function buildVersionChangeSummary({
     : [];
 
   return uniqueStrings([
-    `${prefix}: ${snapshotAt} 기준 source snapshot 반영`,
+    `${prefix}: ${snapshotAt} 기준 source snapshot 반영${
+      snapshot.crawl_snapshot ? " / site_crawl_snapshot 반영" : ""
+    }`,
     ...changeLines,
     summary,
   ]).join("\n");
@@ -2123,6 +2140,8 @@ function compareSourceSnapshots(
         getWhoisFingerprint(nextSnapshot),
       )
     : { added: getWhoisFingerprint(nextSnapshot), removed: [] };
+  const previousCrawlSnapshotId = previousSnapshot?.crawl_snapshot?.id ?? null;
+  const nextCrawlSnapshotId = nextSnapshot.crawl_snapshot?.id ?? null;
 
   return {
     new_reviews_count: Math.max(
@@ -2136,6 +2155,11 @@ function compareSourceSnapshots(
     ),
     dns_changed: dnsDiff.added.length > 0 || dnsDiff.removed.length > 0,
     whois_changed: whoisDiff.added.length > 0 || whoisDiff.removed.length > 0,
+    crawl_snapshot_changed:
+      Boolean(nextCrawlSnapshotId) &&
+      previousCrawlSnapshotId !== nextCrawlSnapshotId,
+    previous_crawl_snapshot_id: previousCrawlSnapshotId,
+    next_crawl_snapshot_id: nextCrawlSnapshotId,
     new_domains: domainDiff.added,
     removed_domains: domainDiff.removed,
     new_resolved_ips: ipDiff.added,
@@ -2149,6 +2173,13 @@ function formatSnapshotChangeSummary(changeSummary: SnapshotChangeSummary) {
     `새 승인 피해 제보 수: ${changeSummary.new_scam_reports_count}`,
     `DNS 변경 여부: ${changeSummary.dns_changed ? "있음" : "없음"}`,
     `WHOIS 변경 여부: ${changeSummary.whois_changed ? "있음" : "없음"}`,
+    `site_crawl_snapshot 반영: ${
+      changeSummary.next_crawl_snapshot_id
+        ? changeSummary.crawl_snapshot_changed
+          ? `변경됨 (${changeSummary.next_crawl_snapshot_id})`
+          : `유지 (${changeSummary.next_crawl_snapshot_id})`
+        : "없음"
+    }`,
     changeSummary.new_domains.length
       ? `추가 도메인: ${changeSummary.new_domains.join(", ")}`
       : "",
@@ -2478,6 +2509,7 @@ async function createBlogPostVersion({
         finalReview.body_md,
         getSeoH1(snapshot),
         snapshot.site_specific_verification,
+        snapshot,
       ),
       faq_json: finalReview.faq_json,
       checklist_json: finalReview.checklist_json,
@@ -3122,6 +3154,32 @@ function calculateSnapshotTrustScore({
   }).total;
 }
 
+async function getLatestBlogSourceCrawlSnapshot(
+  supabase: SupabaseClient,
+  site: SiteRow,
+) {
+  if (site.latest_crawl_snapshot_id) {
+    const pinnedResult = await supabase
+      .from("site_crawl_snapshots")
+      .select(blogSourceCrawlSnapshotSelect)
+      .eq("id", site.latest_crawl_snapshot_id)
+      .eq("site_id", site.id)
+      .maybeSingle<BlogSourceCrawlSnapshotRow>();
+
+    if (pinnedResult.error || pinnedResult.data) {
+      return pinnedResult;
+    }
+  }
+
+  return supabase
+    .from("site_crawl_snapshots")
+    .select(blogSourceCrawlSnapshotSelect)
+    .eq("site_id", site.id)
+    .order("collected_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<BlogSourceCrawlSnapshotRow>();
+}
+
 async function createSourceSnapshot({
   supabase,
   site,
@@ -3191,14 +3249,7 @@ async function createSourceSnapshot({
           .overlaps("resolved_ips", resolvedIps)
           .limit(20)
       : Promise.resolve({ data: [], error: null }),
-    site.latest_crawl_snapshot_id
-      ? supabase
-          .from("site_crawl_snapshots")
-          .select(blogSourceCrawlSnapshotSelect)
-          .eq("id", site.latest_crawl_snapshot_id)
-          .eq("site_id", site.id)
-          .maybeSingle<BlogSourceCrawlSnapshotRow>()
-      : Promise.resolve({ data: null, error: null }),
+    getLatestBlogSourceCrawlSnapshot(supabase, site),
   ]);
 
   if (reviewsResult.error) {
@@ -3292,6 +3343,10 @@ async function createSourceSnapshot({
     domain: getSnapshotDomain(site),
     display_domain: formatDisplayDomain(getSnapshotDomain(site)),
     description: site.description || null,
+    description_source_snapshot_id: site.description_source_snapshot_id ?? null,
+    description_generated_at: site.description_generated_at ?? null,
+    screenshot_url: site.screenshot_url,
+    screenshot_thumb_url: site.screenshot_thumb_url,
     screenshots: getScreenshotUrls(site),
     logo_url: site.logo_url,
     favicon_url: site.favicon_url,
@@ -3305,6 +3360,7 @@ async function createSourceSnapshot({
     created_at: site.created_at,
     updated_at: site.updated_at,
   };
+  const crawlSnapshot = toBlogSourceCrawlSnapshot(crawlSnapshotResult.data ?? null);
   const minimumPublishCheck = buildMinimumPublishCheck({
     site: snapshotSite,
     reviewsSummary,
@@ -3316,6 +3372,7 @@ async function createSourceSnapshot({
   const siteSpecificVerification = buildBlogVerificationSummary({
     generatedAt,
     site: snapshotSite,
+    crawl_snapshot: crawlSnapshot,
     domains,
     dns_records: dnsRecords,
     whois: whoisRecords,
@@ -3335,7 +3392,7 @@ async function createSourceSnapshot({
     generatedAt,
     site: snapshotSite,
     site_detail_path: `/sites/${site.slug}`,
-    crawl_snapshot: toBlogSourceCrawlSnapshot(crawlSnapshotResult.data ?? null),
+    crawl_snapshot: crawlSnapshot,
     domains,
     dns_records: dnsRecords,
     whois: whoisRecords,
@@ -3642,7 +3699,7 @@ function getFallbackSeoTitle(snapshot: SourceSnapshot) {
   const signals = getSeoTitleSignals(snapshot);
   const siteName = signals.site_name || snapshot.site.name;
 
-  return `${siteName} 토토사이트 기본 정보 확인: 먹튀 제보 ${signals.approved_public_scam_report_count}건·후기 ${signals.approved_review_count}건·도메인 ${signals.additional_domain_count}개`;
+  return `${siteName} 토토사이트 기본 정보 확인: 관측 정보·먹튀 제보 ${signals.approved_public_scam_report_count}건·후기 ${signals.approved_review_count}건`;
 }
 
 function getSeoTitleSignals(snapshot: SourceSnapshot): SeoTitleSignals {
@@ -3796,23 +3853,23 @@ function getSeoTitle(snapshot: SourceSnapshot) {
   const whoisSegment = getWhoisTitleSegment(signals);
 
   if (signals.approved_public_scam_report_count > 0) {
-    return `${siteName} 토토사이트 먹튀 제보 ${signals.approved_public_scam_report_count}건·후기 ${signals.approved_review_count}건: ${dnsSegment} 현황`;
+    return `${siteName} 토토사이트 먹튀 제보 ${signals.approved_public_scam_report_count}건·후기 ${signals.approved_review_count}건: 관측 정보와 ${dnsSegment}`;
   }
 
   if (signals.approved_review_count > 0) {
-    return `${siteName} 토토사이트 후기 ${signals.approved_review_count}건·먹튀 제보 0건: ${dnsSegment} 기준`;
+    return `${siteName} 토토사이트 후기 ${signals.approved_review_count}건·먹튀 제보 0건: 관측 정보와 ${dnsSegment}`;
   }
 
   if (signals.additional_domain_count > 1) {
-    return `${siteName} 토토사이트 도메인 ${signals.additional_domain_count}개·먹튀 제보 0건: ${whoisSegment}`;
+    return `${siteName} 토토사이트 도메인 ${signals.additional_domain_count}개 관측 현황: ${whoisSegment}·제보 정리`;
   }
 
   if (signals.has_whois_created_date) {
-    return `${siteName} 토토사이트 ${whoisSegment}: ${dnsSegment}·먹튀 제보 0건`;
+    return `${siteName} 토토사이트 ${whoisSegment}: 원본 관측과 ${dnsSegment}`;
   }
 
   if (hasRichDnsTitleData(signals)) {
-    return `${siteName} 토토사이트 ${dnsSegment} 분석·IP ${signals.resolved_ip_count}개: 먹튀 제보 0건`;
+    return `${siteName} 토토사이트 ${dnsSegment} 분석: 원본 관측·IP ${signals.resolved_ip_count}개`;
   }
 
   return getFallbackSeoTitle(snapshot);
@@ -3941,18 +3998,18 @@ function getSeoH1(snapshot: SourceSnapshot) {
     signals.approved_review_count > 0 ||
     signals.approved_public_scam_report_count > 0
   ) {
-    return `${siteName} 토토사이트 정보 리포트: 먹튀 제보 ${signals.approved_public_scam_report_count}건, 후기 ${signals.approved_review_count}건, DNS 조회 기준`;
+    return `${siteName} 토토사이트 종합 정보 리포트: 관측 정보, 먹튀 제보 ${signals.approved_public_scam_report_count}건, 후기 ${signals.approved_review_count}건`;
   }
 
   if (signals.additional_domain_count > 1 || signals.has_whois_created_date) {
-    return `${siteName} 토토사이트 도메인 리포트: 도메인 ${signals.additional_domain_count}개, ${getWhoisTitleSegment(signals)}, 제보 현황`;
+    return `${siteName} 토토사이트 종합 정보 리포트: 도메인 ${signals.additional_domain_count}개, ${getWhoisTitleSegment(signals)}, 관측 정보`;
   }
 
   if (hasRichDnsTitleData(signals)) {
-    return `${siteName} 토토사이트 정보 확인: ${getDnsTitleSegment(signals)}, IP ${signals.resolved_ip_count}개, 제보 기준`;
+    return `${siteName} 토토사이트 종합 정보 확인: 관측 정보, ${getDnsTitleSegment(signals)}, IP ${signals.resolved_ip_count}개`;
   }
 
-  return `${siteName} 토토사이트 기본 정보 리포트: 먹튀 제보 0건, 후기 0건, 도메인 ${signals.additional_domain_count}개 기준`;
+  return `${siteName} 토토사이트 기본 정보 리포트: 관측 정보, 먹튀 제보 0건, 후기 0건, 도메인 ${signals.additional_domain_count}개 기준`;
 }
 
 function getSeoMetaDescription(snapshot: SourceSnapshot) {
@@ -3963,7 +4020,7 @@ function getSeoMetaDescription(snapshot: SourceSnapshot) {
     formatSeoTitleDate(signals.whois_last_checked_at) ||
     "조회 시점";
 
-  return `${signals.site_name} 토토사이트의 후기 ${signals.approved_review_count}건, 먹튀 제보 ${signals.approved_public_scam_report_count}건, 추가 도메인 ${signals.additional_domain_count}개와 ${dnsTypes}/WHOIS 정보를 ${checkedAt} 기준으로 정리했습니다.`;
+  return `${signals.site_name} 토토사이트의 원본 사이트 관측 정보, 후기 ${signals.approved_review_count}건, 먹튀 제보 ${signals.approved_public_scam_report_count}건, 추가 도메인 ${signals.additional_domain_count}개와 ${dnsTypes}/WHOIS 정보를 ${checkedAt} 기준으로 정리했습니다.`;
 }
 
 function buildSiteInternalLinks(snapshot: SourceSnapshot): BlogDraft["internal_links"] {
@@ -4750,10 +4807,197 @@ function stripInternalPlanningMarkdown(markdown: string) {
   return output.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+function appendMissingRequiredBlogReportSections(
+  markdown: string,
+  snapshot: SourceSnapshot,
+) {
+  const coverage = validateRequiredBlogReportSectionCoverage({
+    siteName: snapshot.site.name,
+    bodyMd: markdown,
+  });
+
+  if (coverage.missingHeadings.length === 0) {
+    return markdown;
+  }
+
+  const expectedHeadings = getRequiredBlogReportHeadings(snapshot.site.name);
+  const missingSections = expectedHeadings
+    .filter((heading) => coverage.missingHeadings.includes(heading))
+    .map((heading) =>
+      [`## ${heading}`, buildRequiredSectionFallbackText(heading, snapshot)]
+        .filter(Boolean)
+        .join("\n\n"),
+    );
+
+  return [markdown.trim(), ...missingSections]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
+function buildRequiredSectionFallbackText(
+  heading: string,
+  snapshot: SourceSnapshot,
+) {
+  const siteName = snapshot.site.name;
+  const crawlSnapshot = snapshot.crawl_snapshot;
+  const representativeDomain = snapshot.derived_facts.primary_domain_display;
+  const additionalDomainCount = snapshot.derived_facts.additional_domains.length;
+  const dnsRecordTypes = uniqueStrings(
+    snapshot.dns_records.map((record) => record.record_type),
+  );
+  const checkedAt =
+    snapshot.snapshot_at ??
+    snapshot.generatedAt ??
+    snapshot.derived_facts.dns_last_checked_at ??
+    snapshot.derived_facts.whois_last_checked_at;
+
+  if (heading.includes("토토사이트 정보 요약")) {
+    return `${siteName} 토토사이트는 ${representativeDomain || "대표 도메인 미확인"} 기준으로 주소·도메인, 원본 사이트 관측 정보, DNS·WHOIS, 먹튀 제보와 후기 현황을 함께 확인하는 정보 리포트 대상입니다. 조회 시점 기준 승인 리뷰 ${snapshot.reviews_summary.approved_review_count}건, 승인 피해 제보 ${snapshot.scam_reports_summary.approved_public_report_count}건, 추가 도메인 ${additionalDomainCount}개가 저장 데이터에 정리되어 있습니다.`;
+  }
+
+  if (heading.includes("원본 사이트 관측 정보")) {
+    if (!crawlSnapshot) {
+      return "조회 시점 기준 연결된 원본 사이트 관측 스냅샷은 아직 확인되지 않았습니다. 따라서 이 글에서는 저장된 사이트 설명과 도메인·DNS·WHOIS 데이터 중심으로 한계를 분리해 설명합니다.";
+    }
+
+    return `원본 사이트 관측 정보는 ${formatSectionDate(crawlSnapshot.collected_at)} 기준 공개 HTML에서 확인된 화면 기록입니다. page title과 H1, 메타 설명은 사이트 식별 보조 자료로만 사용하며, 원문 문구를 그대로 옮기거나 이용을 권유하는 방식으로 해석하지 않습니다.`;
+  }
+
+  if (heading.includes("주소와 도메인 현황")) {
+    const domains = [snapshot.derived_facts.primary_domain_display, ...snapshot.derived_facts.additional_domains_display]
+      .filter(Boolean)
+      .slice(0, 5)
+      .join(", ");
+
+    return `${siteName} 주소와 도메인 현황은 대표 도메인 ${representativeDomain || "확인되지 않음"}과 추가 승인 도메인 ${additionalDomainCount}개를 기준으로 정리합니다.${domains ? ` 확인된 도메인 표기는 ${domains}입니다.` : ""} 외부 사이트로 이동하는 링크는 제공하지 않고 내부 상세 기록에서 변동 여부를 확인하도록 구성합니다.`;
+  }
+
+  if (heading.includes("도메인 DNS·WHOIS 조회 결과")) {
+    const dnsSummary = dnsRecordTypes.length
+      ? `${dnsRecordTypes.join(", ")} 레코드 유형`
+      : "저장된 DNS 레코드 없음";
+
+    return `${siteName} 도메인 DNS·WHOIS 조회 결과는 ${dnsSummary}, WHOIS 등록일 ${snapshot.derived_facts.domain_created_date ?? "확인되지 않음"}, 네임서버 ${snapshot.derived_facts.name_servers.length}개를 기준으로 요약합니다. DNS와 WHOIS 정보는 조회 시점에 따라 달라질 수 있어 운영 주체나 안전성을 단정하는 근거로 사용하지 않습니다.`;
+  }
+
+  if (heading.includes("화면 구성에서 관측된 주요 요소")) {
+    const menuSummary = formatObservationSummary(
+      crawlSnapshot?.observed_menu_labels,
+      "주요 메뉴",
+    );
+    const badgeSummary = formatObservationSummary(
+      crawlSnapshot?.observed_badges,
+      "배지",
+    );
+    const footerSummary = formatObservationSummary(
+      crawlSnapshot?.observed_footer_text,
+      "footer/copyright",
+    );
+
+    return `${siteName} 화면 구성은 ${menuSummary}, ${badgeSummary}, ${footerSummary} 관측값을 중심으로 요약합니다. 세부 메뉴 전체를 나열하기보다 사이트 식별과 화면 기록 확인에 필요한 흐름만 정리합니다.`;
+  }
+
+  if (heading.includes("계정·게임·결제 관련 관측 정보")) {
+    const accountSummary = formatObservationSummary(
+      crawlSnapshot?.observed_account_features,
+      "계정 관련 요소",
+    );
+    const bettingSummary = formatObservationSummary(
+      crawlSnapshot?.observed_betting_features,
+      "게임·베팅 관련 요소",
+    );
+    const paymentSummary = formatObservationSummary(
+      crawlSnapshot?.observed_payment_flags,
+      "결제 관련 표현",
+    );
+
+    return `${siteName} 계정·게임·결제 관련 관측 정보는 ${accountSummary}, ${bettingSummary}, ${paymentSummary}를 구분해 기록합니다. 이 항목은 화면에 어떤 유형의 요소가 보였는지 설명하는 자료일 뿐 이용 절차나 혜택을 안내하는 문맥으로 사용하지 않습니다.`;
+  }
+
+  if (heading.includes("먹튀 제보 현황")) {
+    return `${siteName} 먹튀 제보 현황은 조회 시점 기준 승인되어 공개 처리된 피해 제보 ${snapshot.scam_reports_summary.approved_public_report_count}건을 기준으로 합니다. 제보가 확인되지 않는 경우에도 위험이 없다는 의미로 해석하지 않고, 현재 승인된 제보가 확인되지 않았다는 사실만 분리합니다.`;
+  }
+
+  if (heading.includes("후기 데이터 현황")) {
+    const averageRating = snapshot.reviews_summary.average_rating;
+
+    return `${siteName} 후기 데이터 현황은 승인 리뷰 ${snapshot.reviews_summary.approved_review_count}건${typeof averageRating === "number" ? `, 평균 평점 ${averageRating.toFixed(1)}점` : ""}을 기준으로 요약합니다. 후기 내용은 결제, 고객지원, 계정 제한, 화면 이용 경험처럼 반복되는 신호를 확인하는 보조 데이터로 다룹니다.`;
+  }
+
+  if (heading.includes("확인되지 않은 항목과 해석상 한계")) {
+    return `${siteName} 관련 자료 중 DNS·WHOIS 조회 실패, 관측 스냅샷 부재, 리뷰 또는 제보 부족처럼 확인되지 않은 항목은 별도로 분리해야 합니다. 조회 시점 기준 데이터만으로 운영 주체, 안전성, 피해 가능성을 단정하지 않습니다.`;
+  }
+
+  if (heading.includes("이용 전 확인할 체크리스트")) {
+    return [
+      `- 대표 도메인과 추가 도메인 ${additionalDomainCount}개가 내부 상세 기록과 일치하는지 확인합니다.`,
+      `- DNS·WHOIS 조회 시각과 레코드 유형이 ${formatSectionDate(checkedAt)} 기준인지 확인합니다.`,
+      "- 승인된 먹튀 제보와 후기 수를 함께 확인하되, 제보 부재를 안전 보장으로 해석하지 않습니다.",
+      "- 원본 사이트 관측 정보는 화면 기록 확인용 자료로만 보고 이용 절차 안내로 사용하지 않습니다.",
+    ].join("\n");
+  }
+
+  if (heading.includes("토토사이트 FAQ")) {
+    return [
+      `**${siteName} 주소는 어떻게 확인하나요?** 내부 사이트 상세 기록의 대표 도메인과 추가 승인 도메인 기준으로 확인합니다.`,
+      `**${siteName} 먹튀 제보는 어떻게 보나요?** 승인되어 공개 처리된 피해 제보 수와 접수 시점을 기준으로 확인합니다.`,
+      `**${siteName} 후기는 어떤 기준으로 해석하나요?** 승인 리뷰 수, 작성 시점, 반복되는 이용 경험 신호를 함께 봅니다.`,
+    ].join("\n\n");
+  }
+
+  return `${siteName} 관련 정보는 조회 시점 기준 저장된 확인 데이터만 사용해 정리합니다.`;
+}
+
+function formatObservationSummary(
+  values: unknown[] | null | undefined,
+  label: string,
+) {
+  const safeItems = toSafeObservationItems(values);
+
+  if (safeItems.length === 0) {
+    return `${label} 확인 항목 없음`;
+  }
+
+  return `${label} ${safeItems.length}개${safeItems.length ? ` (${safeItems.slice(0, 3).join(", ")})` : ""}`;
+}
+
+function toSafeObservationItems(values: unknown[] | null | undefined) {
+  if (!Array.isArray(values)) return [];
+
+  return uniqueStrings(
+    values.flatMap((value) => {
+      if (typeof value === "string") return [value];
+      if (!isRecord(value)) return [];
+
+      return [
+        value.label,
+        value.text,
+        value.title,
+        value.name,
+      ].filter((item): item is string => typeof item === "string");
+    }),
+  )
+    .map((value) => value.replace(/\s+/g, " ").trim())
+    .filter((value) => value && !isPromotionalObservationTerm(value))
+    .slice(0, 8);
+}
+
+function isPromotionalObservationTerm(value: string) {
+  return /가입|보너스|이벤트|추천|바로가기|최신\s*주소|우회\s*주소|첫충|매충|쿠폰/i.test(
+    value,
+  );
+}
+
+function formatSectionDate(value: string | null | undefined) {
+  return value ? formatSeoTitleDate(value) || value : "조회 시점";
+}
+
 function normalizeBlogMarkdown(
   markdown: string,
   h1: string,
   verificationSummary?: BlogVerificationSummary | null,
+  snapshot?: SourceSnapshot | null,
 ) {
   const normalized = normalizeMarkdownTitle(
     stripInternalPlanningMarkdown(
@@ -4764,9 +5008,12 @@ function normalizeBlogMarkdown(
     ),
     h1,
   );
-  const withVerification = verificationSummary
-    ? appendBlogVerificationMarkdown(normalized, verificationSummary)
+  const withRequiredSections = snapshot
+    ? appendMissingRequiredBlogReportSections(normalized, snapshot)
     : normalized;
+  const withVerification = verificationSummary
+    ? appendBlogVerificationMarkdown(withRequiredSections, verificationSummary)
+    : withRequiredSections;
 
   return appendRequiredBlogNotices(
     withVerification,
@@ -4777,12 +5024,14 @@ function sanitizePublicBody({
   markdown,
   h1,
   verificationSummary,
+  snapshot,
 }: {
   markdown: string;
   h1: string;
   verificationSummary?: BlogVerificationSummary | null;
+  snapshot?: SourceSnapshot | null;
 }) {
-  return normalizeBlogMarkdown(markdown, h1, verificationSummary);
+  return normalizeBlogMarkdown(markdown, h1, verificationSummary, snapshot);
 }
 
 function normalizeSeoPlan(
@@ -4798,7 +5047,12 @@ function normalizeSeoPlan(
     "추천, 홍보, 가입 유도 표현 금지",
     "안전 보장 또는 먹튀 없음 단정 금지",
     "WHOIS 비공개, CDN, 동일 IP 관측만으로 운영 주체 또는 위험도 단정 금지",
+    "원본 사이트 관측 정보는 사이트 식별과 화면 기록 확인 목적으로만 사용",
   ];
+  const plannedSectionFacts = uniqueStrings([
+    ...seoPlan.confirmed_facts,
+    ...seoPlan.section_plan.flatMap((section) => section.must_include_facts),
+  ]);
 
   return {
     ...seoPlan,
@@ -4826,16 +5080,15 @@ function normalizeSeoPlan(
             "DNS/WHOIS 기반 정보 확인",
           ],
     },
-    section_plan: seoPlan.section_plan.length
-      ? seoPlan.section_plan
-      : [
-          {
-            heading: "검색자가 궁금해하는 핵심 요약",
-            purpose: "조회 시점 기준 확인 가능한 공개 정보를 요약합니다.",
-            must_include_facts: seoPlan.confirmed_facts,
-            must_avoid: requiredRiskWarnings,
-          },
-        ],
+    section_plan: getRequiredBlogReportHeadings(snapshot.site.name).map(
+      (heading) => ({
+        heading,
+        purpose:
+          "사이트 관측 정보, 주소·도메인, DNS·WHOIS, 먹튀 제보, 후기 현황을 종합 리포트 흐름으로 설명합니다.",
+        must_include_facts: plannedSectionFacts,
+        must_avoid: requiredRiskWarnings,
+      }),
+    ),
     risk_warnings: uniqueStrings([
       ...seoPlan.risk_warnings,
       ...requiredRiskWarnings,
@@ -5041,7 +5294,7 @@ function finalSummaryToText(snapshot: SourceSnapshot) {
     formatSeoTitleDate(snapshot.derived_facts.whois_last_checked_at) ||
     "조회 시점";
 
-  return `${siteName} 토토사이트의 후기 ${reviewCount}건, 먹튀 제보 ${reportCount}건, 추가 도메인 ${domainCount}개와 DNS/WHOIS 정보를 ${checkedAt} 기준으로 정리했습니다.`;
+  return `${siteName} 토토사이트의 원본 사이트 관측 정보, 후기 ${reviewCount}건, 먹튀 제보 ${reportCount}건, 추가 도메인 ${domainCount}개와 DNS/WHOIS 정보를 ${checkedAt} 기준으로 정리했습니다.`;
 }
 
 function prohibitedCheckViolations(
@@ -5112,6 +5365,7 @@ function normalizeFinalReviewOutput({
     output.body_md,
     h1,
     snapshot.site_specific_verification,
+    snapshot,
   );
   const checklist = output.checklist_json
     .map((item) => `${item.item.trim()}: ${item.reason.trim()}`)
@@ -5461,13 +5715,21 @@ export async function POST(request: Request) {
     const publishedBlog = requestedBlog.data
       ? null
       : await findPublishedBlogBySource(supabase, site.id);
-    const existingBlog = requestedBlog.data
-      ? requestedBlog.data
-      : mode === "update"
-        ? publishedBlog
-        : allowAdditionalPostForSameSite
-          ? null
-          : publishedBlog ?? (await findExistingBlogBySource(supabase, site.id));
+    const reusableExistingBlog =
+      !requestedBlog.data &&
+      mode === "create" &&
+      !allowAdditionalPostForSameSite &&
+      !publishedBlog
+        ? await findExistingBlogBySource(supabase, site.id)
+        : null;
+    const draftTarget = resolveBlogDraftTarget({
+      requestedBlog: requestedBlog.data,
+      publishedBlog,
+      existingBlog: reusableExistingBlog,
+      mode,
+      allowAdditionalPostForSameSite,
+    });
+    const existingBlog = draftTarget.targetBlog;
 
     if (mode === "update" && !existingBlog) {
       return NextResponse.json(
@@ -5479,9 +5741,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const isAdditionalPost =
-      allowAdditionalPostForSameSite && mode === "create" && !existingBlog;
-    const jobType = existingBlog ? "update" : "create";
+    const isAdditionalPost = draftTarget.isAdditionalPost;
+    const jobType = draftTarget.jobType;
     const activeJob = await findActiveAiGenerationJob(supabase, site.id);
 
     if (activeJob) {
@@ -5513,11 +5774,12 @@ export async function POST(request: Request) {
     });
 
     const fallbackSlug = getFallbackBlogSlug(site);
-    const preferredSlug = existingBlog?.slug ?? (
-      isAdditionalPost
-        ? `${fallbackSlug}-${new Date().toISOString().slice(0, 10)}`
-        : fallbackSlug
-    );
+    const preferredSlug = getPreferredBlogSlug({
+      existingSlug: existingBlog?.slug,
+      fallbackSlug,
+      isAdditionalPost,
+      now: new Date(),
+    });
     const approvedDomainSubmissions = await getApprovedDomainSubmissionRows(
       supabase,
       site.id,
@@ -5619,6 +5881,7 @@ export async function POST(request: Request) {
       markdown: generated.finalReview.body_md,
       h1,
       verificationSummary: persistedSnapshot.site_specific_verification,
+      snapshot: persistedSnapshot,
     });
     const blogVisualImages = selectBlogVisualImages({
       siteName: site.name,

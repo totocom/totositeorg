@@ -164,19 +164,19 @@ function buildPublicObservationSummary({
   }
 
   if (observed_account_features.length > 0) {
-    summary.push("계정 관련 화면 요소가 관측되었습니다.");
+    summary.push("계정 관련 화면 요소가 확인됩니다.");
   }
 
   if (observed_betting_features.length > 0) {
-    summary.push("게임 및 경기 관련 화면 요소가 관측되었습니다.");
+    summary.push("게임 및 경기 관련 화면 요소가 확인됩니다.");
   }
 
   if (observed_payment_flags.length > 0) {
-    summary.push("결제 관련 화면 요소가 관측되었습니다.");
+    summary.push("결제 관련 화면 요소가 확인됩니다.");
   }
 
   if (observed_notice_items.length > 0 || observed_event_items.length > 0) {
-    summary.push("공지성 또는 캠페인성 화면 요소가 관측되었습니다.");
+    summary.push("공지성 또는 캠페인성 화면 요소가 확인됩니다.");
   }
 
   return summary.filter((item) => !containsSiteObservationPromotionalTerm(item));

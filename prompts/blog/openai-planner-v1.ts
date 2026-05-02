@@ -1,3 +1,5 @@
+import { formatRequiredBlogReportHeadings } from "../../app/data/blog-report-sections";
+
 export const BLOG_PROMPT_VERSION = "blog-v1";
 
 export const OPENAI_PLANNER_SYSTEM_PROMPT =
@@ -36,6 +38,7 @@ export function buildOpenAiPlannerPrompt({
   snapshot,
   updateContext,
 }: OpenAiPlannerPromptInput) {
+  const requiredH2Structure = formatRequiredBlogReportHeadings(siteName);
   const input = {
     site_name: siteName,
     primary_keyword: primaryKeyword,
@@ -99,6 +102,9 @@ export function buildOpenAiPlannerPrompt({
 - 먹튀 제보가 0건인 경우에도 "먹튀 없음"이라고 쓰지 말고, "먹튀 제보 0건"처럼 표현한다.
 - search_intent.main_intent는 "정보 확인" 방향으로 둔다.
 - section_plan은 H2/H3 작성에 바로 사용할 수 있는 구조로 만든다.
+- section_plan은 DNS/WHOIS 중심 단일 글이 아니라 사이트 관측 정보 + 주소/도메인 + DNS/WHOIS + 먹튀 제보 + 후기 현황을 포함한 종합 정보 리포트 구조로 만든다.
+- section_plan의 주요 H2는 반드시 다음 순서와 표현을 따른다:
+${requiredH2Structure}
 - section_plan의 주요 H2는 "공개 제보", "공개 피해", "공개 데이터", "공개 먹튀 제보"를 쓰지 않고 주소, 도메인, 먹튀 제보, 후기, DNS, WHOIS처럼 실제 검색 표현과 데이터 항목을 중심으로 작성한다.
 - confirmed_facts, inferences, unknowns를 분리한다.
 - claim_map.source는 sites, dns, whois, reviews, scam_reports, domain_submissions, crawl_snapshot 중 하나만 사용한다.
@@ -108,7 +114,9 @@ export function buildOpenAiPlannerPrompt({
 - writing_brief_for_claude에는 키워드 목록, 검색어 목록, 키워드 나열 섹션을 만들지 말고 문맥 속 자연스러운 표현만 쓰라고 지시한다.
 - confidence는 근거가 직접 있으면 high, 집계/간접 관측이면 medium, 조회 실패/부재/불명확하면 low를 사용한다.
 - 모든 글에는 Source Snapshot의 site_specific_verification 값을 고유 데이터로 반영한다.
+- Source Snapshot의 site.description, site.description_source_snapshot_id, site.description_generated_at, site.screenshot_url, site.screenshot_thumb_url, site.favicon_url, site.logo_url이 있으면 사이트 식별과 화면 기록 확인 목적의 근거로 반영한다.
 - crawl_snapshot 또는 manual_html_snapshot은 원본 페이지의 공개 HTML에서 조회 시점 기준 관측된 정보입니다. 이 정보를 사이트 이용 권유, 가입 유도, 보너스/이벤트 소개, 최신 주소 안내로 사용하지 마세요. 관측 정보는 사이트 식별과 화면 기록 확인 목적의 설명에만 사용하세요.
+- crawl_snapshot이 있으면 page_title, meta_description, h1, 주요 메뉴, 계정 관련 요소, 게임/베팅 관련 요소, 결제 관련 관측값, notice/footer/badge를 해설형으로 요약하되 세부 메뉴 전체를 길게 나열하지 않는다.
 - crawl_snapshot의 page_title, h1, observed_* 값은 보조 자료로만 쓰고, 원본 사이트 문구를 그대로 복사하지 않는다.
 - crawl_snapshot.promotional_flags_json과 excluded_terms_json에 있는 표현은 AI 입력에는 포함되더라도 공개 본문, 제목, FAQ, checklist에서 강조하지 않는다.
 - 블로그 본문에서도 가입, 입금, 충전, 환전, 보너스, 이벤트, 추천, 바로가기, 최신 주소, 우회 주소를 소개하거나 강조하지 않는다.

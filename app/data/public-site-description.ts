@@ -131,7 +131,7 @@ export function getSiteOverviewMarkdownBlocks(value: string) {
   return getSafeMarkdownBlocks(value, {
     includeHeadings: false,
     includeLists: false,
-    maxBlocks: 5,
+    maxBlocks: 4,
   });
 }
 
@@ -234,5 +234,10 @@ function isReviewMemoBlock(value: string) {
 }
 
 function isLowValueOverviewText(value: string) {
-  return /^(관측된 화면 구성|화면 구조|검수 메모|사이트 개요)$/i.test(value);
+  return (
+    /^(관측된 화면 구성|화면 구조|검수 메모|사이트 개요)$/i.test(value) ||
+    /(?:주요\s*메뉴|계정\s*관련\s*요소|게임\/경기\s*관련\s*요소|푸터\/저작권|이미지\s*(?:alt|대체\s*텍스트)|관측\s*배지|배지성\s*표시)\s*[:：]/i.test(
+      value,
+    )
+  );
 }

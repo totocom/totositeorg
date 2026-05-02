@@ -52,6 +52,7 @@ const remoteImagePatterns = [
 ];
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   async headers() {
     return [
       {

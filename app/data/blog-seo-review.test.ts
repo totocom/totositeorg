@@ -33,20 +33,31 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
 
 const validBody = [
   "# 민속촌 토토사이트 검증 리포트",
-  "## 민속촌 토토사이트 검증 기준",
-  "민속촌 토토사이트는 등록 도메인과 DNS 조회값을 함께 확인해야 하는 정보 리포트 대상입니다.",
-  "## 민속촌 주소 확인 방법",
-  "민속촌 주소는 등록된 대표 도메인과 추가 승인 도메인을 나눠 확인하고, 외부 이동 링크 대신 내부 상세 페이지에서 공개 데이터를 비교합니다.",
-  "## 민속촌 도메인과 DNS 기록",
+  "## 민속촌 토토사이트 정보 요약",
+  "민속촌 토토사이트 검증은 등록 도메인과 DNS 조회값, 원본 사이트 관측 정보를 함께 확인해야 하는 정보 리포트 대상입니다.",
+  "## 민속촌 원본 사이트 관측 정보",
+  "조회 시점 기준 공개 HTML 관측값에는 메인 화면 제목, H1, 주요 메뉴 범주, footer 기록이 포함되어 사이트 식별 보조 자료로만 사용합니다.",
+  "## 민속촌 주소와 도메인 현황",
+  "민속촌 주소는 등록된 대표 도메인과 추가 승인 도메인을 나눠 확인하고, 외부 이동 링크 대신 내부 상세 페이지에서 확인 데이터를 비교합니다.",
+  "## 민속촌 도메인 DNS·WHOIS 조회 결과",
   "민속촌 도메인은 WHOIS 생성일, 네임서버, A 레코드 관측값을 함께 보아야 변경 흐름을 더 구체적으로 파악할 수 있습니다.",
+  "## 민속촌 화면 구성에서 관측된 주요 요소",
+  "관측 스냅샷에는 상단 메뉴 4개, 고객센터 영역, copyright 문구가 확인되어 화면 기록 확인 근거로만 정리합니다.",
+  "## 민속촌 계정·게임·결제 관련 관측 정보",
+  "계정 영역과 게임 분류, 결제 관련 표현은 화면에 보인 요소 유형만 요약하고 이용 절차나 혜택 안내로 연결하지 않습니다.",
   "## 민속촌 먹튀 제보 현황",
   "최근 승인 리뷰 6건과 먹튀 제보 1건이 함께 기록되어 있어 단일 후기보다 여러 신호를 같이 보는 구성이 필요합니다.",
   "민속촌 먹튀 제보는 승인된 신고 수와 접수 시점을 기준으로만 설명하며, 단정적인 안전 판단으로 바꾸지 않습니다.",
-  "## 민속촌 후기 요약",
+  "## 민속촌 후기 데이터 현황",
   "WHOIS 생성일과 네임서버 값은 도메인 변경 여부를 판단할 때 보조 근거로 활용할 수 있습니다.",
   "동일 IP 관측값은 없지만 추가 도메인 2개가 승인 상태로 기록되어 주소 확인 항목을 분리했습니다.",
   "민속촌 후기는 결제, 고객지원, 계정 제한처럼 실제 이용 경험에서 반복되는 항목을 중심으로 확인합니다.",
-  "## FAQ",
+  "## 확인되지 않은 항목과 해석상 한계",
+  "DNS와 WHOIS 정보는 조회 시점 기준이며 운영 주체나 안전성을 단정하는 자료로 사용하지 않습니다.",
+  "## 민속촌 이용 전 확인할 체크리스트",
+  "- 대표 도메인과 추가 승인 도메인 2개를 내부 상세 기록에서 확인합니다.",
+  "- 먹튀 제보 1건과 후기 6건의 승인 시점을 함께 확인합니다.",
+  "## 민속촌 토토사이트 FAQ",
   "이 글은 가입 유도가 아니라 확인 가능한 데이터와 이용 전 체크리스트를 정리합니다.",
 ].join("\n\n");
 
@@ -213,6 +224,22 @@ test("validateBlogSeoDraft passes a complete SEO draft", () => {
   assert.equal(result.seoReviewStatus, "passed");
   assert.equal(result.uniqueFactScore, 5);
   assert.equal(result.keywordChecks.titleHasPrimaryKeyword, true);
+  assert.equal(
+    result.keywordChecks.requiredReportSectionCoverage.hasObservationSection,
+    true,
+  );
+  assert.equal(
+    result.keywordChecks.requiredReportSectionCoverage.hasDnsWhoisSection,
+    true,
+  );
+  assert.equal(
+    result.keywordChecks.requiredReportSectionCoverage.hasScamReportSection,
+    true,
+  );
+  assert.equal(
+    result.keywordChecks.requiredReportSectionCoverage.hasReviewSection,
+    true,
+  );
   assert.deepEqual(result.adminWarnings, []);
 });
 
@@ -697,10 +724,15 @@ test("validateBlogSeoDraft passes secondary keyword coverage when all are includ
 test("validateBlogSeoDraft warns when some secondary keywords are missing", () => {
   const result = validateBlogSeoDraft({
     ...validDraft,
-    bodyMd: validBody.replace(
-      "## 민속촌 후기 요약\n\nWHOIS 생성일과 네임서버 값은 도메인 변경 여부를 판단할 때 보조 근거로 활용할 수 있습니다.\n\n동일 IP 관측값은 없지만 추가 도메인 2개가 승인 상태로 기록되어 주소 확인 항목을 분리했습니다.\n\n민속촌 후기는 결제, 고객지원, 계정 제한처럼 실제 이용 경험에서 반복되는 항목을 중심으로 확인합니다.",
-      "## 이용자 경험 요약\n\nWHOIS 생성일과 네임서버 값은 도메인 변경 여부를 판단할 때 보조 근거로 활용할 수 있습니다.\n\n동일 IP 관측값은 없지만 추가 도메인 2개가 승인 상태로 기록되어 주소 확인 항목을 분리했습니다.\n\n이용자 경험은 결제, 고객지원, 계정 제한처럼 실제 이용 흐름에서 반복되는 항목을 중심으로 확인합니다.",
-    ),
+    title: "민속촌 토토사이트 종합 리포트",
+    metaTitle: "민속촌 토토사이트 | 주소·도메인·먹튀 제보 현황",
+    h1: "민속촌 토토사이트 종합 리포트",
+    bodyMd: validBody
+      .replace("# 민속촌 토토사이트 검증 리포트", "# 민속촌 토토사이트 종합 리포트")
+      .replace(
+        "민속촌 토토사이트 검증은 등록 도메인과 DNS 조회값, 원본 사이트 관측 정보를 함께 확인해야 하는 정보 리포트 대상입니다.",
+        "민속촌 토토사이트는 등록 도메인과 DNS 조회값, 원본 사이트 관측 정보를 함께 확인해야 하는 정보 리포트 대상입니다.",
+      ),
     faq: [
       { question: "민속촌 주소는 어떻게 확인하나요?", answer: "등록 도메인과 최근 승인 데이터를 함께 확인합니다." },
       { question: "민속촌 먹튀 제보가 있나요?", answer: "승인된 제보 수와 내용을 기준으로 확인합니다." },
@@ -716,7 +748,7 @@ test("validateBlogSeoDraft warns when some secondary keywords are missing", () =
     ),
   );
   assert.deepEqual(result.keywordChecks.secondaryKeywordCoverage.missing, [
-    "민속촌 후기",
+    "민속촌 토토사이트 검증",
   ]);
 });
 

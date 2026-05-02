@@ -59,53 +59,38 @@ function safeBullets(values: string[], limit = 6) {
 
 function buildLocalDescriptionDraft({
   siteName,
-  sourceUrl,
   observation,
 }: {
   siteName: string;
-  sourceUrl: string;
   observation: SiteHtmlObservation;
 }) {
-  const title = observation.page_title || observation.h1 || siteName;
-  const menuLabels = safeBullets(observation.observed_menu_labels, 10);
+  const displayName =
+    safeBullets([observation.h1 || observation.page_title || siteName], 1)[0] ||
+    siteName;
+  const siteSubject = siteName.endsWith("사이트") ? siteName : `${siteName} 사이트`;
   const accountItems = safeBullets(observation.observed_account_features);
   const bettingItems = safeBullets(observation.observed_betting_features);
   const paymentItems = safeBullets(observation.observed_payment_flags);
-  const noticeItems = safeBullets(observation.observed_notice_items);
-  const footerItems = safeBullets(observation.observed_footer_text, 3);
-  const lines = [
-    `${siteName} 사이트 상세 설명 초안`,
-    "",
-    `조회 시점 기준 관리자가 제공한 공개 HTML과 스크린샷에서 관측된 정보를 바탕으로 ${siteName}의 화면 기록을 정리한 초안입니다. 화면에서 확인된 제목 계열은 "${title}"이며, 가입 또는 이용을 권유하기 위한 내용이 아닙니다.`,
-    "",
-    "관측된 화면 구성",
-    menuLabels.length > 0
-      ? `- 주요 메뉴: ${menuLabels.join(", ")}`
-      : "- 주요 메뉴: HTML에서 명확한 메뉴 라벨을 추가 검수해야 합니다.",
-    accountItems.length > 0
-      ? `- 계정 관련 요소: ${accountItems.join(", ")}`
-      : "- 계정 관련 요소: 공개 화면에서 별도 확인이 필요합니다.",
+  const displayNameSentence =
+    displayName && displayName !== siteName
+      ? `${siteSubject}는 공개 화면에서 "${displayName}"이라는 표시명이 사용된 것으로 확인됩니다.`
+      : `${siteSubject}는 공개 화면에서 사이트 식별명과 주요 화면 흐름이 함께 확인됩니다.`;
+  const gameTypeSentence =
     bettingItems.length > 0
-      ? `- 게임/경기 관련 요소: ${bettingItems.join(", ")}`
-      : "- 게임/경기 관련 요소: 공개 화면에서 별도 확인이 필요합니다.",
-    paymentItems.length > 0
-      ? "- 결제 관련 요소: 공개 화면에 관련 라벨이 관측되었습니다."
-      : "- 결제 관련 요소: 공개 화면에서 별도 확인이 필요합니다.",
-    noticeItems.length > 0
-      ? `- 공지/안내 요소: ${noticeItems.join(", ")}`
-      : "- 공지/안내 요소: HTML에서 명확한 공지 영역을 추가 검수해야 합니다.",
-    footerItems.length > 0
-      ? `- 푸터/저작권: ${footerItems.join(" / ")}`
-      : "- 푸터/저작권: 공개 화면 하단 정보는 추가 검수가 필요합니다.",
-    "",
-    "검수 메모",
-    `- 원본 URL: ${sourceUrl}`,
-    `- HTML 해시: ${observation.html_sha256}`,
-    `- 화면 텍스트 해시: ${observation.visible_text_sha256}`,
-    "- 외부 이미지 후보는 미리보기 후보로만 사용하고, 상세페이지에는 저장소에 확정된 이미지만 반영해야 합니다.",
+      ? "스포츠와 카지노·슬롯 계열처럼 게임 유형을 구분하는 흐름도 함께 보이지만, 세부 분류명은 본문에 나열하지 않았습니다."
+      : "게임 유형으로 보이는 항목은 세부값을 본문에 나열하지 않고 별도 관측 정보로 분리했습니다.";
+  const paymentRecordSentence =
+    paymentItems.length > 0 || accountItems.length > 0
+      ? "일부 영역에서는 금전 처리나 이용 기록과 관련된 요소도 확인되지만, 실제 처리 방식으로 해석하지 않았습니다."
+      : "금전 처리나 이용 기록과 관련된 실제 절차는 제공된 화면만으로 판단하지 않았습니다.";
+  const paragraphs = [
+    observationDisclosureText,
+    `${displayNameSentence} 주요 화면은 게임 유형, 계정 관련 메뉴, 이용 내역으로 보이는 항목을 중심으로 구성되어 있습니다. ${gameTypeSentence}`,
+    `상단과 주요 메뉴 영역에는 화면 이동 항목과 계정 이용과 관련된 메뉴가 함께 보입니다. ${paymentRecordSentence}`,
+    "다만 제공된 HTML과 스크린샷만으로는 실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부까지 확인할 수 없습니다. 세부 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에 별도로 정리했습니다.",
   ];
 
-  return lines.join("\n");
+  return paragraphs.join("\n\n");
 }
 
 function buildObservationSummaryJson(observation: SiteHtmlObservation) {
@@ -179,7 +164,10 @@ async function callOpenAiDescription({
   });
   const userPrompt = rewriteDraft
     ? [
-        "아래 설명문은 원본 HTML 문장을 그대로 복사한 것으로 의심되는 부분이 있습니다. 원본 문구를 그대로 사용하지 말고, 조회 시점 기준 관측 정보 요약문으로 다시 작성하세요. 가입, 입금, 프로모션, 보너스, 추천 문구는 강조하지 마세요.",
+        "아래 설명문은 원본 HTML 문장을 그대로 복사한 것으로 의심되는 부분이 있습니다. 원본 문구를 그대로 사용하지 말고, sites.description에 저장할 자연스러운 사이트 설명문으로 다시 작성하세요. 가입, 입금, 프로모션, 보너스, 추천 문구는 강조하지 마세요.",
+        "3~4문단, 각 문단 2~3문장, 전체 400~700자 정도로 자연스럽게 작성하고 제목이나 bullet 목록은 사용하지 마세요.",
+        "세부 메뉴, 게임 분류, footer, 이미지 alt, 배지, 긴 URL은 설명 본문에 나열하지 마세요.",
+        "실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부는 확인되지 않았다고 짧게 언급하세요.",
         "",
         "기존 설명문:",
         rewriteDraft,
@@ -204,10 +192,18 @@ async function callOpenAiDescription({
             {
               type: "input_text",
               text: [
-                "한국어 사이트 상세 설명 초안을 작성한다.",
-                "추천, 홍보, 가입 유도, 이벤트 강조를 하지 않는다.",
-                "입력 HTML에서 공개 화면 기준으로 관측된 사실만 쓴다.",
-                "첫 문단에는 조회 시점 기준, 관리자가 제공한 공개 HTML과 스크린샷, 관측된 정보, 가입 또는 이용 권유가 아니라는 의미를 포함한다.",
+                "한국어 사이트 상세 설명 초안을 sites.description에 저장할 자연스러운 설명문으로 작성한다.",
+                "추천, 홍보, 가입 유도, 입금 유도, 이벤트 강조를 하지 않는다.",
+                "입력 HTML과 스크린샷에 표시된 정보만 짧게 요약한다.",
+                "첫 문단에는 '이 설명은 조회 시점 기준 관리자가 제공한 공개 HTML과 스크린샷을 바탕으로 작성되었습니다. 화면에 표시된 정보만 요약한 것이며, 가입이나 이용을 권유하는 내용은 아닙니다.' 고지를 포함한다.",
+                "3~4문단, 각 문단 2~3문장, 전체 400~700자 정도로 작성한다.",
+                "제목, bullet 목록, 표, 키워드 나열은 사용하지 않는다.",
+                "세부 메뉴, 게임 분류, footer, 이미지 alt, 배지, 긴 URL은 설명 본문에 나열하지 않고 원본 사이트 관측 정보 섹션에서 다룰 값으로 남긴다.",
+                "메뉴 전체 목록, 게임명, 카테고리명, 언어명, footer 문구를 길게 나열하지 않는다.",
+                "'관측되었습니다'는 최대 2회까지만 사용하고, '공개 화면', '공개 HTML', '조회 시점 기준' 표현도 반복하지 않는다.",
+                "'구성 요소', '문구가 확인되었습니다', '배치된 형태로 보입니다'처럼 AI 리포트처럼 보이는 표현은 최소화한다.",
+                "대신 '확인됩니다', '표시됩니다', '사용되었습니다', '구성되어 있습니다', '함께 보입니다', '따로 정리했습니다'를 우선 사용한다.",
+                "실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부는 제공된 HTML과 스크린샷만으로 확인되지 않는다고 짧게 언급한다.",
                 "promotional/excluded terms는 본문에서 강조하지 않는다.",
                 "마크다운으로 작성하되 외부 이미지 URL을 삽입하지 않는다.",
               ].join("\n"),
@@ -319,7 +315,6 @@ export async function POST(request: Request) {
   if (!aiDetailDescriptionMd) {
     aiDetailDescriptionMd = buildLocalDescriptionDraft({
       siteName,
-      sourceUrl,
       observation,
     });
   }

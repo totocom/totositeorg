@@ -1,3 +1,5 @@
+import { formatRequiredBlogReportHeadings } from "../../app/data/blog-report-sections";
+
 export const OPENAI_VALIDATOR_SYSTEM_PROMPT =
   "당신은 CMS 저장 전 최종 검수자입니다. 제목/메타/Markdown/FAQ/checklist를 정리하고 금지 표현과 근거 없는 주장을 엄격히 검사한 JSON만 출력합니다.";
 
@@ -43,6 +45,8 @@ export function buildOpenAiValidatorPrompt({
   updateContext,
   previousViolations,
 }: OpenAiValidatorPromptInput) {
+  const requiredH2Structure = formatRequiredBlogReportHeadings(siteName);
+
   return `Claude가 작성한 한국어 본문을 OpenAI 최종 검수 JSON으로 정리하세요.
 
 절대 규칙:
@@ -60,6 +64,9 @@ export function buildOpenAiValidatorPrompt({
 - category_strategy.tag_slugs는 SEO Plan의 값과 같은 소문자 slug 배열로 두되, "dns", "whois", "scam-reports", "user-reviews", "change-history"는 해당 근거 또는 보조 카테고리가 있을 때만 유지한다.
 - category_strategy.reason에는 대표 카테고리를 site-reports로 둔 이유를 한국어 한 문장으로 적는다.
 - body_md의 H1은 반드시 "# ${seoH1}"로 둔다.
+- body_md는 DNS/WHOIS 중심 단일 리포트가 아니라 사이트 관측 정보, 주소·도메인, DNS·WHOIS, 먹튀 제보, 후기 현황을 모두 포함한 종합 정보 리포트로 정리한다.
+- body_md의 주요 H2는 반드시 다음 순서와 표현을 포함한다:
+${requiredH2Structure}
 - title, meta_title, H1, 주요 H2에는 "공개"를 최대한 사용하지 않는다. "공개"는 내부 기준 설명이나 고지문에서만 필요한 경우 제한적으로 사용한다.
 - title, meta_title, H1, 주요 H2에는 "공개 제보", "공개 피해", "공개 데이터", "공개 먹튀 제보" 표현을 사용하지 않는다.
 - title, meta_title, H1, 주요 H2에는 검색자가 실제로 검색할 표현인 "${primaryKeyword}", ${secondaryKeywords.join(", ")}를 자연스럽게 우선 사용한다.
@@ -83,7 +90,9 @@ ${noticeLines.join("\n")}
 - title, meta_title, H1에는 다음 표현을 사용하지 않는다: 추천, 안전놀이터, 먹튀 없음, 검증 완료, 가입, 보너스, 이벤트, 우회주소, 최신 접속주소.
 - 서버가 이 JSON을 CMS 저장용 blog_posts 데이터로 변환한다.
 - 추천, 홍보, 가입 유도, 안전 보장 표현을 제거한다.
+- Source Snapshot의 site.description, site.description_source_snapshot_id, site.description_generated_at, site.screenshot_url, site.screenshot_thumb_url, site.favicon_url, site.logo_url이 있으면 사이트 식별과 화면 기록 확인 목적의 근거로만 반영한다.
 - crawl_snapshot 또는 manual_html_snapshot은 원본 페이지의 공개 HTML에서 조회 시점 기준 관측된 정보입니다. 이 정보를 사이트 이용 권유, 가입 유도, 보너스/이벤트 소개, 최신 주소 안내로 사용하지 마세요. 관측 정보는 사이트 식별과 화면 기록 확인 목적의 설명에만 사용하세요.
+- crawl_snapshot이 있으면 "원본 사이트 관측 정보", "화면 구성에서 관측된 주요 요소", "계정·게임·결제 관련 관측 정보" 섹션이 빠지지 않았는지 확인한다.
 - crawl_snapshot의 원본 page_title, h1, observed_* 문구를 body_md에 그대로 복사하지 않았는지 확인한다.
 - crawl_snapshot.promotional_flags_json과 excluded_terms_json의 가입, 입금, 충전, 환전, 보너스, 이벤트, 추천, 바로가기, 최신 주소, 우회 주소 표현이 body_md, FAQ, checklist에서 강조되면 제거한다.
 - 피해 제보 부재는 본문 설명에서 "조회 시점 기준 승인된 피해 제보는 확인되지 않습니다"로 표현한다.

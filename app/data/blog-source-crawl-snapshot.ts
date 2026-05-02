@@ -24,6 +24,7 @@ export const blogSourceCrawlSnapshotSelect = [
   "promotional_flags_json",
   "excluded_terms_json",
   "screenshot_url",
+  "screenshot_thumb_url",
 ].join(", ");
 
 export const blogSourceCrawlSnapshotAiInstruction =
@@ -48,6 +49,7 @@ export type BlogSourceCrawlSnapshotRow = {
   promotional_flags_json: SiteCrawlSnapshotJsonObject;
   excluded_terms_json: SiteCrawlSnapshotJsonArray;
   screenshot_url: string | null;
+  screenshot_thumb_url: string | null;
 };
 
 export type BlogSourceCrawlSnapshot = {
@@ -69,6 +71,7 @@ export type BlogSourceCrawlSnapshot = {
   promotional_flags_json: SiteCrawlSnapshotJsonObject;
   excluded_terms_json: SiteCrawlSnapshotJsonArray;
   screenshot_url: string | null;
+  screenshot_thumb_url: string | null;
   ai_usage_instruction: string;
 };
 
@@ -103,6 +106,7 @@ export function toBlogSourceCrawlSnapshot(
     promotional_flags_json: normalizeJsonObject(row.promotional_flags_json),
     excluded_terms_json: normalizeJsonArray(row.excluded_terms_json),
     screenshot_url: getAllowedStoredImageUrl(row.screenshot_url),
+    screenshot_thumb_url: getAllowedStoredImageUrl(row.screenshot_thumb_url),
     ai_usage_instruction: blogSourceCrawlSnapshotAiInstruction,
   };
 }

@@ -32,6 +32,8 @@ const crawlSnapshotRow: BlogSourceCrawlSnapshotRow = {
   excluded_terms_json: ["가입", "보너스", "이벤트"],
   screenshot_url:
     "https://project.supabase.co/storage/v1/object/public/site-screenshots/snapshot.webp",
+  screenshot_thumb_url:
+    "https://project.supabase.co/storage/v1/object/public/site-screenshots/snapshot-thumb.webp",
 };
 
 test("toBlogSourceCrawlSnapshot includes latest crawl snapshot fields for source snapshots", () => {
@@ -49,6 +51,10 @@ test("toBlogSourceCrawlSnapshot includes latest crawl snapshot fields for source
     found_terms: [{ term: "보너스", count: 1 }],
   });
   assert.deepEqual(snapshot.excluded_terms_json, ["가입", "보너스", "이벤트"]);
+  assert.equal(
+    snapshot.screenshot_thumb_url,
+    "https://project.supabase.co/storage/v1/object/public/site-screenshots/snapshot-thumb.webp",
+  );
   assert.equal(snapshot.ai_usage_instruction, blogSourceCrawlSnapshotAiInstruction);
 });
 
@@ -72,10 +78,12 @@ test("toBlogSourceCrawlSnapshot ignores external screenshot URLs", () => {
   const snapshot = toBlogSourceCrawlSnapshot({
     ...crawlSnapshotRow,
     screenshot_url: "https://external.example/snapshot.webp",
+    screenshot_thumb_url: "https://external.example/snapshot-thumb.webp",
   });
 
   assert.ok(snapshot);
   assert.equal(snapshot.screenshot_url, null);
+  assert.equal(snapshot.screenshot_thumb_url, null);
 });
 
 test("getBlogSourceCrawlSnapshotJson returns persisted crawl snapshot JSON", () => {

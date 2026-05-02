@@ -14,6 +14,7 @@ import {
 import {
   approveObservationDescription,
   generateObservationDescription,
+  observationDisclosureText,
   type ApproveObservationDescriptionSiteUpdate,
   type ApproveObservationDescriptionSnapshotUpdate,
   type ObservationDescriptionSite,
@@ -287,8 +288,12 @@ test("manual HTML fixture smoke covers extraction generation approval public vie
     snapshot_status: inserted.snapshot_status,
     ai_observation_summary_json: inserted.ai_observation_summary_json,
   };
-  const generatedDescription =
-    "조회 시점 기준 공개 HTML에서 관측된 정보만 정리한 설명입니다. 메뉴 구성과 화면 요소, 하단 안내 문구를 중심으로 요약합니다.";
+  const generatedDescription = [
+    observationDisclosureText,
+    "수동 관측 테스트 사이트는 공개 화면에서 \"수동 관측 메인\"이라는 표시명이 사용된 것으로 확인됩니다. 주요 화면은 게임 유형, 계정 관련 메뉴, 이용 내역으로 보이는 항목을 중심으로 구성되어 있습니다. 스포츠와 카지노·슬롯 계열처럼 게임 유형을 구분하는 흐름도 함께 보이지만, 세부 분류명은 본문에 나열하지 않았습니다.",
+    "상단과 주요 메뉴 영역에는 화면 이동 항목과 계정 이용과 관련된 메뉴가 함께 보입니다. 일부 영역에서는 금전 처리나 이용 기록과 관련된 요소도 확인되지만, 실제 처리 방식으로 해석하지 않았습니다.",
+    "다만 제공된 HTML과 스크린샷만으로는 실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부까지 확인할 수 없습니다. 세부 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에 별도로 정리했습니다.",
+  ].join("\n\n");
   const generatedUpdates: ObservationDescriptionSnapshotUpdate[] = [];
 
   const generated = await generateObservationDescription({
@@ -434,12 +439,14 @@ test("manual HTML fixture smoke covers extraction generation approval public vie
     promotional_flags_json: inserted.promotional_flags_json,
     excluded_terms_json: inserted.excluded_terms_json,
     screenshot_url: inserted.screenshot_url,
+    screenshot_thumb_url: inserted.screenshot_thumb_url,
   });
   const serializedBlogSource = JSON.stringify(blogSourceSnapshot);
 
   assert.ok(blogSourceSnapshot);
   assert.equal(blogSourceSnapshot.snapshot_kind, "manual_html_snapshot");
   assert.equal(blogSourceSnapshot.screenshot_url, storedScreenshotUrl);
+  assert.equal(blogSourceSnapshot.screenshot_thumb_url, storedThumbUrl);
   assert.equal(serializedBlogSource.includes("raw_html"), false);
   assert.equal(serializedBlogSource.includes("<html"), false);
 });

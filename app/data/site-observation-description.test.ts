@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildSiteObservationDescriptionPrompt,
+  siteObservationDescriptionSystemPrompt,
+} from "../../prompts/site-observation-description-v1";
+import {
   approveObservationDescription,
   buildObservationDescriptionFallback,
   ensureObservationDisclosure,
@@ -58,16 +62,23 @@ const snapshot: ObservationDescriptionSnapshot = {
   snapshot_status: "extracted",
 };
 
+const validNaturalDescription = [
+  observationDisclosureText,
+  "관측 테스트 사이트는 공개 화면에서 \"관측 테스트 메인\"이라는 표시명이 사용된 것으로 확인됩니다. 주요 화면은 게임 유형, 계정 관련 메뉴, 이용 내역으로 보이는 항목을 중심으로 구성되어 있습니다. 스포츠와 카지노·슬롯 계열처럼 게임 유형을 구분하는 흐름도 함께 보이지만, 세부 분류명은 본문에 나열하지 않았습니다.",
+  "상단과 주요 메뉴 영역에는 화면 이동 항목과 계정 이용과 관련된 메뉴가 함께 보입니다. 일부 영역에서는 금전 처리나 이용 기록과 관련된 요소도 확인되지만, 실제 처리 방식으로 해석하지 않았습니다.",
+  "다만 제공된 HTML과 스크린샷만으로는 실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부까지 확인할 수 없습니다. 세부 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에 별도로 정리했습니다.",
+].join("\n\n");
+
 const validAiOutput: ObservationDescriptionAiOutput = {
-  detail_description_md: `${observationDisclosureText}\n\n주요 메뉴, 화면 요소, 푸터 정보를 요약하고 화면 기록 확인에 필요한 공개 관측값을 정리합니다. 관리자 검수자는 이 요약을 기준으로 공개 상세페이지 설명을 보정할 수 있습니다.`,
+  detail_description_md: validNaturalDescription,
   observation_summary: {
     page_title: "관측 테스트 페이지",
     h1: "관측 테스트 메인",
     menu_summary: ["홈", "스포츠", "고객센터"],
-    account_feature_summary: ["계정 관련 화면 요소가 관측되었습니다."],
-    betting_feature_summary: ["게임 및 경기 관련 화면 요소가 관측되었습니다."],
+    account_feature_summary: ["계정 관련 화면 요소가 확인됩니다."],
+    betting_feature_summary: ["게임 및 경기 관련 화면 요소가 확인됩니다."],
     payment_feature_summary: [
-      "금전 처리 관련 화면 요소가 관측되었으나 공개 설명에서는 직접 라벨을 제외했습니다.",
+      "금전 처리 관련 화면 요소가 확인되지만 공개 설명에서는 직접 라벨을 제외했습니다.",
     ],
     notice_summary: ["공지사항"],
     footer_summary: ["Copyright 2026 Example. All rights reserved."],
@@ -128,7 +139,7 @@ async function runApprove(options: {
   let snapshotUpdate: ApproveObservationDescriptionSnapshotUpdate | null = null;
   const finalDescription =
     options.finalDescription ??
-    "조회 시점 기준 공개 HTML에서 관측된 정보만 바탕으로 정리한 최종 설명입니다. 메뉴와 화면 요소를 요약하며 이용을 권유하지 않습니다.";
+    validNaturalDescription;
   const result = await approveObservationDescription({
     adminSession:
       options.admin === false
@@ -176,7 +187,7 @@ test("ensureObservationDisclosure inserts 공개 HTML and observation source wor
   const result = ensureObservationDisclosure(description);
 
   assert.equal(result.includes("공개 HTML"), true);
-  assert.equal(result.includes("관측된 정보"), true);
+  assert.equal(result.includes("화면에 표시된 정보만 요약"), true);
 });
 
 test("ensureObservationDisclosure does not duplicate an existing disclosure", () => {
@@ -235,8 +246,11 @@ test("generateObservationDescription inserts required disclosure before validati
   const { result, updatePayload } = await runGenerate({
     aiOutput: {
       ...validAiOutput,
-      detail_description_md:
-        "공개 HTML 관측 정보만 정리한 초안입니다. 화면 구조, 메뉴 배열, 하단 안내, 이미지 대체 텍스트를 관리자가 확인하기 쉽게 요약합니다.",
+      detail_description_md: [
+        "관측 테스트 사이트는 화면에 표시된 식별명과 주요 화면 흐름을 중심으로 요약할 수 있습니다. 주요 화면은 게임 유형, 계정 관련 메뉴, 이용 내역으로 보이는 항목을 중심으로 구성되어 있습니다. 스포츠와 카지노·슬롯 계열처럼 게임 유형을 구분하는 흐름도 함께 보이지만, 세부 분류명은 본문에 나열하지 않았습니다.",
+        "상단과 주요 메뉴 영역에는 화면 이동 항목과 계정 이용과 관련된 메뉴가 함께 보입니다. 일부 영역에서는 금전 처리나 이용 기록과 관련된 요소도 확인되지만, 실제 처리 방식으로 해석하지 않았습니다.",
+        "다만 제공된 HTML과 스크린샷만으로는 실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부까지 확인할 수 없습니다. 세부 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에 별도로 정리했습니다.",
+      ].join("\n\n"),
     },
   });
   const warnings = result.body.admin_warnings as string[];
@@ -262,6 +276,7 @@ test("fallback draft does not emphasize promotional flags in public description"
     observationDisclosureText,
     "",
   );
+  const paragraphs = getParagraphs(fallback.detail_description_md);
 
   assert.equal(
     /가입|충전|환전|이벤트|보너스|첫충|추천|바로가기|최신 주소|우회 주소/.test(
@@ -270,11 +285,22 @@ test("fallback draft does not emphasize promotional flags in public description"
     false,
   );
   assert.equal(
-    fallback.detail_description_md.includes(
-      "이용 유도성 문구가 관측되어 공개 설명에서는 제외했습니다.",
-    ),
+    /^#{1,6}\s|^\s*[-*+]\s/m.test(fallback.detail_description_md),
+    false,
+  );
+  assert.equal(paragraphs.length, 4);
+  assert.equal(
+    paragraphs.every((paragraph) => {
+      const sentenceCount = getSentences(paragraph).length;
+      return sentenceCount >= 2 && sentenceCount <= 3;
+    }),
     true,
   );
+  assert.equal(getPlainLength(fallback.detail_description_md) >= 400, true);
+  assert.equal(getPlainLength(fallback.detail_description_md) <= 700, true);
+  assert.equal(fallback.detail_description_md.includes(site.url ?? ""), false);
+  assert.equal(fallback.detail_description_md.includes("홈, 스포츠, 고객센터"), false);
+  assert.equal(countReportLikePhrases(fallback.detail_description_md) <= 2, true);
   assert.deepEqual(fallback.observation_summary.excluded_promotional_terms, [
     "가입",
     "충전",
@@ -339,7 +365,7 @@ test("validateObservationDescriptionDraft fails hard prohibited phrases", () => 
 
 test("validateObservationDescriptionDraft ignores short title h1 and menu copies", () => {
   const validation = validateObservationDescriptionDraft({
-    detailDescriptionMd: `${observationDisclosureText}\n\n관측 테스트 페이지와 관측 테스트 메인, 홈, 스포츠 라벨을 참고해 화면 구조를 요약했습니다. 추가로 메뉴 배열과 하단 안내가 관리 검수용으로 정리되었습니다.`,
+    detailDescriptionMd: validNaturalDescription,
     sourceTextChunks: ["관측 테스트 페이지", "관측 테스트 메인", "홈", "스포츠"],
   });
 
@@ -407,8 +433,7 @@ test("generateObservationDescription does not change site description before app
 });
 
 test("approveObservationDescription updates site description after approval", async () => {
-  const finalDescription =
-    "조회 시점 기준 공개 HTML에서 관측된 정보만 반영한 관리자 최종 설명입니다. 공개 화면 구성과 푸터 정보를 요약했습니다.";
+  const finalDescription = validNaturalDescription;
   const { result, siteUpdate } = await runApprove({ finalDescription });
 
   assert.equal(result.status, 200);
@@ -456,6 +481,74 @@ test("approveObservationDescription marks snapshot as approved", async () => {
   );
 });
 
+test("validateObservationDescriptionDraft warns on report-like repetition and long URLs", () => {
+  const reportLikeDescription = [
+    observationDisclosureText,
+    "공개 화면에서는 메뉴 구성 요소가 배치된 형태로 보입니다. 공개 화면에서는 여러 문구가 확인되었습니다. 화면에는 관측되었습니다라는 표현이 반복되어 AI 리포트처럼 보일 수 있습니다.",
+    "주소는 https://example.com/some/very/long/path/that/should/not/be/in/the/site-description 처럼 본문에 길게 들어가면 안 됩니다. 세부 메뉴와 이미지 alt, 배지 정보도 개요 설명에 섞여 있습니다.",
+    "관리자는 화면에 표시된 정보만 요약해야 합니다. 안전성이나 피해 여부는 화면 정보만으로 단정하지 않습니다.",
+  ].join("\n\n");
+  const validation = validateObservationDescriptionDraft({
+    detailDescriptionMd: reportLikeDescription,
+    sourceTextChunks: ["메뉴 영역", "공지 영역", "하단 영역"],
+  });
+
+  assert.equal(validation.status, "warning");
+  assert.equal(
+    validation.warnings.some((warning) => warning.includes("반복 표현")),
+    true,
+  );
+  assert.equal(
+    validation.warnings.some((warning) => warning.includes("URL")),
+    true,
+  );
+  assert.equal(
+    validation.warnings.some((warning) => warning.includes("원본 사이트 관측 정보")),
+    true,
+  );
+});
+
+test("site observation description prompt requires natural bounded paragraphs", () => {
+  const prompt = buildSiteObservationDescriptionPrompt({
+    site: {
+      id: site.id,
+      name: site.name,
+      url: site.url,
+    },
+    snapshot: {
+      id: snapshot.id,
+      source_url: snapshot.source_url,
+      final_url: snapshot.final_url,
+      collected_at: snapshot.collected_at,
+      page_title: snapshot.page_title,
+      meta_description: snapshot.meta_description,
+      h1: snapshot.h1,
+      observed_menu_labels: ["홈", "스포츠"],
+      observed_account_features: ["로그인"],
+      observed_betting_features: ["스포츠 경기"],
+      observed_payment_flags: ["충전"],
+      observed_notice_items: ["공지"],
+      observed_event_items: ["이벤트"],
+      observed_footer_text: ["Copyright"],
+      observed_badges: ["LIVE"],
+      image_alt_texts: ["대표 이미지"],
+      promotional_flags_json: {},
+      excluded_terms_json: ["가입"],
+      html_sha256: snapshot.html_sha256,
+      visible_text_sha256: snapshot.visible_text_sha256,
+    },
+  });
+  const combinedPrompt = `${siteObservationDescriptionSystemPrompt}\n${prompt}`;
+
+  assert.match(combinedPrompt, /3~4문단/);
+  assert.match(combinedPrompt, /400~700자/);
+  assert.match(combinedPrompt, /세부 메뉴, 게임 분류, footer, 이미지 alt, 배지/);
+  assert.match(combinedPrompt, /URL은 설명 본문에 직접 길게 쓰지 말고/);
+  assert.match(combinedPrompt, /실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부/);
+  assert.match(combinedPrompt, /원본 사이트 관측 정보/);
+  assert.match(combinedPrompt, /확인됩니다/);
+});
+
 test("approveObservationDescription blocks forbidden final descriptions", async () => {
   const { result, siteUpdate, snapshotUpdate } = await runApprove({
     finalDescription:
@@ -477,3 +570,36 @@ test("approveObservationDescription rejects non-admin callers", async () => {
   assert.equal(siteUpdate, null);
   assert.equal(snapshotUpdate, null);
 });
+
+function getParagraphs(value: string) {
+  return value.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean);
+}
+
+function getSentences(value: string) {
+  return value
+    .replace(/([.!?。！？])\s+/g, "$1\n")
+    .split(/\n+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function getPlainLength(value: string) {
+  return value
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s{0,3}(?:[-*+]|\d+\.)\s+/gm, "")
+    .replace(/[#*_`>~|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim().length;
+}
+
+function countReportLikePhrases(value: string) {
+  return [
+    "관측되었습니다",
+    "공개 화면에서는",
+    "조회 시점 기준",
+    "공개 HTML에서",
+    "구성 요소",
+    "문구가 확인되었습니다",
+    "배치된 형태로 보입니다",
+  ].reduce((total, phrase) => total + value.split(phrase).length - 1, 0);
+}

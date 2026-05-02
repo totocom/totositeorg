@@ -1,25 +1,31 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { cache } from "react";
 import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actions";
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
+import { RelatedBlogReportCard } from "@/app/components/related-blog-report-card";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
 import { SafeMarkdown } from "@/app/components/safe-markdown";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
 import { SiteObservationSnapshotCard } from "@/app/components/site-observation-snapshot-card";
+import { SiteShareActions } from "@/app/components/site-share-actions";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
-import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
-import { getPublishedBlogPostForSite } from "@/app/data/public-blog-posts";
+import { extractDomain } from "@/app/data/domain-whois";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
 import { getSiteOverviewMarkdownBlocks } from "@/app/data/public-site-description";
 import {
+  buildSiteDetailHeading,
   buildMissingSiteMetadata,
   buildSiteDetailMetaDescription,
   buildSiteDetailMetadata,
+  buildSiteDetailShareDescription,
+  buildSiteDetailShareTitle,
 } from "@/app/data/site-detail-metadata";
+import { buildSiteDetailInternalLinks } from "@/app/data/site-detail-internal-links";
 import {
   calculateSiteTrustScore,
   formatRatingScore,
@@ -28,6 +34,7 @@ import {
   scamReportScoreLabel,
   getTrustScoreTone,
 } from "@/app/data/sites";
+import { siteUrl } from "@/lib/config";
 
 function Stars({ rating }: { rating: number }) {
   const filled = Math.round(Math.max(1, Math.min(5, rating)));
@@ -47,6 +54,10 @@ type SiteDetailPageProps = {
 
 export const dynamicParams = true;
 export const revalidate = 300;
+
+const getCachedPublicSiteDetail = cache((slug: string) =>
+  getPublicSiteDetail(slug),
+);
 
 function getDomainAge(value: string) {
   if (!value) return "확인 불가";
@@ -143,8 +154,9 @@ function TrustScoreMetric({
 export async function generateMetadata({
   params,
 }: SiteDetailPageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const { site } = await getPublicSiteDetail(slug.trim());
+  const { slug: rawSlug } = await params;
+  const slug = rawSlug.trim();
+  const { site } = await getCachedPublicSiteDetail(slug);
 
   if (!site) {
     return buildMissingSiteMetadata();
@@ -157,22 +169,18 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const { slug: rawSlug } = await params;
   const slug = rawSlug.trim();
 
-  console.log("[site-detail] route params", {
-    rawSlug,
-    slug,
-    type: typeof slug,
-  });
-
-  const { site, reviews, scamReports, observationSnapshot, errorMessage, source } =
-    await getPublicSiteDetail(slug);
+  const {
+    site,
+    reviews,
+    scamReports,
+    observationSnapshot,
+    relatedBlogReport,
+    domainCreationDates,
+    errorMessage,
+    source,
+  } = await getCachedPublicSiteDetail(slug);
 
   if (!site) {
-    console.log("[site-detail] no public site rendered", {
-      slug,
-      errorMessage,
-      source,
-    });
-
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
         <Link href="/sites" className="text-sm font-semibold text-accent">
@@ -201,6 +209,10 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   }
 
   const siteDetailMetaDescription = buildSiteDetailMetaDescription(site);
+  const siteDetailHeading = buildSiteDetailHeading(site);
+  const shareTitle = buildSiteDetailShareTitle(site);
+  const shareDescription = buildSiteDetailShareDescription(site);
+  const shareUrl = `${siteUrl.replace(/\/$/, "")}/sites/${encodeURIComponent(slug)}`;
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "Review",
@@ -224,20 +236,19 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const domainTargets = Array.from(
     new Set([site.siteUrl, ...site.domains].filter(Boolean)),
   ).slice(0, 6);
-  const domainCreationDates = await getBatchDomainCreationDates(
-    domainTargets.map((domainUrl) => extractDomain(domainUrl)).filter(Boolean),
+  const siteDetailInternalLinks = buildSiteDetailInternalLinks({
+    siteName: site.siteName,
+    includeDomainLinks: domainTargets.length > 0,
+  });
+  const domainCreationDateMap = new Map(
+    domainCreationDates.map(({ domain, creationDate }) => [
+      domain,
+      creationDate,
+    ]),
   );
-  const oldestDomainCreationDate = domainTargets
-    .map((domainUrl) => domainCreationDates.get(extractDomain(domainUrl)))
-    .filter((date): date is string =>
-      typeof date === "string" && Number.isFinite(new Date(date).getTime()),
-    )
-    .reduce<string | null>(
-      (oldest, date) => (oldest === null || date < oldest ? date : oldest),
-      null,
-    );
+  const oldestDomainCreationDate = site.oldestDomainCreationDate ?? null;
   const domainInfoTabs = domainTargets.map((domainUrl) => {
-    const creationDate = domainCreationDates.get(extractDomain(domainUrl));
+    const creationDate = domainCreationDateMap.get(extractDomain(domainUrl));
 
     return {
       siteId: site.id,
@@ -266,9 +277,10 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     oldestDomainCreationDate: oldestDomainCreationDate ?? undefined,
   });
   const trustToneClasses = getTrustToneClasses(getTrustScoreTone(trustScore.total));
-  const screenshotPreviewUrl = site.screenshotThumbUrl || site.screenshotUrl;
+  const screenshotPreviewUrl = site.screenshotUrl
+    ? site.screenshotThumbUrl || site.screenshotUrl
+    : null;
   const logoAlt = `${site.siteName} 토토사이트 로고`;
-  const relatedBlogPost = await getPublishedBlogPostForSite(site.id);
   const scamReportStatusCopy = getApprovedScamReportStatusCopy(scamReportCount);
   const representativeDomain = site.siteUrl;
   const representativeDisplayDomain = formatDisplayDomain(representativeDomain);
@@ -297,7 +309,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
         </nav>
 
         {/* 메인 정보 카드 */}
-        <article className="mt-4 rounded-xl border border-line bg-surface shadow-sm">
+        <article id="site-overview" className="mt-4 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
           {/* 상단: 로고 + 이름 + 뱃지 */}
           <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between">
             {/* 왼쪽 */}
@@ -328,8 +340,11 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                       "운영 이력 확인 불가"
                     )}
                   </p>
-                  <h1 className="mt-1.5 break-keep text-2xl font-bold sm:text-3xl">
+                  <p className="mt-1.5 inline-flex rounded-md border border-line bg-background px-2 py-1 text-xs font-semibold text-foreground">
                     {site.siteName}
+                  </p>
+                  <h1 className="mt-2 break-keep text-2xl font-bold sm:text-3xl">
+                    {siteDetailHeading}
                   </h1>
                   <p className="mt-1 break-all text-sm text-muted">
                     {formatDisplayUrl(site.siteUrl)}
@@ -371,7 +386,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
           {/* 등록 도메인 */}
           {domainTargets.length > 0 ? (
-            <div className="border-t border-line px-5 py-3">
+            <div id="domain-history" className="scroll-mt-24 border-t border-line px-5 py-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">
                 등록 도메인
               </p>
@@ -431,26 +446,32 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
         </article>
 
-        {relatedBlogPost ? (
-          <section className="mt-5 rounded-xl border border-line bg-surface p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-              공개 데이터 리포트
-            </p>
-            <h2 className="mt-1 text-base font-bold">
-              블로그 정보 리포트
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              이 상세 페이지의 공개 데이터, DNS/WHOIS 조회 정보, 승인 리뷰와
-              피해 제보 현황을 기준으로 정리한 블로그 글입니다.
-            </p>
-            <Link
-              href={`/blog/${relatedBlogPost.slug}`}
-              className="mt-3 inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
-            >
-              {relatedBlogPost.title}
-            </Link>
-          </section>
-        ) : null}
+        <SiteShareActions
+          siteName={site.siteName}
+          shareUrl={shareUrl}
+          title={shareTitle}
+          description={shareDescription}
+        />
+
+        <nav
+          className="mt-4 rounded-xl border border-line bg-surface px-5 py-4 shadow-sm"
+          aria-label={`${site.siteName} 상세 페이지 내부 링크`}
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+            상세 페이지 탐색
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {siteDetailInternalLinks.map((link) => (
+              <Link
+                key={link.key}
+                href={link.href}
+                className="inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
 
         <SiteTelegramAlertSubscription siteId={site.id} siteName={site.siteName} />
 
@@ -492,6 +513,11 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             faviconUrl: site.faviconUrl,
             logoUrl: site.logoUrl,
           }}
+        />
+
+        <RelatedBlogReportCard
+          siteName={site.siteName}
+          report={relatedBlogReport}
         />
 
         {/* 도메인 & DNS */}

@@ -162,3 +162,28 @@ test("site overview omits menu list while observation section keeps menus", () =
   if (!observationModel.hasSnapshot) throw new Error("expected observation");
   assert.deepEqual(observationModel.menuLabels, ["홈", "스포츠", "카지노", "고객센터"]);
 });
+
+test("site overview is limited to natural paragraphs and omits detail-only observation rows", () => {
+  const description = [
+    "첫 번째 문단입니다. 화면에 표시된 정보만 요약합니다.",
+    "",
+    "두 번째 문단입니다. 주소와 도메인은 별도 섹션에서 확인합니다.",
+    "",
+    "푸터/저작권: Copyright 2026 Example",
+    "",
+    "이미지 alt: 대표 화면",
+    "",
+    "세 번째 문단입니다. 이용 권유 없이 필요한 맥락만 남겼습니다.",
+    "",
+    "네 번째 문단입니다. 승인 제보와 후기 자료를 함께 확인하도록 구성되어 있습니다.",
+    "",
+    "다섯 번째 문단입니다. 개요에는 표시되지 않아야 합니다.",
+  ].join("\n");
+  const overviewBlocks = getSiteOverviewMarkdownBlocks(description);
+  const overviewText = JSON.stringify(overviewBlocks);
+
+  assert.equal(overviewBlocks.length, 4);
+  assert.equal(overviewText.includes("푸터/저작권"), false);
+  assert.equal(overviewText.includes("이미지 alt"), false);
+  assert.equal(overviewText.includes("다섯 번째 문단"), false);
+});

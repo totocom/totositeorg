@@ -6,6 +6,10 @@ import {
   reviewBlogImageSeo,
   type BlogImageSeoReview,
 } from "./blog-visuals";
+import {
+  validateRequiredBlogReportSectionCoverage,
+  type RequiredBlogReportSectionCoverage,
+} from "./blog-report-sections";
 
 export type BlogSeoReviewStatus =
   | "not_reviewed"
@@ -181,6 +185,7 @@ export type BlogKeywordChecks = {
   h1HasPrimaryKeyword: boolean;
   secondaryKeywordCoverage: SecondaryKeywordCoverage;
   h2KeywordCoverage: H2KeywordCoverage;
+  requiredReportSectionCoverage: RequiredBlogReportSectionCoverage;
   duplicateInternalAnchorTexts: DuplicateInternalAnchorText[];
   renderedInternalAnchorReview: BlogRenderedInternalAnchorReview;
   imageSeoReview: BlogImageSeoReview;
@@ -297,6 +302,9 @@ const secondaryKeywordMissingFailure =
 
 const h2KeywordCoverageWarning =
   "사이트명 기반 H2 유형이 4개 미만입니다. 토토사이트, 주소, 도메인, 먹튀, 후기, FAQ 관련 H2를 문맥에 맞게 보강하세요.";
+
+const requiredReportSectionWarning =
+  "블로그 본문이 새 종합 정보 리포트 H2 구조를 모두 포함하지 않습니다.";
 
 const emptySlugFailure =
   "slug가 비어 있습니다. 검색 사용자가 이해할 수 있는 {사이트명}-totosite 형식의 slug가 필요합니다.";
@@ -1122,6 +1130,11 @@ export function validateBlogSeoDraft(
     siteName: input.siteName,
     bodyMd: input.bodyMd,
   });
+  const requiredReportSectionCoverage =
+    validateRequiredBlogReportSectionCoverage({
+      siteName: input.siteName,
+      bodyMd: input.bodyMd,
+    });
   const externalReferenceReview = validateExternalReferences(input.externalLinks);
   const uniqueFactScore = calculateUniqueFactScore(input.facts);
   const averageWordsPerSentence = calculateAverageWordsPerSentence(input.bodyMd);
@@ -1218,6 +1231,13 @@ export function validateBlogSeoDraft(
     duplicateRiskHints.push("h2_keyword_coverage_lt_4");
   }
 
+  if (requiredReportSectionCoverage.missingHeadings.length > 0) {
+    adminWarnings.push(
+      `${requiredReportSectionWarning} 누락: ${requiredReportSectionCoverage.missingHeadings.join(", ")}`,
+    );
+    duplicateRiskHints.push("required_report_sections_missing");
+  }
+
   if (uniqueFactScore < 3) {
     hasFailure = true;
     adminWarnings.push("사이트별 고유 데이터가 3개 미만입니다.");
@@ -1270,6 +1290,7 @@ export function validateBlogSeoDraft(
       h1HasPrimaryKeyword: containsKeyword(input.h1, keywords.primaryKeyword),
       secondaryKeywordCoverage,
       h2KeywordCoverage,
+      requiredReportSectionCoverage,
       duplicateInternalAnchorTexts,
       renderedInternalAnchorReview,
       imageSeoReview,

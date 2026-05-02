@@ -191,7 +191,28 @@ const emptyProhibitedPhraseCheck: ObservationDescriptionProhibitedPhraseCheck = 
 };
 
 export const observationDisclosureText =
-  "이 설명은 조회 시점 기준 관리자가 제공한 공개 HTML과 스크린샷에서 관측된 정보를 바탕으로 작성되었습니다. 이 정보는 사이트 식별과 화면 기록 확인을 위한 자료이며, 가입 또는 이용을 권유하기 위한 목적이 아닙니다.";
+  "이 설명은 조회 시점 기준 관리자가 제공한 공개 HTML과 스크린샷을 바탕으로 작성되었습니다. 화면에 표시된 정보만 요약한 것이며, 가입이나 이용을 권유하는 내용은 아닙니다.";
+
+const detailDescriptionMinLength = 400;
+const detailDescriptionMaxLength = 700;
+const reportLikeRepeatedPhrases = [
+  "관측되었습니다",
+  "구성 요소",
+  "문구가 확인되었습니다",
+  "배치된 형태로 보입니다",
+];
+const sourceDisclosureRepeatedPhrases = [
+  "공개 화면",
+  "공개 HTML",
+  "조회 시점 기준",
+];
+const overviewDetailOnlyPatterns = [
+  /(?:세부\s*메뉴|게임\s*분류)\s*[:：]/,
+  /\bfooter\b/i,
+  /푸터/,
+  /이미지\s*(?:alt|대체\s*텍스트)/i,
+  /배지/,
+];
 
 export async function generateObservationDescription({
   adminSession,
@@ -561,45 +582,43 @@ export async function approveObservationDescription({
 }
 
 export function buildObservationDescriptionFallback({
+  site,
   snapshot,
 }: {
   site: ObservationDescriptionSite;
   snapshot: ObservationDescriptionSnapshot;
 }): ObservationDescriptionAiOutput {
   const observationSummary = buildObservationSummary(snapshot);
+  const siteName = safePublicText(site.name) || "해당 사이트";
   const titleSummary = safePublicText(snapshot.page_title);
   const h1Summary = safePublicText(snapshot.h1);
-  const imageAltTexts = safeValues(getImageAltTexts(snapshot), 4);
-  const badgeTexts = safeValues(snapshot.observed_badges, 4);
-  const lines = [
-    "## 관측 정보 설명 초안",
-    "",
+  const displayName = getObservationDisplayName(
+    titleSummary,
+    h1Summary,
+    siteName,
+  );
+  const siteSubject = getSiteSubjectName(siteName);
+  const displayNameSentence =
+    displayName && displayName !== siteName
+      ? `${siteSubject}는 공개 화면에서 "${displayName}"이라는 표시명이 사용된 것으로 확인됩니다.`
+      : `${siteSubject}는 공개 화면에서 사이트 식별명과 주요 화면 흐름이 함께 확인됩니다.`;
+  const gameTypeSentence =
+    observationSummary.betting_feature_summary.length > 0
+      ? "스포츠와 카지노·슬롯 계열처럼 게임 유형을 구분하는 흐름도 함께 보이지만, 세부 분류명은 본문에 나열하지 않았습니다."
+      : "게임 유형으로 보이는 항목은 세부값을 본문에 나열하지 않고 별도 관측 정보로 분리했습니다.";
+  const paymentRecordSentence =
+    observationSummary.payment_feature_summary.length > 0
+      ? "일부 영역에서는 금전 처리나 이용 기록과 관련된 요소도 확인되지만, 실제 처리 방식으로 해석하지 않았습니다."
+      : "금전 처리나 이용 기록과 관련된 실제 절차는 제공된 화면만으로 판단하지 않았습니다.";
+  const paragraphs = [
     observationDisclosureText,
-    "",
-    "### 화면 구조",
-    ...(titleSummary ? [`- 페이지 제목 계열: ${titleSummary}`] : []),
-    ...(h1Summary && h1Summary !== titleSummary
-      ? [`- 대표 제목 계열: ${h1Summary}`]
-      : []),
-    ...toMarkdownBullets("주요 메뉴", observationSummary.menu_summary),
-    ...toMarkdownBullets("계정 관련 요소", observationSummary.account_feature_summary),
-    ...toMarkdownBullets("게임 및 경기 관련 요소", observationSummary.betting_feature_summary),
-    ...toMarkdownBullets("금전 처리 관련 요소", observationSummary.payment_feature_summary),
-    ...toMarkdownBullets("공지성 화면 요소", observationSummary.notice_summary),
-    ...toMarkdownBullets("푸터 영역", observationSummary.footer_summary),
-    ...toMarkdownBullets("배지성 표시", badgeTexts),
-    ...toMarkdownBullets("이미지 대체 텍스트", imageAltTexts),
-    ...(observationSummary.excluded_promotional_terms.length > 0
-      ? ["- 이용 유도성 문구가 관측되어 공개 설명에서는 제외했습니다."]
-      : []),
-    "",
-    "### 검수 메모",
-    "- 이 초안은 공개 화면에서 추출된 관측값만 요약합니다.",
-    "- 안전성, 피해 여부, 운영 신뢰도는 이 관측값만으로 단정하지 않습니다.",
+    `${displayNameSentence} 주요 화면은 게임 유형, 계정 관련 메뉴, 이용 내역으로 보이는 항목을 중심으로 구성되어 있습니다. ${gameTypeSentence}`,
+    `상단과 주요 메뉴 영역에는 화면 이동 항목과 계정 이용과 관련된 메뉴가 함께 보입니다. ${paymentRecordSentence}`,
+    "다만 제공된 HTML과 스크린샷만으로는 실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부까지 확인할 수 없습니다. 세부 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에 별도로 정리했습니다.",
   ];
 
   return {
-    detail_description_md: lines.join("\n"),
+    detail_description_md: paragraphs.join("\n\n"),
     observation_summary: observationSummary,
     admin_warnings: [],
     prohibited_phrase_check: emptyProhibitedPhraseCheck,
@@ -616,17 +635,17 @@ export function buildObservationSummary(
     account_feature_summary: safeValues(
       snapshot.observed_account_features,
       6,
-      "계정 관련 화면 요소가 관측되었으나 이용 유도성 표현은 제외했습니다.",
+      "계정 관련 화면 요소가 확인되지만 이용 유도성 표현은 제외했습니다.",
     ),
     betting_feature_summary: safeValues(
       snapshot.observed_betting_features,
       6,
-      "게임 및 경기 관련 화면 요소가 관측되었습니다.",
+      "게임 및 경기 관련 화면 요소가 확인됩니다.",
     ),
     payment_feature_summary: safeValues(
       snapshot.observed_payment_flags,
       6,
-      "금전 처리 관련 화면 요소가 관측되었으나 공개 설명에서는 직접 라벨을 제외했습니다.",
+      "금전 처리 관련 화면 요소가 확인되지만 공개 설명에서는 직접 라벨을 제외했습니다.",
     ),
     notice_summary: safeValues(
       [
@@ -634,12 +653,12 @@ export function buildObservationSummary(
         ...asStringArray(snapshot.observed_event_items),
       ],
       6,
-      "공지성 또는 캠페인성 화면 요소가 관측되었습니다.",
+      "공지성 또는 캠페인성 화면 요소가 확인됩니다.",
     ),
     footer_summary: safeValues(
       snapshot.observed_footer_text,
       4,
-      "푸터 영역의 운영 또는 저작권 관련 문구가 관측되었습니다.",
+      "하단 영역의 운영 또는 저작권 관련 문구가 확인됩니다.",
     ),
     excluded_promotional_terms: asStringArray(snapshot.excluded_terms_json),
   };
@@ -782,6 +801,8 @@ export function validateObservationDescriptionDraft({
     warnings.push("관측 데이터가 부족해 관리자 추가 검수가 필요합니다.");
   }
 
+  warnings.push(...getNaturalDescriptionStyleWarnings(sanitizedDescription));
+
   if (containsRawHtmlRenderAttempt(sanitizedDescription)) {
     errors.push("외부 원본 HTML을 그대로 렌더링하려는 내용이 포함되어 있습니다.");
   }
@@ -885,13 +906,23 @@ function safePublicText(value: unknown) {
   return text.length > 120 ? `${text.slice(0, 117)}...` : text;
 }
 
-function toMarkdownBullets(label: string, values: string[]) {
-  return values.map((value) => `- ${label}: ${value}`);
-}
-
 function stringArrayOrFallback(value: unknown, fallback: string[]) {
   const values = asStringArray(value);
   return values.length > 0 ? values : fallback;
+}
+
+function getObservationDisplayName(
+  titleSummary: string,
+  h1Summary: string,
+  siteName: string,
+) {
+  const displayName = h1Summary || titleSummary || siteName;
+
+  return displayName.length > 60 ? `${displayName.slice(0, 57)}...` : displayName;
+}
+
+function getSiteSubjectName(siteName: string) {
+  return siteName.endsWith("사이트") ? siteName : `${siteName} 사이트`;
 }
 
 function normalizeRequestBody(value: unknown): ObservationDescriptionRequestBody {
@@ -1106,6 +1137,81 @@ function splitSentences(value: string) {
         .trim(),
     )
     .filter(Boolean);
+}
+
+function getNaturalDescriptionStyleWarnings(value: string) {
+  const warnings: string[] = [];
+  const paragraphs = getDescriptionParagraphs(value);
+  const plainTextLength = normalizeForStyleLength(value).length;
+  const repeatedPhraseCount = reportLikeRepeatedPhrases.reduce(
+    (total, phrase) => total + countTextOccurrences(value, phrase),
+    0,
+  );
+  const hasRepeatedSourceDisclosurePhrase = sourceDisclosureRepeatedPhrases.some(
+    (phrase) => countTextOccurrences(value, phrase) > 1,
+  );
+
+  if (paragraphs.length < 3 || paragraphs.length > 4) {
+    warnings.push("사이트 설명은 3~4문단으로 정리하는 것이 좋습니다.");
+  }
+
+  if (
+    plainTextLength < detailDescriptionMinLength ||
+    plainTextLength > detailDescriptionMaxLength
+  ) {
+    warnings.push("사이트 설명은 400~700자 정도로 조정하는 것이 좋습니다.");
+  }
+
+  if (repeatedPhraseCount > 2 || hasRepeatedSourceDisclosurePhrase) {
+    warnings.push(
+      "AI 리포트처럼 보이는 반복 표현은 전체 설명에서 1~2회 이하로 줄이는 것이 좋습니다.",
+    );
+  }
+
+  if (/^\s{0,3}(?:#{1,6}|[-*+]|\d+\.)\s/m.test(value)) {
+    warnings.push("사이트 설명은 제목이나 목록보다 자연스러운 문단 중심으로 작성하세요.");
+  }
+
+  if (/https?:\/\/\S{24,}/i.test(value)) {
+    warnings.push("URL은 설명 본문에 길게 쓰지 말고 주소·도메인 섹션에서 표시하세요.");
+  }
+
+  if (overviewDetailOnlyPatterns.some((pattern) => pattern.test(value))) {
+    warnings.push(
+      "세부 메뉴, 게임 분류, footer, 이미지 alt, 배지 같은 항목은 원본 사이트 관측 정보 섹션에서만 표시하세요.",
+    );
+  }
+
+  for (const paragraph of paragraphs) {
+    const sentenceCount = splitSentences(paragraph).length;
+
+    if (sentenceCount > 3) {
+      warnings.push("각 문단은 2~3문장 이내로 줄이는 것이 좋습니다.");
+      break;
+    }
+  }
+
+  return warnings;
+}
+
+function getDescriptionParagraphs(value: string) {
+  return value
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+}
+
+function normalizeForStyleLength(value: string) {
+  return value
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s{0,3}(?:[-*+]|\d+\.)\s+/gm, "")
+    .replace(/[#*_`>~|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function countTextOccurrences(value: string, phrase: string) {
+  return value.split(phrase).length - 1;
 }
 
 function isPromotionalSentence(sentence: string) {

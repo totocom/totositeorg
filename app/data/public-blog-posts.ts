@@ -788,11 +788,11 @@ export async function getPublishedBlogPostForSite(siteId: string) {
   const { data, error } = await supabase
     .from("blog_posts")
     .select("slug, title, published_at, updated_at")
+    .eq("site_id", siteId)
     .eq("status", "published")
     .eq("legal_review_status", "approved")
-    .or(`site_id.eq.${siteId},source_site_id.eq.${siteId}`)
-    .order("published_at", { ascending: false, nullsFirst: false })
     .order("updated_at", { ascending: false })
+    .order("published_at", { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle<SiteBlogBacklinkRow>();
 

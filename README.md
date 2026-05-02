@@ -119,3 +119,14 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Security header check
+
+Next.js `X-Powered-By` response headers are disabled in `next.config.ts`.
+After deploying, verify a public site detail URL with:
+
+```bash
+curl -I https://totosite.org/sites/{slug}
+```
+
+The response headers should not include `X-Powered-By`.

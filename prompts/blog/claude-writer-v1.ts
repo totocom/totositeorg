@@ -1,3 +1,5 @@
+import { formatRequiredBlogReportHeadings } from "../../app/data/blog-report-sections";
+
 export const CLAUDE_WRITER_SYSTEM_PROMPT =
   "당신은 한국어 정보 검증 리포트 작성자입니다. 자연스러운 Markdown 본문을 쓰되, 내부 분석 라벨을 공개 본문에 노출하지 않고 JSON 객체만 출력합니다.";
 
@@ -30,6 +32,9 @@ export function buildClaudeWriterPrompt({
   hasLookupFailures,
   updateContext,
 }: ClaudeWriterPromptInput) {
+  const requiredH2Structure = formatRequiredBlogReportHeadings(
+    getSiteNameFromSnapshot(snapshot),
+  );
   const updateInstruction = updateContext
     ? `\n업데이트 작업 지침:\n- 기존 글을 새로 쓰는 것이 아니라 같은 slug의 기존 본문을 최신 공개 데이터 기준으로 업데이트하는 초안을 작성합니다.\n- 기존 본문에서 유지 가능한 구조와 표현은 유지하되, 변경 요약에 해당하는 항목을 우선 반영합니다.\n- 변경 요약에 없는 새 주장이나 홍보성 문장은 추가하지 않습니다.\n- 기존 slug: ${updateContext.previousPost.slug}\n- 변경 요약:\n${toJsonText(updateContext.changeSummary)}\n\n기존 Markdown 본문:\n${updateContext.previousPost.body_md || "(기존 Markdown 본문 없음)"}\n`
     : "";
@@ -53,7 +58,11 @@ export function buildClaudeWriterPrompt({
 - Cloudflare 사용, WHOIS 비공개, 동일 IP 관측만으로 위험하다고 단정하지 않습니다.
 - 피해 제보가 0건인 경우에도 "먹튀 없음"이라고 쓰지 말고, "조회 시점 기준 승인된 피해 제보는 확인되지 않음"이라고 표현합니다.
 - writing_brief_for_claude와 section_plan을 우선 따르되, Source Snapshot에 없는 사실은 추가하지 마세요.
+- 이 글은 DNS/WHOIS 중심 단일 리포트가 아니라 사이트 관측 정보, 주소·도메인, DNS·WHOIS, 먹튀 제보, 후기 현황을 함께 정리하는 종합 정보 리포트입니다.
+- Source Snapshot의 site.description, site.description_source_snapshot_id, site.description_generated_at, site.screenshot_url, site.screenshot_thumb_url, site.favicon_url, site.logo_url을 사이트 식별과 화면 기록 확인 근거로 자연스럽게 반영합니다.
 - crawl_snapshot 또는 manual_html_snapshot은 원본 페이지의 공개 HTML에서 조회 시점 기준 관측된 정보입니다. 이 정보를 사이트 이용 권유, 가입 유도, 보너스/이벤트 소개, 최신 주소 안내로 사용하지 마세요. 관측 정보는 사이트 식별과 화면 기록 확인 목적의 설명에만 사용하세요.
+- crawl_snapshot이 있으면 "원본 사이트 관측 정보", "화면 구성에서 관측된 주요 요소", "계정·게임·결제 관련 관측 정보" 섹션에서 해설형으로 요약합니다.
+- 화면 구성, 주요 메뉴, 계정 관련 요소, 게임/베팅 관련 요소, footer/copyright 정보는 요약하되 세부 메뉴 전체를 길게 나열하지 마세요.
 - crawl_snapshot의 page_title, h1, observed_* 값은 보조 자료로만 사용하고 원본 사이트 문구를 그대로 복사하지 마세요.
 - crawl_snapshot.promotional_flags_json과 excluded_terms_json에 들어 있는 가입, 입금, 충전, 환전, 보너스, 이벤트, 추천, 바로가기, 최신 주소, 우회 주소 관련 문구는 공개 본문에서 강조하지 마세요.
 - 실제 데이터가 부족한 섹션은 억지로 채우지 말고 "확인되지 않음"으로 처리합니다.
@@ -89,15 +98,7 @@ ${updateInstruction}
 draft_markdown 기본 구조:
 # ${seoH1}
 
-## 1. 핵심 요약
-## 2. 현재 확인된 주소와 추가 도메인
-## 3. 도메인 등록일, 갱신일, 만료일, 네임서버 요약
-## 4. DNS 레코드 요약
-## 5. 동일 IP 또는 연결 가능 사이트 여부
-## 6. 먹튀 피해 제보 현황
-## 7. 이용자 후기 현황
-## 8. 이용 전 정보 확인 체크리스트
-## 9. FAQ
+${requiredH2Structure}
 ## 작성 기준 및 고지
 
 출력 형식:
@@ -130,4 +131,18 @@ ${toJsonText(snapshot)}
 
 OpenAI SEO Plan:
 ${toJsonText(seoPlan)}`;
+}
+
+function getSiteNameFromSnapshot(snapshot: unknown) {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    return "{사이트명}";
+  }
+
+  const site = (snapshot as { site?: unknown }).site;
+  if (!site || typeof site !== "object" || Array.isArray(site)) {
+    return "{사이트명}";
+  }
+
+  const name = (site as { name?: unknown }).name;
+  return typeof name === "string" && name.trim() ? name.trim() : "{사이트명}";
 }

@@ -4,8 +4,15 @@ import type { ReviewTarget } from "./sites";
 import { siteName, siteUrl } from "../../lib/config";
 
 const SITE_DETAIL_TITLE_SUFFIX = "주소·도메인·먹튀 제보 현황";
+const SITE_DETAIL_HEADING_SUFFIX = "토토사이트 정보: 주소·도메인·먹튀 제보 현황";
 const DEFAULT_SITE_DETAIL_OG_IMAGE_PATH = "/logo.png";
-const META_DESCRIPTION_MAX_LENGTH = 200;
+const META_DESCRIPTION_MAX_LENGTH = 160;
+const SITE_DETAIL_HEADING_FORBIDDEN_TERMS = [
+  "추천",
+  "안전",
+  "먹튀 없음",
+  "검증 완료",
+];
 
 export function stripMarkdownForMeta(input: string) {
   const withoutUnsafeHtml = input
@@ -36,21 +43,34 @@ export function buildSiteDetailTitle(site: Pick<ReviewTarget, "siteName">) {
   );
 }
 
+export function buildSiteDetailShareTitle(site: Pick<ReviewTarget, "siteName">) {
+  return buildSiteDetailTitle(site);
+}
+
+export function buildSiteDetailShareDescription(
+  site: Pick<ReviewTarget, "siteName">,
+) {
+  const displayName = normalizeMetaSiteName(site.siteName);
+
+  return stripMarkdownForMeta(
+    `${displayName} 토토사이트의 주소, 도메인, DNS·WHOIS, 먹튀 제보와 후기 현황을 조회 시점 기준으로 정리한 정보 페이지입니다.`,
+  );
+}
+
+export function buildSiteDetailHeading(site: Pick<ReviewTarget, "siteName">) {
+  const displayName = normalizeHeadingSiteName(site.siteName);
+  const heading = `${displayName} ${SITE_DETAIL_HEADING_SUFFIX}`;
+
+  return removeForbiddenHeadingTerms(heading).replace(/\s+/g, " ").trim();
+}
+
 export function buildSiteDetailMetaDescription(
-  site: Pick<ReviewTarget, "siteName" | "shortDescription">,
+  site: Pick<ReviewTarget, "siteName">,
 ) {
   const displayName = normalizeMetaSiteName(site.siteName);
   const templateDescription = `${displayName} 토토사이트의 주소, 도메인, DNS·WHOIS 정보와 승인된 먹튀 피해 제보 및 후기 현황을 조회 시점 기준으로 정리한 정보 페이지입니다.`;
-  const description = stripMarkdownForMeta(templateDescription);
 
-  if (description) {
-    return truncateMetaDescription(description);
-  }
-
-  return truncateMetaDescription(
-    stripMarkdownForMeta(site.shortDescription) ||
-      "토토사이트 주소, 도메인, DNS·WHOIS 정보와 승인된 먹튀 피해 제보 및 후기 현황을 조회 시점 기준으로 정리한 정보 페이지입니다.",
-  );
+  return truncateMetaDescription(stripMarkdownForMeta(templateDescription));
 }
 
 export function getSiteDetailSocialImage(
@@ -126,6 +146,22 @@ function normalizeTitleSiteName(value: string) {
 
 function normalizeMetaSiteName(value: string) {
   return normalizeTitleSiteName(value);
+}
+
+function normalizeHeadingSiteName(value: string) {
+  const normalizedName = normalizeTitleSiteName(value);
+  const safeName = removeForbiddenHeadingTerms(normalizedName)
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return safeName || "사이트";
+}
+
+function removeForbiddenHeadingTerms(value: string) {
+  return SITE_DETAIL_HEADING_FORBIDDEN_TERMS.reduce(
+    (result, term) => result.split(term).join(""),
+    value,
+  );
 }
 
 function dedupeTitleSegments(value: string) {
