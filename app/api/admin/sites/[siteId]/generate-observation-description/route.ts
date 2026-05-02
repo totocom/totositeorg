@@ -159,7 +159,9 @@ async function callOpenAiObservationDescription({
   const userPrompt = rewriteDraft
     ? [
         "아래 설명문은 원본 HTML 문장을 그대로 복사한 것으로 의심되는 부분이 있습니다. 원본 문구를 그대로 사용하지 말고, sites.description에 저장할 자연스러운 사이트 설명문으로 다시 작성하세요. 가입, 입금, 프로모션, 보너스, 추천 문구는 강조하지 마세요.",
-        "세부 메뉴, 게임 분류, footer, 이미지 alt, 배지, 긴 URL은 설명 본문에 나열하지 말고 observation_summary에만 정리하세요.",
+        "고지문은 별도 컴포넌트에서 출력하므로 본문에 넣지 말고, 2~3문단과 300~600자 범위로 작성하세요.",
+        "page_title, meta_description, h1 같은 내부 필드명과 '문서 제목은', '메타 설명에는', '대표 제목 영역에는' 표현을 쓰지 마세요.",
+        "세부 메뉴, 게임명, footer, 이미지 alt, 배지, 긴 URL은 설명 본문에 나열하지 말고 observation_summary에만 정리하세요.",
         "실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부는 확인되지 않았다고 짧게 언급하세요.",
         "",
         "기존 설명문:",

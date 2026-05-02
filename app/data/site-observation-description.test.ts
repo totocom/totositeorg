@@ -63,10 +63,9 @@ const snapshot: ObservationDescriptionSnapshot = {
 };
 
 const validNaturalDescription = [
-  observationDisclosureText,
-  "관측 테스트 사이트는 공개 화면에서 \"관측 테스트 메인\"이라는 표시명이 사용된 것으로 확인됩니다. 주요 화면은 게임 유형, 계정 관련 메뉴, 이용 내역으로 보이는 항목을 중심으로 구성되어 있습니다. 스포츠와 카지노·슬롯 계열처럼 게임 유형을 구분하는 흐름도 함께 보이지만, 세부 분류명은 본문에 나열하지 않았습니다.",
-  "상단과 주요 메뉴 영역에는 화면 이동 항목과 계정 이용과 관련된 메뉴가 함께 보입니다. 일부 영역에서는 금전 처리나 이용 기록과 관련된 요소도 확인되지만, 실제 처리 방식으로 해석하지 않았습니다.",
-  "다만 제공된 HTML과 스크린샷만으로는 실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부까지 확인할 수 없습니다. 세부 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에 별도로 정리했습니다.",
+  "관측 테스트 사이트는 공개 화면에서 \"관측 테스트 메인\"이라는 이름을 사용하는 사이트입니다. 주요 화면은 스포츠, 카지노, 슬롯 등 게임 카테고리를 중심으로 구성되어 있으며, 로그인과 고객센터처럼 계정·문의 관련 메뉴도 함께 배치되어 있습니다.",
+  "본문에는 여러 영역으로 이동하는 카드형 안내와 화면 전환 요소가 함께 배치되어 있습니다. 일부 화면에는 결제나 이용 내역 관련 요소가 포함되어 있지만, 제공된 HTML과 스크린샷만으로 실제 결제 방식이나 이용 조건까지 확인할 수는 없습니다.",
+  "하단에는 고객지원, 공지, 외부 연락 채널, 책임 있는 이용 관련 안내가 포함되어 있습니다. 자세한 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있습니다.",
 ].join("\n\n");
 
 const validAiOutput: ObservationDescriptionAiOutput = {
@@ -172,29 +171,31 @@ async function runApprove(options: {
   };
 }
 
-test("ensureObservationDisclosure inserts 조회 시점 기준 when missing", () => {
+test("ensureObservationDisclosure no longer inserts long notice text", () => {
   const description =
-    "공개 HTML 관측 정보를 바탕으로 메뉴와 화면 요소를 요약합니다.";
+    "화면 구성과 계정 메뉴를 자연스럽게 요약합니다. 실제 결제 방식은 확인할 수 없습니다.";
   const result = ensureObservationDisclosure(description);
 
-  assert.equal(result.includes("조회 시점 기준"), true);
-  assert.equal(result.includes(description), true);
+  assert.equal(result, description);
+  assert.equal(result.includes(observationDisclosureText), false);
 });
 
-test("ensureObservationDisclosure inserts 공개 HTML and observation source wording when missing", () => {
-  const description =
-    "조회 기준 화면 기록을 바탕으로 메뉴와 하단 안내를 정리합니다.";
+test("ensureObservationDisclosure removes legacy disclosure text", () => {
+  const description = `${observationDisclosureText}\n\n화면 구성과 메뉴를 요약합니다. 실제 결제 방식은 확인할 수 없습니다.`;
   const result = ensureObservationDisclosure(description);
 
-  assert.equal(result.includes("공개 HTML"), true);
-  assert.equal(result.includes("화면에 표시된 정보만 요약"), true);
+  assert.equal(result.includes(observationDisclosureText), false);
+  assert.equal(result.includes("화면 구성과 메뉴를 요약합니다."), true);
 });
 
-test("ensureObservationDisclosure does not duplicate an existing disclosure", () => {
-  const description = `${observationDisclosureText}\n\n화면 구성과 메뉴를 요약합니다.`;
+test("ensureObservationDisclosure removes internal extraction sentences", () => {
+  const description = `${observationDisclosureText}\n\n문서 제목은 \"테스트\"로 표시되었습니다. 메타 설명에는 내부 설명이 있습니다. 대표 제목 영역에는 H1 값이 있습니다.\n\n화면 구성과 메뉴를 요약합니다. 실제 결제 방식은 확인할 수 없습니다.`;
   const result = ensureObservationDisclosure(description);
 
-  assert.equal(result.split(observationDisclosureText).length - 1, 1);
+  assert.equal(result.includes("문서 제목은"), false);
+  assert.equal(result.includes("메타 설명에는"), false);
+  assert.equal(result.includes("대표 제목 영역에는"), false);
+  assert.equal(result.includes("화면 구성과 메뉴를 요약합니다."), true);
 });
 
 test("generateObservationDescription stores AI result on the snapshot", async () => {
@@ -242,45 +243,35 @@ test("generateObservationDescription marks forbidden phrases as failed", async (
   );
 });
 
-test("generateObservationDescription inserts required disclosure before validation", async () => {
+test("generateObservationDescription stores natural description without embedded notice", async () => {
   const { result, updatePayload } = await runGenerate({
     aiOutput: {
       ...validAiOutput,
-      detail_description_md: [
-        "관측 테스트 사이트는 화면에 표시된 식별명과 주요 화면 흐름을 중심으로 요약할 수 있습니다. 주요 화면은 게임 유형, 계정 관련 메뉴, 이용 내역으로 보이는 항목을 중심으로 구성되어 있습니다. 스포츠와 카지노·슬롯 계열처럼 게임 유형을 구분하는 흐름도 함께 보이지만, 세부 분류명은 본문에 나열하지 않았습니다.",
-        "상단과 주요 메뉴 영역에는 화면 이동 항목과 계정 이용과 관련된 메뉴가 함께 보입니다. 일부 영역에서는 금전 처리나 이용 기록과 관련된 요소도 확인되지만, 실제 처리 방식으로 해석하지 않았습니다.",
-        "다만 제공된 HTML과 스크린샷만으로는 실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부까지 확인할 수 없습니다. 세부 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에 별도로 정리했습니다.",
-      ].join("\n\n"),
+      detail_description_md: [observationDisclosureText, validNaturalDescription].join(
+        "\n\n",
+      ),
     },
   });
   const warnings = result.body.admin_warnings as string[];
 
   assert.equal(result.body.validation_status, "passed");
-  assert.match(
-    updatePayload?.ai_detail_description_md ?? "",
-    /조회 시점 기준/,
-  );
   assert.equal(
     updatePayload?.ai_detail_description_md.includes(observationDisclosureText),
-    true,
+    false,
   );
   assert.equal(
-    warnings.some((warning) => warning.includes("조회 시점 기준")),
+    warnings.some((warning) => warning.includes("조회 시점 기준") && warning.includes("없습니다")),
     false,
   );
 });
 
 test("fallback draft does not emphasize promotional flags in public description", () => {
   const fallback = buildObservationDescriptionFallback({ site, snapshot });
-  const fallbackWithoutDisclosure = fallback.detail_description_md.replace(
-    observationDisclosureText,
-    "",
-  );
   const paragraphs = getParagraphs(fallback.detail_description_md);
 
   assert.equal(
     /가입|충전|환전|이벤트|보너스|첫충|추천|바로가기|최신 주소|우회 주소/.test(
-      fallbackWithoutDisclosure,
+      fallback.detail_description_md,
     ),
     false,
   );
@@ -288,7 +279,7 @@ test("fallback draft does not emphasize promotional flags in public description"
     /^#{1,6}\s|^\s*[-*+]\s/m.test(fallback.detail_description_md),
     false,
   );
-  assert.equal(paragraphs.length, 4);
+  assert.equal(paragraphs.length, 3);
   assert.equal(
     paragraphs.every((paragraph) => {
       const sentenceCount = getSentences(paragraph).length;
@@ -296,11 +287,12 @@ test("fallback draft does not emphasize promotional flags in public description"
     }),
     true,
   );
-  assert.equal(getPlainLength(fallback.detail_description_md) >= 400, true);
-  assert.equal(getPlainLength(fallback.detail_description_md) <= 700, true);
+  assert.equal(getPlainLength(fallback.detail_description_md) >= 300, true);
+  assert.equal(getPlainLength(fallback.detail_description_md) <= 600, true);
   assert.equal(fallback.detail_description_md.includes(site.url ?? ""), false);
   assert.equal(fallback.detail_description_md.includes("홈, 스포츠, 고객센터"), false);
   assert.equal(countReportLikePhrases(fallback.detail_description_md) <= 2, true);
+  assert.equal(fallback.detail_description_md.includes(observationDisclosureText), false);
   assert.deepEqual(fallback.observation_summary.excluded_promotional_terms, [
     "가입",
     "충전",
@@ -309,41 +301,44 @@ test("fallback draft does not emphasize promotional flags in public description"
   ]);
 });
 
-test("validateObservationDescriptionDraft reports disclosure omissions as warnings", () => {
+test("validateObservationDescriptionDraft does not require embedded disclosure", () => {
   const validation = validateObservationDescriptionDraft({
-    detailDescriptionMd:
-      "관리자가 확인한 화면 구성과 메뉴 배열을 중심으로 사이트 식별에 필요한 공개 관측값을 요약합니다.",
+    detailDescriptionMd: validNaturalDescription,
     sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
   });
 
-  assert.equal(validation.status, "warning");
+  assert.equal(validation.status, "passed");
   assert.equal(
     validation.warnings.some((warning) => warning.includes("조회 시점 기준")),
-    true,
+    false,
   );
   assert.equal(
     validation.warnings.some((warning) => warning.includes("공개 HTML")),
-    true,
+    false,
   );
   assert.deepEqual(validation.errors, []);
 });
 
-test("validateObservationDescriptionDraft clears disclosure warnings after automatic insertion", () => {
-  const description =
-    "관리자가 확인한 화면 구성과 메뉴 배열을 중심으로 사이트 식별에 필요한 공개 관측값을 요약합니다.";
+test("validateObservationDescriptionDraft warns for repeated source-report wording", () => {
+  const description = [
+    "공개 화면 문구가 반복됩니다. 공개 화면 구성은 반복됩니다.",
+    "공개 화면 관련 문장이 다시 나옵니다. 조회 시점 기준 공개 HTML 문장이 있습니다.",
+    "조회 시점 기준 공개 HTML 문장이 한 번 더 나옵니다.",
+  ].join("\n\n");
   const validation = validateObservationDescriptionDraft({
-    detailDescriptionMd: ensureObservationDisclosure(description),
+    detailDescriptionMd: description,
     sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
   });
 
   assert.equal(
-    validation.warnings.some((warning) => warning.includes("조회 시점 기준")),
-    false,
+    validation.warnings.some((warning) => warning.includes("공개 화면")),
+    true,
   );
   assert.equal(
-    validation.warnings.some((warning) => warning.includes("공개 HTML")),
-    false,
+    validation.warnings.some((warning) => warning.includes("조회 시점 기준")),
+    true,
   );
+  assert.equal(validation.status, "warning");
 });
 
 test("validateObservationDescriptionDraft fails hard prohibited phrases", () => {
@@ -388,7 +383,7 @@ test("validateObservationDescriptionDraft warns for one similar source sentence"
   assert.deepEqual(validation.errors, []);
 });
 
-test("validateObservationDescriptionDraft fails for multiple long copied sentences", () => {
+test("validateObservationDescriptionDraft warns for multiple long copied sentences", () => {
   const firstCopiedSentence =
     "관리자 공지 영역에는 점검 일정과 화면 변경 안내가 순서대로 배치되어 있으며 이용자는 화면 하단에서 관련 고지를 확인할 수 있다는 긴 문장이 표시되고 추가 안내 문구도 같은 문단에 이어지며 관리자가 별도 확인해야 할 화면 위치와 문단 성격까지 함께 설명됩니다.";
   const secondCopiedSentence =
@@ -398,11 +393,12 @@ test("validateObservationDescriptionDraft fails for multiple long copied sentenc
     sourceTextChunks: [firstCopiedSentence, secondCopiedSentence, "메뉴 영역"],
   });
 
-  assert.equal(validation.status, "failed");
+  assert.equal(validation.status, "warning");
   assert.equal(
-    validation.errors.some((error) => error.includes("80자 이상")),
+    validation.warnings.some((warning) => warning.includes("80자 이상")),
     true,
   );
+  assert.deepEqual(validation.errors, []);
 });
 
 test("validateObservationDescriptionDraft fails long copied promotional sentence", () => {
@@ -444,7 +440,8 @@ test("approveObservationDescription updates site description after approval", as
 test("approveObservationDescription allows warning-only descriptions", async () => {
   const copiedSentence =
     "관리자 공지 영역에는 점검 일정과 화면 변경 안내가 순서대로 배치되어 있다는 문장이 표시됩니다.";
-  const finalDescription = `${observationDisclosureText}\n\n${copiedSentence}\n\n관리자 최종 설명은 화면 구조, 메뉴 배열, 하단 안내, 이미지 대체 텍스트, 관측 시각, 해시 기록을 종합해 사이트 식별과 화면 기록 확인에 필요한 내용을 별도로 정리합니다. 이 문단은 원문 표현을 반복하지 않고 공개 관측값의 용도와 검수 기준을 설명합니다.`;
+  const finalStoredDescription = `${copiedSentence}\n\n${validNaturalDescription}`;
+  const finalDescription = `${observationDisclosureText}\n\n${finalStoredDescription}`;
   const { result, siteUpdate, snapshotUpdate } = await runApprove({
     finalDescription,
     targetSnapshot: {
@@ -455,7 +452,7 @@ test("approveObservationDescription allows warning-only descriptions", async () 
 
   assert.equal(result.status, 200);
   assert.equal(result.body.validation_status, "warning");
-  assert.equal(siteUpdate?.description, finalDescription);
+  assert.equal(siteUpdate?.description, finalStoredDescription);
   assert.equal(snapshotUpdate?.snapshot_status, "approved");
 });
 
@@ -470,7 +467,11 @@ test("approveObservationDescription marks snapshot as approved", async () => {
   const { snapshotUpdate } = await runApprove();
 
   assert.equal(snapshotUpdate?.snapshot_status, "approved");
-  assert.match(snapshotUpdate?.ai_detail_description_md ?? "", /조회 시점 기준/);
+  assert.equal(
+    snapshotUpdate?.ai_detail_description_md.includes(observationDisclosureText),
+    false,
+  );
+  assert.match(snapshotUpdate?.ai_detail_description_md ?? "", /원본 사이트 관측 정보/);
   assert.equal(
     (
       snapshotUpdate?.ai_observation_summary_json as {
@@ -540,9 +541,11 @@ test("site observation description prompt requires natural bounded paragraphs", 
   });
   const combinedPrompt = `${siteObservationDescriptionSystemPrompt}\n${prompt}`;
 
-  assert.match(combinedPrompt, /3~4문단/);
-  assert.match(combinedPrompt, /400~700자/);
-  assert.match(combinedPrompt, /세부 메뉴, 게임 분류, footer, 이미지 alt, 배지/);
+  assert.match(combinedPrompt, /2~3문단/);
+  assert.match(combinedPrompt, /300~600자/);
+  assert.match(combinedPrompt, /고지문은 별도/);
+  assert.match(combinedPrompt, /page_title, meta_description, h1/);
+  assert.match(combinedPrompt, /세부 메뉴, 게임명, footer, 이미지 alt, 배지/);
   assert.match(combinedPrompt, /URL은 설명 본문에 직접 길게 쓰지 말고/);
   assert.match(combinedPrompt, /실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부/);
   assert.match(combinedPrompt, /원본 사이트 관측 정보/);

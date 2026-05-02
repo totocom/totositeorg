@@ -10,6 +10,7 @@ import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summ
 import { SafeMarkdown } from "@/app/components/safe-markdown";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
+import { SiteDescriptionNotice } from "@/app/components/site-description-notice";
 import { SiteFeedbackSubmissionGuide } from "@/app/components/site-feedback-submission-guide";
 import { SiteObservationSnapshotCard } from "@/app/components/site-observation-snapshot-card";
 import { SiteShareActions } from "@/app/components/site-share-actions";
@@ -437,6 +438,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           {overviewBlocks.length > 0 ? (
             <div className="px-5 pb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">사이트 개요</p>
+              <SiteDescriptionNotice />
               <SafeMarkdown
                 value={site.shortDescription}
                 blocks={overviewBlocks}

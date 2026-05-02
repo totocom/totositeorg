@@ -1,3 +1,5 @@
+import { siteDescriptionNoticeText } from "./site-description-notice";
+
 export type SafeMarkdownInline =
   | {
       type: "text";
@@ -47,7 +49,35 @@ type SafeMarkdownOptions = {
   maxBlocks?: number;
 };
 
+export type ObservationDescriptionFormatResult = {
+  description: string;
+  warnings: string[];
+};
+
+const legacyObservationDisclosureText =
+  "이 설명은 조회 시점 기준 관리자가 제공한 공개 HTML과 스크린샷을 바탕으로 작성되었습니다. 화면에 표시된 정보만 요약한 것이며, 가입이나 이용을 권유하는 내용은 아닙니다.";
+
 export function normalizePublicSiteDescription(value: string) {
+  return formatObservationDescriptionForPublic(value).description;
+}
+
+export function formatObservationDescriptionForPublic(
+  value: string,
+): ObservationDescriptionFormatResult {
+  const normalizedDescription = normalizeObservationDescriptionText(value);
+  const warnings = getObservationDescriptionFormatWarnings(normalizedDescription);
+  const paragraphs = normalizedDescription
+    .split(/\n{2,}/)
+    .map(formatObservationDescriptionParagraph)
+    .filter(Boolean);
+
+  return {
+    description: paragraphs.join("\n\n").trim(),
+    warnings,
+  };
+}
+
+function normalizeObservationDescriptionText(value: string) {
   return stripUnsafeHtml(value)
     .replace(/본\s*설명\s*초안은|설명\s*초안은|본\s*초안은|이\s*초안은/g, "이 설명은")
     .replace(/초안/g, "설명")
@@ -55,6 +85,105 @@ export function normalizePublicSiteDescription(value: string) {
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{4,}/g, "\n\n\n")
     .trim();
+}
+
+function formatObservationDescriptionParagraph(value: string) {
+  const sentences = splitDescriptionSentences(value)
+    .filter((sentence) => !isNoticeSentence(sentence))
+    .filter((sentence) => !isInternalExtractionSentence(sentence));
+
+  return sentences.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function splitDescriptionSentences(value: string) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+
+  return normalized
+    .replace(/([.!?。！？])\s+/g, "$1\n")
+    .split(/\n+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function isNoticeSentence(value: string) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+
+  return (
+    normalized === siteDescriptionNoticeText ||
+    normalized === legacyObservationDisclosureText ||
+    (/^이\s*설명은/.test(normalized) &&
+      /공개\s*HTML|스크린샷/.test(normalized)) ||
+    /가입이나\s*이용을\s*권유하는\s*내용은\s*아닙니다/.test(normalized) ||
+    (/^이\s*설명은\s*조회\s*시점\s*기준/.test(normalized) &&
+      /공개\s*HTML|스크린샷|관측/.test(normalized))
+  );
+}
+
+function isInternalExtractionSentence(value: string) {
+  return /문서\s*제목은|페이지\s*제목은|메타\s*설명(?:에는|은)|대표\s*제목\s*영역(?:에는|은)|\bpage_title\b|\bmeta_description\b|\bh1\b|h1\s*(?:에는|은)/i.test(
+    value,
+  );
+}
+
+function getObservationDescriptionFormatWarnings(value: string) {
+  const warnings: string[] = [];
+  const plainText = value.replace(/\s+/g, " ").trim();
+
+  if (countOccurrences(plainText, "관측되었습니다") >= 3) {
+    warnings.push("'관측되었습니다' 표현이 3회 이상 반복됩니다.");
+  }
+
+  if (countOccurrences(plainText, "공개 화면") >= 3) {
+    warnings.push("'공개 화면' 표현이 3회 이상 반복됩니다.");
+  }
+
+  if (countOccurrences(plainText, "조회 시점 기준") >= 2) {
+    warnings.push("'조회 시점 기준' 표현이 2회 이상 반복됩니다.");
+  }
+
+  if (countOccurrences(plainText, "공개 HTML") >= 2) {
+    warnings.push("'공개 HTML' 표현이 2회 이상 반복됩니다.");
+  }
+
+  if (isInternalExtractionSentence(plainText)) {
+    warnings.push("page_title, meta_description, h1 같은 내부 추출 설명이 포함되어 있습니다.");
+  }
+
+  if (/https?:\/\/\S+|www\.[^\s)]+/i.test(plainText)) {
+    warnings.push("URL은 사이트 설명 본문보다 주소·도메인 섹션에서 표시하는 것이 좋습니다.");
+  }
+
+  if (/^\s{0,3}(?:#{1,6}|[-*+]|\d+\.)\s/m.test(value)) {
+    warnings.push("사이트 설명에 제목 또는 bullet/list 형식이 포함되어 있습니다.");
+  }
+
+  if (plainText.length > 700) {
+    warnings.push("사이트 설명이 700자를 초과합니다.");
+  }
+
+  if (hasLongMenuLikeEnumeration(plainText)) {
+    warnings.push("메뉴명이나 세부 항목이 과도하게 나열된 문장이 있습니다.");
+  }
+
+  return Array.from(new Set(warnings));
+}
+
+function hasLongMenuLikeEnumeration(value: string) {
+  return value
+    .split(/[.!?。！？]\s*/)
+    .some((sentence) => {
+      const items = sentence
+        .split(/\s*(?:,|，|、|·|ㆍ|\/|\|)\s*/)
+        .map((item) => item.trim())
+        .filter((item) => item.length >= 1 && item.length <= 18);
+
+      return items.length >= 8;
+    });
+}
+
+function countOccurrences(value: string, phrase: string) {
+  return value.split(phrase).length - 1;
 }
 
 export function getSafeMarkdownBlocks(
@@ -131,7 +260,7 @@ export function getSiteOverviewMarkdownBlocks(value: string) {
   return getSafeMarkdownBlocks(value, {
     includeHeadings: false,
     includeLists: false,
-    maxBlocks: 4,
+    maxBlocks: 3,
   });
 }
 

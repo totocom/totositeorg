@@ -6,11 +6,13 @@ import {
   type PublicSiteObservationSnapshot,
 } from "./public-site-observation-snapshot";
 import {
+  formatObservationDescriptionForPublic,
   getSafeMarkdownBlocks,
   getSiteOverviewMarkdownBlocks,
   normalizePublicSiteDescription,
   normalizePublicSiteDomains,
 } from "./public-site-description";
+import { siteDescriptionNoticeText } from "./site-description-notice";
 import {
   calculateSiteTrustScore,
   getApprovedScamReportStatusCopy,
@@ -53,12 +55,88 @@ test("site title header footer copy does not expose 토토사이트 추천", () 
 
 test("normalizePublicSiteDescription replaces 본 초안은 with 이 설명은", () => {
   const description = normalizePublicSiteDescription(
-    "본 초안은 조회 시점 기준 공개 HTML에서 관측된 정보를 요약합니다.",
+    "본 초안은 사이트 화면 구성을 자연스럽게 설명합니다.",
   );
 
   assert.equal(description.includes("본 초안은"), false);
   assert.equal(description.includes("초안"), false);
   assert.equal(description.startsWith("이 설명은"), true);
+});
+
+test("formatObservationDescriptionForPublic separates long notice from description", () => {
+  const formatted = formatObservationDescriptionForPublic(
+    [
+      siteDescriptionNoticeText,
+      "",
+      "테스트 사이트는 공개 화면에서 테스트라는 이름을 사용하는 사이트입니다. 주요 화면은 게임 카테고리와 계정 관련 메뉴를 중심으로 구성되어 있습니다.",
+      "",
+      "본문에는 카드형 안내와 화면 전환 요소가 함께 배치되어 있습니다. 자세한 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있습니다.",
+    ].join("\n"),
+  );
+
+  assert.equal(formatted.description.includes(siteDescriptionNoticeText), false);
+  assert.equal(formatted.description.includes("가입이나 이용을 권유"), false);
+  assert.match(formatted.description, /테스트 사이트는/);
+});
+
+test("formatObservationDescriptionForPublic removes internal extraction sentences", () => {
+  const formatted = formatObservationDescriptionForPublic(
+    [
+      "문서 제목은 \"최고의 무료 온라인 게임\"으로 표시되었습니다.",
+      "메타 설명에는 내부 추출 문장이 있습니다.",
+      "대표 제목 영역에는 H1 값이 있습니다.",
+      "",
+      "테스트 사이트는 공개 화면에서 테스트라는 이름을 사용하는 사이트입니다. 주요 화면은 계정 관련 메뉴와 고객지원 요소를 중심으로 구성되어 있습니다.",
+    ].join("\n"),
+  );
+
+  assert.equal(formatted.description.includes("문서 제목은"), false);
+  assert.equal(formatted.description.includes("메타 설명에는"), false);
+  assert.equal(formatted.description.includes("대표 제목 영역에는"), false);
+  assert.match(formatted.description, /테스트 사이트는/);
+  assert.equal(
+    formatted.warnings.some((warning) => warning.includes("내부 추출")),
+    true,
+  );
+});
+
+test("formatObservationDescriptionForPublic warns on report-like repetition URLs and lists", () => {
+  const formatted = formatObservationDescriptionForPublic(
+    [
+      "공개 화면에서는 항목이 관측되었습니다. 공개 화면에서는 추가 항목이 관측되었습니다. 공개 화면에서는 다시 관측되었습니다.",
+      "",
+      "- https://example.com/path",
+    ].join("\n"),
+  );
+
+  assert.equal(
+    formatted.warnings.some((warning) => warning.includes("관측되었습니다")),
+    true,
+  );
+  assert.equal(
+    formatted.warnings.some((warning) => warning.includes("공개 화면")),
+    true,
+  );
+  assert.equal(
+    formatted.warnings.some((warning) => warning.includes("URL")),
+    true,
+  );
+  assert.equal(
+    formatted.warnings.some((warning) => warning.includes("bullet")),
+    true,
+  );
+});
+
+test("site description notice component is rendered above the overview description", () => {
+  const pageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
+  const noticeSource = readFileSync(
+    "app/components/site-description-notice.tsx",
+    "utf8",
+  );
+
+  assert.match(pageSource, /import\s+\{\s*SiteDescriptionNotice\s*\}/);
+  assert.match(pageSource, /<SiteDescriptionNotice\s*\/>[\s\S]*<SafeMarkdown/);
+  assert.match(noticeSource, /siteDescriptionNoticeText/);
 });
 
 test("safe markdown parser renders markdown without raw markers", () => {
@@ -182,8 +260,8 @@ test("site overview is limited to natural paragraphs and omits detail-only obser
   const overviewBlocks = getSiteOverviewMarkdownBlocks(description);
   const overviewText = JSON.stringify(overviewBlocks);
 
-  assert.equal(overviewBlocks.length, 4);
+  assert.equal(overviewBlocks.length, 3);
   assert.equal(overviewText.includes("푸터/저작권"), false);
   assert.equal(overviewText.includes("이미지 alt"), false);
-  assert.equal(overviewText.includes("다섯 번째 문단"), false);
+  assert.equal(overviewText.includes("네 번째 문단"), false);
 });

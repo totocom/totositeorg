@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import type { SiteHtmlObservation } from "@/app/data/site-html-observation";
 import { containsSiteObservationPromotionalTerm } from "@/app/data/site-html-promotional-flags";
+import { formatObservationDescriptionForPublic } from "@/app/data/public-site-description";
 import {
-  ensureObservationDisclosure,
-  observationDisclosureText,
   sanitizeObservationDescription,
   validateObservationDescriptionDraft,
 } from "@/app/data/site-observation-description";
@@ -73,21 +72,20 @@ function buildLocalDescriptionDraft({
   const paymentItems = safeBullets(observation.observed_payment_flags);
   const displayNameSentence =
     displayName && displayName !== siteName
-      ? `${siteSubject}는 공개 화면에서 "${displayName}"이라는 표시명이 사용된 것으로 확인됩니다.`
-      : `${siteSubject}는 공개 화면에서 사이트 식별명과 주요 화면 흐름이 함께 확인됩니다.`;
-  const gameTypeSentence =
+      ? `${siteSubject}는 공개 화면에서 "${displayName}"이라는 이름을 사용하는 사이트입니다.`
+      : `${siteSubject}는 사이트 식별명과 주요 화면 흐름을 함께 사용하는 사이트입니다.`;
+  const categorySentence =
     bettingItems.length > 0
-      ? "스포츠와 카지노·슬롯 계열처럼 게임 유형을 구분하는 흐름도 함께 보이지만, 세부 분류명은 본문에 나열하지 않았습니다."
-      : "게임 유형으로 보이는 항목은 세부값을 본문에 나열하지 않고 별도 관측 정보로 분리했습니다.";
+      ? "주요 화면은 스포츠, 카지노, 슬롯 등 게임 카테고리를 중심으로 구성되어 있으며, 로그인과 고객센터처럼 계정·문의 관련 메뉴도 함께 배치되어 있습니다."
+      : "주요 화면은 사이트 식별 영역, 계정 관련 메뉴, 문의 또는 고객지원 요소를 중심으로 구성되어 있습니다.";
   const paymentRecordSentence =
     paymentItems.length > 0 || accountItems.length > 0
-      ? "일부 영역에서는 금전 처리나 이용 기록과 관련된 요소도 확인되지만, 실제 처리 방식으로 해석하지 않았습니다."
-      : "금전 처리나 이용 기록과 관련된 실제 절차는 제공된 화면만으로 판단하지 않았습니다.";
+      ? "일부 화면에는 결제나 이용 내역 관련 요소가 포함되어 있지만, 제공된 HTML과 스크린샷만으로 실제 결제 방식이나 이용 조건까지 확인할 수는 없습니다."
+      : "제공된 HTML과 스크린샷만으로 실제 결제 방식, 본인 확인 절차, 이용 조건까지 확인할 수는 없습니다.";
   const paragraphs = [
-    observationDisclosureText,
-    `${displayNameSentence} 주요 화면은 게임 유형, 계정 관련 메뉴, 이용 내역으로 보이는 항목을 중심으로 구성되어 있습니다. ${gameTypeSentence}`,
-    `상단과 주요 메뉴 영역에는 화면 이동 항목과 계정 이용과 관련된 메뉴가 함께 보입니다. ${paymentRecordSentence}`,
-    "다만 제공된 HTML과 스크린샷만으로는 실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부까지 확인할 수 없습니다. 세부 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에 별도로 정리했습니다.",
+    `${displayNameSentence} ${categorySentence}`,
+    `본문에는 여러 영역으로 이동하는 카드형 안내와 화면 전환 요소가 함께 배치되어 있습니다. ${paymentRecordSentence}`,
+    "하단에는 고객지원, 공지, 외부 연락 채널, 책임 있는 이용 관련 안내가 포함되어 있습니다. 자세한 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있습니다.",
   ];
 
   return paragraphs.join("\n\n");
@@ -165,7 +163,7 @@ async function callOpenAiDescription({
   const userPrompt = rewriteDraft
     ? [
         "아래 설명문은 원본 HTML 문장을 그대로 복사한 것으로 의심되는 부분이 있습니다. 원본 문구를 그대로 사용하지 말고, sites.description에 저장할 자연스러운 사이트 설명문으로 다시 작성하세요. 가입, 입금, 프로모션, 보너스, 추천 문구는 강조하지 마세요.",
-        "3~4문단, 각 문단 2~3문장, 전체 400~700자 정도로 자연스럽게 작성하고 제목이나 bullet 목록은 사용하지 마세요.",
+        "2~3문단, 각 문단 2~3문장, 전체 300~600자 정도로 자연스럽게 작성하고 제목이나 bullet 목록은 사용하지 마세요.",
         "세부 메뉴, 게임 분류, footer, 이미지 alt, 배지, 긴 URL은 설명 본문에 나열하지 마세요.",
         "실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부는 확인되지 않았다고 짧게 언급하세요.",
         "",
@@ -195,9 +193,10 @@ async function callOpenAiDescription({
                 "한국어 사이트 상세 설명 초안을 sites.description에 저장할 자연스러운 설명문으로 작성한다.",
                 "추천, 홍보, 가입 유도, 입금 유도, 이벤트 강조를 하지 않는다.",
                 "입력 HTML과 스크린샷에 표시된 정보만 짧게 요약한다.",
-                "첫 문단에는 '이 설명은 조회 시점 기준 관리자가 제공한 공개 HTML과 스크린샷을 바탕으로 작성되었습니다. 화면에 표시된 정보만 요약한 것이며, 가입이나 이용을 권유하는 내용은 아닙니다.' 고지를 포함한다.",
-                "3~4문단, 각 문단 2~3문장, 전체 400~700자 정도로 작성한다.",
+                "고지문은 별도 컴포넌트에서 출력하므로 본문에 넣지 않는다.",
+                "2~3문단, 각 문단 2~3문장, 전체 300~600자 정도로 작성한다.",
                 "제목, bullet 목록, 표, 키워드 나열은 사용하지 않는다.",
+                "page_title, meta_description, h1 같은 내부 필드명이나 '문서 제목은', '메타 설명에는', '대표 제목 영역에는' 표현을 쓰지 않는다.",
                 "세부 메뉴, 게임 분류, footer, 이미지 alt, 배지, 긴 URL은 설명 본문에 나열하지 않고 원본 사이트 관측 정보 섹션에서 다룰 값으로 남긴다.",
                 "메뉴 전체 목록, 게임명, 카테고리명, 언어명, footer 문구를 길게 나열하지 않는다.",
                 "'관측되었습니다'는 최대 2회까지만 사용하고, '공개 화면', '공개 HTML', '조회 시점 기준' 표현도 반복하지 않는다.",
@@ -319,9 +318,13 @@ export async function POST(request: Request) {
     });
   }
 
-  aiDetailDescriptionMd = sanitizeObservationDescription(
-    ensureObservationDisclosure(aiDetailDescriptionMd),
+  const formattedDescription = formatObservationDescriptionForPublic(
+    aiDetailDescriptionMd,
   );
+  aiDetailDescriptionMd = sanitizeObservationDescription(
+    formattedDescription.description,
+  );
+  adminWarnings.push(...formattedDescription.warnings);
   let validation = validateObservationDescriptionDraft({
     detailDescriptionMd: aiDetailDescriptionMd,
     sourceTextChunks: getObservationSourceTextChunks(observation),
@@ -345,9 +348,13 @@ export async function POST(request: Request) {
         observation,
         rewriteDraft: aiDetailDescriptionMd,
       });
-      aiDetailDescriptionMd = sanitizeObservationDescription(
-        ensureObservationDisclosure(aiDetailDescriptionMd),
+      const formattedRewriteDescription = formatObservationDescriptionForPublic(
+        aiDetailDescriptionMd,
       );
+      aiDetailDescriptionMd = sanitizeObservationDescription(
+        formattedRewriteDescription.description,
+      );
+      adminWarnings.push(...formattedRewriteDescription.warnings);
       validation = validateObservationDescriptionDraft({
         detailDescriptionMd: aiDetailDescriptionMd,
         sourceTextChunks: getObservationSourceTextChunks(observation),
@@ -365,9 +372,7 @@ export async function POST(request: Request) {
   }
 
   if (
-    containsSiteObservationPromotionalTerm(
-      aiDetailDescriptionMd.replace(observationDisclosureText, ""),
-    )
+    containsSiteObservationPromotionalTerm(aiDetailDescriptionMd)
   ) {
     adminWarnings.push(
       "초안에 이용 유도성 문구가 포함될 수 있습니다. 공개 저장 전 문맥을 검수하세요.",
