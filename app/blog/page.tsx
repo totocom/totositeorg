@@ -50,7 +50,7 @@ export default async function BlogPage() {
                 <source srcSet="/logo-96.webp" type="image/webp" />
                 <img
                   src="/logo-96.webp"
-                  alt="토토사이트 추천 로고"
+                  alt="토토사이트 정보 로고"
                   width="48"
                   height="48"
                   className="neon-logo h-8 w-8 shrink-0"

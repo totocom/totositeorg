@@ -105,9 +105,9 @@ function InternalDataLinks({ links }: { links: InternalDataLink[] }) {
 
   return (
     <div className="mt-4 flex flex-wrap gap-2">
-      {links.map((link) => (
+      {links.map((link, linkIndex) => (
         <Link
-          key={`${link.href}-${link.label}`}
+          key={`${link.href}-${link.label}-${linkIndex}`}
           href={link.href}
           className="inline-flex min-h-9 items-center rounded-md border border-line bg-background px-3 py-1.5 text-xs font-bold text-foreground transition hover:border-accent hover:text-accent"
         >
@@ -129,9 +129,9 @@ function BlogExternalReferences({
     <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-bold uppercase text-muted">참고 자료</h2>
       <div className="mt-3 grid gap-3">
-        {references.map((reference) => (
+        {references.map((reference, referenceIndex) => (
           <a
-            key={`${reference.url}-${reference.title}`}
+            key={`${reference.url}-${reference.title}-${referenceIndex}`}
             href={reference.url}
             target="_blank"
             rel="noopener noreferrer nofollow"
@@ -505,9 +505,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             ) : null}
             {post.tags?.length ? (
               <div className="mt-4 flex flex-wrap gap-2">
-                {post.tags.slice(0, 10).map((tag) => (
+                {post.tags.slice(0, 10).map((tag, tagIndex) => (
                   <Link
-                    key={tag}
+                    key={`${getBlogTagSlug(tag)}-${tagIndex}`}
                     href={`/blog/tag/${encodeURIComponent(getBlogTagSlug(tag))}`}
                     className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-muted"
                   >
@@ -535,7 +535,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           </section>
 
           <div className="grid gap-8 py-6">
-            {post.sections.map((section) => {
+            {post.sections.map((section, sectionIndex) => {
               const sectionInternalLinks = (
                 sectionLinkPlacementsByHeading.get(section.heading) ?? []
               ).flatMap((placement) =>
@@ -543,19 +543,24 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               );
 
               return (
-                <section key={section.heading}>
+                <section key={`${section.heading}-${sectionIndex}`}>
                   <h2 className="text-xl font-bold text-foreground">
                     {section.heading}
                   </h2>
                   <div className="mt-3 grid gap-3 text-sm leading-7 text-muted">
-                    {section.paragraphs.map((paragraph) => (
-                      <p key={paragraph}>{paragraph}</p>
+                    {section.paragraphs.map((paragraph, paragraphIndex) => (
+                      <p key={`${section.heading}-paragraph-${paragraphIndex}`}>
+                        {paragraph}
+                      </p>
                     ))}
                   </div>
                   {section.bullets ? (
                     <ul className="mt-4 grid gap-2 text-sm leading-6 text-muted">
-                      {section.bullets.map((bullet) => (
-                        <li key={bullet} className="flex gap-2">
+                      {section.bullets.map((bullet, bulletIndex) => (
+                        <li
+                          key={`${section.heading}-bullet-${bulletIndex}`}
+                          className="flex gap-2"
+                        >
                           <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
                           <span>{bullet}</span>
                         </li>
@@ -574,8 +579,8 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 체크리스트
               </h2>
               <ul className="mt-4 grid gap-2 text-sm leading-6 text-muted">
-                {post.checklist.map((item) => (
-                  <li key={item} className="flex gap-2">
+                {post.checklist.map((item, itemIndex) => (
+                  <li key={`checklist-${itemIndex}`} className="flex gap-2">
                     <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-accent-soft text-xs font-bold text-accent">
                       ✓
                     </span>
@@ -590,8 +595,11 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <section className="mt-6 rounded-lg border border-line bg-background p-5">
               <h2 className="text-xl font-bold text-foreground">자주 묻는 질문</h2>
               <dl className="mt-4 divide-y divide-line">
-                {post.faqs.map((faq) => (
-                  <div key={faq.question} className="py-4 first:pt-0 last:pb-0">
+                {post.faqs.map((faq, faqIndex) => (
+                  <div
+                    key={`${faq.question}-${faqIndex}`}
+                    className="py-4 first:pt-0 last:pb-0"
+                  >
                     <dt className="text-sm font-bold text-foreground">
                       {faq.question}
                     </dt>

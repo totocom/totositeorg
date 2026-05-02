@@ -5,6 +5,7 @@ import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actio
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
+import { SafeMarkdown } from "@/app/components/safe-markdown";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
 import { SiteObservationSnapshotCard } from "@/app/components/site-observation-snapshot-card";
@@ -13,10 +14,18 @@ import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display
 import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
 import { getPublishedBlogPostForSite } from "@/app/data/public-blog-posts";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
+import { getSiteOverviewMarkdownBlocks } from "@/app/data/public-site-description";
+import {
+  buildMissingSiteMetadata,
+  buildSiteDetailMetaDescription,
+  buildSiteDetailMetadata,
+} from "@/app/data/site-detail-metadata";
 import {
   calculateSiteTrustScore,
   formatRatingScore,
   formatTrustScore,
+  getApprovedScamReportStatusCopy,
+  scamReportScoreLabel,
   getTrustScoreTone,
 } from "@/app/data/sites";
 
@@ -30,8 +39,6 @@ function Stars({ rating }: { rating: number }) {
     </span>
   );
 }
-import { siteUrl } from "@/lib/config";
-
 type SiteDetailPageProps = {
   params: Promise<{
     slug: string;
@@ -140,23 +147,10 @@ export async function generateMetadata({
   const { site } = await getPublicSiteDetail(slug.trim());
 
   if (!site) {
-    return { title: "사이트를 찾을 수 없습니다" };
+    return buildMissingSiteMetadata();
   }
 
-  const title = `${site.siteName} 토토사이트 리뷰`;
-  const description = `${site.siteName} 신뢰 점수 ${formatTrustScore(site.trustScore)}. 먹튀 리스크, 도메인 운영 이력, 이용자 경험을 종합해 확인하세요. ${site.shortDescription}`;
-  const pageUrl = `${siteUrl}/sites/${slug}`;
-
-  return {
-    title,
-    description,
-    alternates: { canonical: pageUrl },
-    openGraph: {
-      url: pageUrl,
-      title,
-      description,
-    },
-  };
+  return buildSiteDetailMetadata(site, slug);
 }
 
 export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
@@ -206,6 +200,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     );
   }
 
+  const siteDetailMetaDescription = buildSiteDetailMetaDescription(site);
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "Review",
@@ -221,12 +216,13 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
       bestRating: 100,
       worstRating: 20,
     },
-    name: `${site.siteName} 토토사이트 리뷰`,
-    description:
-      reviews[0] ? getReviewSeoSummary(site.siteName, reviews[0].experience) : site.shortDescription,
+    name: `${site.siteName} 토토사이트 정보`,
+    description: reviews[0]
+      ? getReviewSeoSummary(site.siteName, reviews[0].experience)
+      : siteDetailMetaDescription,
   };
   const domainTargets = Array.from(
-    new Set((site.domains.length > 0 ? site.domains : [site.siteUrl]).filter(Boolean)),
+    new Set([site.siteUrl, ...site.domains].filter(Boolean)),
   ).slice(0, 6);
   const domainCreationDates = await getBatchDomainCreationDates(
     domainTargets.map((domainUrl) => extractDomain(domainUrl)).filter(Boolean),
@@ -273,6 +269,13 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const screenshotPreviewUrl = site.screenshotThumbUrl || site.screenshotUrl;
   const logoAlt = `${site.siteName} 토토사이트 로고`;
   const relatedBlogPost = await getPublishedBlogPostForSite(site.id);
+  const scamReportStatusCopy = getApprovedScamReportStatusCopy(scamReportCount);
+  const representativeDomain = site.siteUrl;
+  const representativeDisplayDomain = formatDisplayDomain(representativeDomain);
+  const additionalDomains = domainTargets.filter(
+    (domain) => formatDisplayDomain(domain) !== representativeDisplayDomain,
+  );
+  const overviewBlocks = getSiteOverviewMarkdownBlocks(site.shortDescription);
 
   return (
     <>
@@ -345,15 +348,21 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </div>
               {scamReportCount > 0 ? (
                 <div className="neon-scam flex-1 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center dark:border-red-900 dark:bg-red-950/40 sm:flex-none">
-                  <p className="text-sm font-bold text-red-600 dark:text-red-400">⚠ 먹튀 {scamReportCount}건</p>
+                  <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                    {scamReportStatusCopy.primary}
+                  </p>
                   <p className="mt-0.5 text-xs text-red-500 dark:text-red-400/70">
                     {formatDamageAmount(scamDamageAmount, scamDamageAmountUnknownCount)}
                   </p>
                 </div>
               ) : (
                 <div className="neon-safe flex-1 rounded-xl border border-accent/20 bg-accent-soft px-4 py-3 text-center sm:flex-none">
-                  <p className="text-sm font-bold text-accent">✓ 먹튀 없음</p>
-                  <p className="mt-0.5 text-xs text-accent/70">신고 이력 없음</p>
+                  <p className="text-sm font-bold text-accent">
+                    {scamReportStatusCopy.primary}
+                  </p>
+                  <p className="mt-0.5 text-xs text-accent/70">
+                    {scamReportStatusCopy.secondary}
+                  </p>
                 </div>
               )}
               <AdminSiteDetailActions siteId={site.id} siteSlug={site.slug} />
@@ -361,20 +370,26 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           </div>
 
           {/* 등록 도메인 */}
-          {site.domains.length > 1 ? (
+          {domainTargets.length > 0 ? (
             <div className="border-t border-line px-5 py-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">
                 등록 도메인
               </p>
-              <div className="mt-2 flex w-full flex-wrap items-center gap-2">
-                {site.domains.map((domain) => (
-                  <span
-                    key={domain}
-                    className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted"
-                  >
-                    {formatDisplayUrl(domain)}
+              <div className="mt-2 grid gap-2 text-xs text-muted sm:grid-cols-2">
+                <div className="rounded-md bg-background px-3 py-2">
+                  <span className="font-semibold text-foreground">대표 도메인: </span>
+                  <span className="break-all">
+                    {representativeDisplayDomain || formatDisplayUrl(representativeDomain)}
                   </span>
-                ))}
+                </div>
+                {additionalDomains.length > 0 ? (
+                  <div className="rounded-md bg-background px-3 py-2">
+                    <span className="font-semibold text-foreground">추가 도메인: </span>
+                    <span className="break-all">
+                      {additionalDomains.map(formatDisplayDomain).join(", ")}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -385,7 +400,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               <TrustScoreMetric
-                label="먹튀 리스크"
+                label={scamReportScoreLabel}
                 value={trustScore.scamRisk}
               />
               <TrustScoreMetric
@@ -403,10 +418,14 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           </div>
 
           {/* 사이트 개요 */}
-          {site.shortDescription ? (
+          {overviewBlocks.length > 0 ? (
             <div className="px-5 pb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">사이트 개요</p>
-              <p className="mt-2 text-sm leading-7 text-foreground">{site.shortDescription}</p>
+              <SafeMarkdown
+                value={site.shortDescription}
+                blocks={overviewBlocks}
+                className="mt-2"
+              />
             </div>
           ) : null}
 

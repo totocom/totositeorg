@@ -375,7 +375,7 @@ export function AdminShell({ children }: AdminShellProps) {
                 <source srcSet="/logo-96.webp" type="image/webp" />
                 <img
                   src="/logo-96.webp"
-                  alt="토토사이트 추천 로고"
+                  alt="토토사이트 정보 로고"
                   width="56"
                   height="56"
                   className="neon-logo h-9 w-9 shrink-0"
@@ -386,7 +386,7 @@ export function AdminShell({ children }: AdminShellProps) {
                   관리자 콘솔
                 </span>
                 <span className="block text-xs font-semibold text-white/40">
-                  토토사이트 추천
+                  토토사이트 정보
                 </span>
               </span>
             </Link>

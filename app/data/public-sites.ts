@@ -10,6 +10,10 @@ import {
 import type { PublicDnsInfo } from "@/app/data/domain-dns";
 import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
 import type { PublicSiteObservationSnapshot } from "@/app/data/public-site-observation-snapshot";
+import {
+  normalizePublicSiteDescription,
+  normalizePublicSiteDomains,
+} from "@/app/data/public-site-description";
 import type { SiteCrawlSnapshotSiteColumns } from "@/app/data/site-crawl-snapshots";
 import { getAllowedStoredImageUrl } from "@/app/data/storage-image-url";
 import { supabase } from "@/lib/supabase/client";
@@ -136,9 +140,11 @@ function getDisplayName(site: PublicSiteRow) {
 }
 
 function getSiteDomains(site: PublicSiteRow): string[] {
-  return Array.isArray(site.domains) && site.domains.length > 0
-    ? site.domains
-    : [site.url];
+  return normalizePublicSiteDomains(
+    Array.isArray(site.domains) && site.domains.length > 0
+      ? site.domains
+      : [site.url],
+  );
 }
 
 function getOldestCreationDate(
@@ -161,10 +167,7 @@ function mapSiteRow(
   scamReports: PublicScamReportRow[] = [],
   oldestDomainCreationDate?: string,
 ) {
-  const domains =
-    Array.isArray(site.domains) && site.domains.length > 0
-      ? site.domains
-      : [site.url];
+  const domains = getSiteDomains(site);
   const scamDamageAmount = scamReports.reduce(
     (total, report) => total + Number(report.damage_amount ?? 0),
     0,
@@ -201,7 +204,7 @@ function mapSiteRow(
     licenseInfo: site.license_info,
     status: "운영 중",
     moderationStatus: "approved",
-    shortDescription: site.description,
+    shortDescription: normalizePublicSiteDescription(site.description),
     averageRating,
     reviewCount,
     scamReportCount,

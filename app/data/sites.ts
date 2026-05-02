@@ -55,6 +55,22 @@ export type SiteTrustScore = {
   summary: string;
 };
 
+export const scamReportScoreLabel = "피해 제보 현황 점수";
+
+export function getApprovedScamReportStatusCopy(scamReportCount = 0) {
+  if (scamReportCount > 0) {
+    return {
+      primary: `⚠ 승인된 먹튀 피해 제보 ${scamReportCount}건`,
+      secondary: "관리자 검토 후 공개된 피해 제보가 있습니다.",
+    };
+  }
+
+  return {
+    primary: "✓ 승인된 먹튀 피해 제보 0건",
+    secondary: "조회 기준 승인된 먹튀 피해 제보 없음",
+  };
+}
+
 export type SiteReview = {
   id: string;
   siteId: string;
@@ -201,7 +217,9 @@ function getTrustScoreSummary(
   reviewCount: number,
 ) {
   const parts = [
-    scamReportCount > 0 ? `먹튀 ${scamReportCount}건 반영` : "먹튀 제보 없음",
+    scamReportCount > 0
+      ? `승인된 먹튀 피해 제보 ${scamReportCount}건 반영`
+      : "승인된 먹튀 피해 제보 0건",
     oldestDomainCreationDate ? "도메인 이력 반영" : "도메인 이력 확인 불가",
     reviewCount > 0 ? `이용자 평가 ${reviewCount}건 반영` : "이용자 평가 대기",
   ];

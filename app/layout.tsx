@@ -10,13 +10,13 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     template: `%s | ${siteName}`,
-    default: `${siteName} - 안전한 토토사이트 순위 및 리뷰`,
+    default: `${siteName} - 토토사이트 데이터 리포트 및 리뷰`,
   },
   description: siteDescription,
   keywords: [
     "토토사이트",
-    "토토사이트 추천",
-    "안전한 토토사이트",
+    "토토사이트 정보",
+    "토토사이트 검증 정보",
     "먹튀검증 토토사이트",
     "토토사이트 순위",
     "토토사이트 리뷰",
@@ -34,12 +34,12 @@ export const metadata: Metadata = {
     locale: "ko_KR",
     url: siteUrl,
     siteName: siteName,
-    title: `${siteName} - 안전한 토토사이트 순위 및 리뷰`,
+    title: `${siteName} - 토토사이트 데이터 리포트 및 리뷰`,
     description: siteDescription,
   },
   twitter: {
     card: "summary_large_image",
-    title: `${siteName} - 안전한 토토사이트 순위 및 리뷰`,
+    title: `${siteName} - 토토사이트 데이터 리포트 및 리뷰`,
     description: siteDescription,
   },
   robots: {

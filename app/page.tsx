@@ -97,7 +97,7 @@ export default async function Home() {
                     <source srcSet="/logo-96.webp" type="image/webp" />
                     <img
                       src="/logo-96.webp"
-                      alt="토토사이트 추천 로고"
+                      alt="토토사이트 정보 로고"
                       width="64"
                       height="64"
                       className="neon-logo h-8 w-8 shrink-0"

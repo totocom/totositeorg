@@ -11,7 +11,7 @@ export function Footer() {
           <div>
             <div className="flex items-center gap-2 text-lg font-bold text-white">
               <span className="text-accent">★</span>
-              토토사이트 추천
+              토토사이트 정보
             </div>
             <p className="mt-2 max-w-xs text-sm leading-6 text-white/50">
               이용자 경험 공유와 정보 제공을 위한 플랫폼입니다.

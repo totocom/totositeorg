@@ -38,13 +38,13 @@ export function Header() {
               <source srcSet="/logo-96.webp" type="image/webp" />
               <img
                 src="/logo-96.webp"
-                alt="토토사이트 추천 로고"
+                alt="토토사이트 정보 로고"
                 width="56"
                 height="56"
                 className="neon-logo h-7 w-7 shrink-0"
               />
             </picture>
-            토토사이트 추천
+            토토사이트 정보
           </Link>
 
           <button
