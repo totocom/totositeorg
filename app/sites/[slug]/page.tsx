@@ -9,7 +9,6 @@ import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote"
 import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
 import { SafeMarkdown } from "@/app/components/safe-markdown";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
-import { SiteAuthorActions } from "@/app/components/site-author-actions";
 import { SiteDescriptionNotice } from "@/app/components/site-description-notice";
 import { SiteFeedbackSubmissionGuide } from "@/app/components/site-feedback-submission-guide";
 import { SiteObservationSnapshotCard } from "@/app/components/site-observation-snapshot-card";
@@ -60,6 +59,9 @@ export const revalidate = 300;
 const getCachedPublicSiteDetail = cache((slug: string) =>
   getPublicSiteDetail(slug),
 );
+
+const primarySubmissionActionClassName =
+  "inline-flex min-h-11 w-full items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-center text-sm font-semibold leading-5 text-white transition hover:bg-accent/80 active:scale-95";
 
 function getDomainAge(value: string) {
   if (!value) return "확인 불가";
@@ -254,6 +256,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
 
     return {
       siteId: site.id,
+      siteName: site.siteName,
       domainUrl,
       displayDomain: formatDisplayDomain(domainUrl),
       domainAge: creationDate ? getDomainAge(creationDate) : "확인 불가",
@@ -299,33 +302,57 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
         />
       )}
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_320px] lg:px-8">
+        <div className="min-w-0">
+          {/* 메인 정보 카드 */}
+          <article id="site-overview" className="scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
+            {/* 브레드크럼 */}
+            <nav aria-label="Breadcrumb" className="px-5 pt-5 text-sm text-muted">
+              <ol className="flex flex-wrap items-center gap-2">
+                <li className="flex min-w-0 items-center gap-2">
+                  <Link href="/" className="font-semibold transition hover:text-accent">
+                    홈
+                  </Link>
+                </li>
+                <li className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden="true" className="text-muted/70">
+                    /
+                  </span>
+                  <Link
+                    href="/sites"
+                    className="font-semibold transition hover:text-accent"
+                  >
+                    사이트 목록
+                  </Link>
+                </li>
+                <li className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden="true" className="text-muted/70">
+                    /
+                  </span>
+                  <span
+                    aria-current="page"
+                    className="break-words font-semibold text-foreground"
+                  >
+                    {site.siteName}
+                  </span>
+                </li>
+              </ol>
+            </nav>
 
-        {/* 브레드크럼 */}
-        <nav className="flex items-center gap-1.5 text-xs text-muted">
-          <Link href="/" className="hover:text-foreground transition">홈</Link>
-          <span>/</span>
-          <Link href="/sites" className="hover:text-foreground transition">사이트 목록</Link>
-          <span>/</span>
-          <span className="text-foreground">{site.siteName}</span>
-        </nav>
-
-        {/* 메인 정보 카드 */}
-        <article id="site-overview" className="mt-4 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
-          {/* 상단: 로고 + 이름 + 뱃지 */}
-          <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between">
-            {/* 왼쪽 */}
-            <div className="w-full min-w-0 flex-1">
+          {/* 상단: 로고 + 운영 이력 + 사이트명 */}
+          <div className="grid gap-5 p-5">
+            {/* 사이트 기본 정보 */}
+            <div className="w-full min-w-0">
               <div className="flex w-full min-w-0 items-start gap-4">
                 {site.faviconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={site.faviconUrl}
                     alt={logoAlt}
-                    className="h-16 w-16 shrink-0 rounded-xl border border-line bg-white object-contain p-1.5 dark:bg-surface"
+                    className="h-12 w-12 shrink-0 rounded-xl border border-line bg-white object-contain p-1.5 dark:bg-surface"
                   />
                 ) : (
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-line bg-background text-xl font-bold text-accent">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line bg-background text-lg font-bold text-accent">
                     {site.siteName.trim().charAt(0)}
                   </div>
                 )}
@@ -345,26 +372,28 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   <p className="mt-1.5 inline-flex rounded-md border border-line bg-background px-2 py-1 text-xs font-semibold text-foreground">
                     {site.siteName}
                   </p>
-                  <h1 className="mt-2 break-keep text-2xl font-bold sm:text-3xl">
-                    {siteDetailHeading}
-                  </h1>
-                  <p className="mt-1 break-all text-sm text-muted">
-                    {formatDisplayUrl(site.siteUrl)}
-                  </p>
                 </div>
+              </div>
+              <div className="mt-4">
+                <h1 className="break-keep text-2xl font-bold sm:text-3xl">
+                  {siteDetailHeading}
+                </h1>
+                <p className="mt-1 break-all text-sm text-muted">
+                  {formatDisplayUrl(site.siteUrl)}
+                </p>
               </div>
             </div>
 
-            {/* 오른쪽: 평점 + 먹튀 */}
-            <div className="flex shrink-0 flex-row gap-3">
-              <div className={`${trustToneClasses.neon} flex-1 rounded-xl border px-4 py-3 text-center sm:flex-none ${trustToneClasses.border} ${trustToneClasses.background}`}>
+            {/* 신뢰 점수 + 먹튀 피해 제보 상태 */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className={`${trustToneClasses.neon} rounded-xl border px-4 py-3 text-center ${trustToneClasses.border} ${trustToneClasses.background}`}>
                 <p className={`text-xs font-semibold ${trustToneClasses.text}`}>신뢰 점수</p>
                 <p className={`mt-1 text-xl font-black ${trustToneClasses.text}`}>
                   {formatTrustScore(trustScore)}
                 </p>
               </div>
               {scamReportCount > 0 ? (
-                <div className="neon-scam flex-1 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center dark:border-red-900 dark:bg-red-950/40 sm:flex-none">
+                <div className="neon-scam rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center dark:border-red-900 dark:bg-red-950/40">
                   <p className="text-sm font-bold text-red-600 dark:text-red-400">
                     {scamReportStatusCopy.primary}
                   </p>
@@ -373,7 +402,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   </p>
                 </div>
               ) : (
-                <div className="neon-safe flex-1 rounded-xl border border-accent/20 bg-accent-soft px-4 py-3 text-center sm:flex-none">
+                <div className="neon-safe rounded-xl border border-accent/20 bg-accent-soft px-4 py-3 text-center">
                   <p className="text-sm font-bold text-accent">
                     {scamReportStatusCopy.primary}
                   </p>
@@ -382,7 +411,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   </p>
                 </div>
               )}
-              <AdminSiteDetailActions siteId={site.id} siteSlug={site.slug} />
+              <div className="sm:col-span-2">
+                <AdminSiteDetailActions siteId={site.id} siteSlug={site.slug} />
+              </div>
             </div>
           </div>
 
@@ -438,7 +469,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           {overviewBlocks.length > 0 ? (
             <div className="px-5 pb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">사이트 개요</p>
-              <SiteDescriptionNotice />
+              <SiteDescriptionNotice siteName={site.siteName} />
               <SafeMarkdown
                 value={site.shortDescription}
                 blocks={overviewBlocks}
@@ -448,35 +479,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           ) : null}
 
         </article>
-
-        <SiteShareActions
-          siteName={site.siteName}
-          shareUrl={shareUrl}
-          title={shareTitle}
-          description={shareDescription}
-        />
-
-        <nav
-          className="mt-4 rounded-xl border border-line bg-surface px-5 py-4 shadow-sm"
-          aria-label={`${site.siteName} 상세 페이지 내부 링크`}
-        >
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-            상세 페이지 탐색
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {siteDetailInternalLinks.map((link) => (
-              <Link
-                key={link.key}
-                href={link.href}
-                className="inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
-
-        <SiteTelegramAlertSubscription siteId={site.id} siteName={site.siteName} />
 
         {/* 스크린샷 */}
         {site.screenshotUrl && screenshotPreviewUrl ? (
@@ -518,11 +520,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           }}
         />
 
-        <RelatedBlogReportCard
-          siteName={site.siteName}
-          report={relatedBlogReport}
-        />
-
         {/* 도메인 & DNS */}
         <DomainInfoTabs items={domainInfoTabs} />
 
@@ -534,7 +531,14 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               <p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력</p>
               <h2 className="mt-1 text-base font-bold">승인된 피해 제보</h2>
             </div>
-            <SiteAuthorActions siteId={site.id} siteName={site.siteName} kind="scam-report" />
+            <div className="w-full sm:w-auto sm:shrink-0">
+              <Link
+                href={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
+                className={primarySubmissionActionClassName}
+              >
+                {site.siteName} 먹튀 피해 제보하기
+              </Link>
+            </div>
           </div>
           {scamReports.length > 0 ? (
             <div className="grid gap-3 p-4">
@@ -591,7 +595,14 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               <p className="text-xs font-semibold uppercase tracking-wider text-accent">커뮤니티 리뷰</p>
               <h2 className="mt-1 text-base font-bold">최근 이용 경험</h2>
             </div>
-            <SiteAuthorActions siteId={site.id} siteName={site.siteName} kind="review" />
+            <div className="w-full sm:w-auto sm:shrink-0">
+              <Link
+                href={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
+                className={primarySubmissionActionClassName}
+              >
+                {site.siteName} 후기 남기기
+              </Link>
+            </div>
           </div>
           {reviews.length > 0 ? (
             <div className="grid gap-3 p-4">
@@ -635,8 +646,45 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           )}
         </section>
 
-        <SiteFeedbackSubmissionGuide siteId={site.id} siteName={site.siteName} />
+        </div>
 
+        <aside className="grid content-start gap-4">
+          <SiteShareActions
+            siteName={site.siteName}
+            shareUrl={shareUrl}
+            title={shareTitle}
+            description={shareDescription}
+          />
+
+          <nav
+            className="rounded-xl border border-line bg-surface px-5 py-4 shadow-sm"
+            aria-label={`${site.siteName} 상세 페이지 내부 링크`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+              상세 페이지 탐색
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {siteDetailInternalLinks.map((link) => (
+                <Link
+                  key={link.key}
+                  href={link.href}
+                  className="inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </nav>
+
+          <SiteTelegramAlertSubscription siteId={site.id} siteName={site.siteName} />
+
+          <RelatedBlogReportCard
+            siteName={site.siteName}
+            report={relatedBlogReport}
+          />
+
+          <SiteFeedbackSubmissionGuide siteId={site.id} siteName={site.siteName} />
+        </aside>
       </main>
     </>
   );

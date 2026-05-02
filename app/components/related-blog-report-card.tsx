@@ -18,7 +18,7 @@ export function RelatedBlogReportCard({
   if (!model) return null;
 
   return (
-    <section className="mt-5 rounded-xl border border-line bg-surface p-5 shadow-sm">
+    <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-wider text-accent">
         {model.heading}
       </p>

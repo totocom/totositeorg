@@ -130,26 +130,35 @@ export function ReviewHelpfulnessVote({
   const helpfulSelected = currentVote === 1;
   const notHelpfulSelected = currentVote === -1;
   const isOwnReview = Boolean(user && authorUserId && user.id === authorUserId);
-
-  if (isAuthLoading || !user) {
-    return null;
-  }
+  const isVoteDisabled =
+    isAuthLoading || !user || isOwnReview || isLoading || isSaving;
+  const statusMessage =
+    message ||
+    (isAuthLoading
+      ? "로그인 상태를 확인하는 중입니다."
+      : !user
+        ? "로그인 후 투표할 수 있습니다."
+        : isOwnReview
+          ? "내가 작성한 리뷰에는 투표할 수 없습니다."
+          : "");
 
   return (
     <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">
       <p className="text-xs font-semibold text-muted">
         이 리뷰가 도움이 됐나요?
       </p>
-      {isOwnReview ? (
-        <p className="text-xs font-semibold text-muted">
-          내가 작성한 리뷰에는 투표할 수 없습니다.
+      {statusMessage ? (
+        <p className="min-h-4 text-xs font-semibold text-muted" aria-live="polite">
+          {statusMessage}
         </p>
-      ) : null}
+      ) : (
+        <p className="min-h-4 text-xs font-semibold text-muted" aria-hidden="true" />
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => submitVote(1)}
-          disabled={isOwnReview || isLoading || isSaving}
+          disabled={isVoteDisabled}
           className={[
             "h-9 rounded-md border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
             helpfulSelected
@@ -164,7 +173,7 @@ export function ReviewHelpfulnessVote({
         <button
           type="button"
           onClick={() => submitVote(-1)}
-          disabled={isOwnReview || isLoading || isSaving}
+          disabled={isVoteDisabled}
           className={[
             "h-9 rounded-md border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
             notHelpfulSelected
@@ -180,9 +189,6 @@ export function ReviewHelpfulnessVote({
           <span className="text-xs font-semibold text-muted">저장 중...</span>
         ) : null}
       </div>
-      {message ? (
-        <p className="text-xs font-semibold text-muted">{message}</p>
-      ) : null}
     </div>
   );
 }

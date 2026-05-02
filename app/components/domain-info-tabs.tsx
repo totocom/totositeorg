@@ -8,6 +8,7 @@ import { SiteDomainSubmissionForm } from "@/app/components/site-domain-submissio
 
 export type DomainInfoTabItem = {
   siteId: string;
+  siteName: string;
   domainUrl: string;
   displayDomain: string;
   domainAge: string;
@@ -162,7 +163,10 @@ export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
         <h2 className="mt-1 text-xl font-bold">도메인 이력 및 DNS</h2>
       </div>
 
-      <SiteDomainSubmissionForm siteId={domainItems[0]?.siteId ?? ""} />
+      <SiteDomainSubmissionForm
+        siteId={domainItems[0]?.siteId ?? ""}
+        siteName={domainItems[0]?.siteName ?? ""}
+      />
 
       <div className="border-b border-line px-5 py-3">
         <div className="flex gap-2 overflow-x-auto pb-1">

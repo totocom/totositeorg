@@ -121,7 +121,7 @@ export function SiteShareActions({
 
   return (
     <section
-      className="mt-4 rounded-xl border border-line bg-surface px-5 py-4 shadow-sm"
+      className="rounded-xl border border-line bg-surface px-5 py-4 shadow-sm"
       aria-labelledby="site-share-actions-title"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -170,7 +170,7 @@ export function SiteTelegramAlertSubscription({
   }
 
   return (
-    <section className="mt-5 rounded-xl border border-line bg-surface p-5 shadow-sm">
+    <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-accent">

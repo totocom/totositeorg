@@ -116,30 +116,144 @@ test("site detail page renders the feedback and scam report submission guide", (
 
   assert.match(siteDetailPageSource, /import\s+\{\s*SiteFeedbackSubmissionGuide\s*\}/);
   assert.match(siteDetailPageSource, /<SiteFeedbackSubmissionGuide\s+siteId=\{site\.id\}\s+siteName=\{site\.siteName\}\s*\/>/);
+  assert.match(
+    siteDetailPageSource,
+    /<SiteDescriptionNotice\s+siteName=\{site\.siteName\}\s*\/>/,
+  );
 });
 
-test("site detail section action buttons use site-specific review and scam report labels", () => {
+test("site detail page uses the same two-column detail layout as blog posts", () => {
   const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
-  const siteAuthorActionsSource = readFileSync(
-    "app/components/site-author-actions.tsx",
+  const blogDetailPageSource = readFileSync("app/blog/[slug]/page.tsx", "utf8");
+
+  assert.match(blogDetailPageSource, /lg:grid-cols-\[1fr_320px\]/);
+  assert.match(siteDetailPageSource, /lg:grid-cols-\[1fr_320px\]/);
+  assert.match(siteDetailPageSource, /<div className="min-w-0">/);
+  assert.match(
+    siteDetailPageSource,
+    /<article id="site-overview" className="scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">[\s\S]*?<nav aria-label="Breadcrumb" className="px-5 pt-5 text-sm text-muted">[\s\S]*?aria-current="page"[\s\S]*?\{site\.siteName\}/,
+  );
+  assert.match(
+    siteDetailPageSource,
+    /<aside className="grid content-start gap-4">[\s\S]*?<SiteShareActions[\s\S]*?상세 페이지 탐색[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<\/aside>/,
+  );
+});
+
+test("site detail overview stacks trust and report summaries below the title", () => {
+  const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
+
+  assert.doesNotMatch(
+    siteDetailPageSource,
+    /flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between/,
+  );
+  assert.match(
+    siteDetailPageSource,
+    /<div className="grid gap-5 p-5">[\s\S]*?\{siteDetailHeading\}[\s\S]*?<div className="grid gap-3 sm:grid-cols-2">[\s\S]*?신뢰 점수[\s\S]*?scamReportStatusCopy/,
+  );
+  assert.match(
+    siteDetailPageSource,
+    /<div className="flex w-full min-w-0 items-start gap-4">[\s\S]*?\{site\.siteName\}[\s\S]*?<\/div>\s*<\/div>\s*<div className="mt-4">\s*<h1 className="break-keep text-2xl font-bold sm:text-3xl">\s*\{siteDetailHeading\}/,
+  );
+  assert.match(
+    siteDetailPageSource,
+    /className="h-12 w-12 shrink-0 rounded-xl border border-line bg-white object-contain p-1\.5 dark:bg-surface"/,
+  );
+});
+
+test("site detail sections do not render duplicate review and scam report action buttons", () => {
+  const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
+
+  assert.doesNotMatch(siteDetailPageSource, /site-author-actions/);
+  assert.doesNotMatch(siteDetailPageSource, /<SiteAuthorActions\b/);
+});
+
+test("site detail review submission action is rendered in the review section header", () => {
+  const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
+
+  assert.match(
+    siteDetailPageSource,
+    /const primarySubmissionActionClassName =\s*"inline-flex min-h-11 w-full items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-center text-sm font-semibold leading-5 text-white transition hover:bg-accent\/80 active:scale-95"/,
+  );
+  assert.match(
+    siteDetailPageSource,
+    /href=\{`\/submit-review\?siteId=\$\{encodeURIComponent\(site\.id\)\}`\}/,
+  );
+  assert.match(siteDetailPageSource, /\{site\.siteName\} 후기 남기기/);
+  assert.match(
+    siteDetailPageSource,
+    /<p className="text-xs font-semibold uppercase tracking-wider text-accent">커뮤니티 리뷰<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">최근 이용 경험<\/h2>[\s\S]*?primarySubmissionActionClassName/,
+  );
+});
+
+test("site detail scam report submission action is rendered in the scam reports section header", () => {
+  const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
+  const feedbackSubmissionGuideSource = readFileSync(
+    "app/components/site-feedback-submission-guide.tsx",
     "utf8",
   );
 
   assert.match(
     siteDetailPageSource,
-    /<SiteAuthorActions\s+siteId=\{site\.id\}\s+siteName=\{site\.siteName\}\s+kind="scam-report"\s*\/>/,
+    /const primarySubmissionActionClassName =\s*"inline-flex min-h-11 w-full items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-center text-sm font-semibold leading-5 text-white transition hover:bg-accent\/80 active:scale-95"/,
   );
+  assert.doesNotMatch(siteDetailPageSource, /scamReportSubmissionActionClassName/);
   assert.match(
     siteDetailPageSource,
-    /<SiteAuthorActions\s+siteId=\{site\.id\}\s+siteName=\{site\.siteName\}\s+kind="review"\s*\/>/,
+    /href=\{`\/submit-scam-report\?siteId=\$\{encodeURIComponent\(site\.id\)\}`\}/,
   );
-  assert.match(siteAuthorActionsSource, /\$\{normalizedSiteName\} 후기 남기기/);
+  assert.match(siteDetailPageSource, /\{site\.siteName\} 먹튀 피해 제보하기/);
   assert.match(
-    siteAuthorActionsSource,
-    /\$\{normalizedSiteName\} 먹튀 피해 제보하기/,
+    siteDetailPageSource,
+    /<p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">승인된 피해 제보<\/h2>[\s\S]*?primarySubmissionActionClassName/,
   );
-  assert.doesNotMatch(siteAuthorActionsSource, /"만족도 평가"/);
-  assert.doesNotMatch(siteAuthorActionsSource, /"먹튀 제보하기"/);
+  assert.doesNotMatch(feedbackSubmissionGuideSource, /guide\.actions\[/);
+  assert.doesNotMatch(feedbackSubmissionGuideSource, /Action\.href/);
+});
+
+test("site detail domain submission button uses site-specific label", () => {
+  const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
+  const domainInfoTabsSource = readFileSync(
+    "app/components/domain-info-tabs.tsx",
+    "utf8",
+  );
+  const siteDomainSubmissionFormSource = readFileSync(
+    "app/components/site-domain-submission-form.tsx",
+    "utf8",
+  );
+
+  assert.match(siteDetailPageSource, /siteName:\s*site\.siteName/);
+  assert.match(
+    domainInfoTabsSource,
+    /siteName=\{domainItems\[0\]\?\.siteName\s*\?\?\s*""\}/,
+  );
+  assert.match(
+    siteDomainSubmissionFormSource,
+    /\$\{normalizedSiteName\}도메인 추가/,
+  );
+  assert.match(
+    siteDomainSubmissionFormSource,
+    /className="h-10 rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent\/80 active:scale-95 disabled:opacity-50"/,
+  );
+  assert.doesNotMatch(siteDomainSubmissionFormSource, /"도메인 추가"/);
+  assert.doesNotMatch(siteDomainSubmissionFormSource, /"로그인 후 추가"/);
+});
+
+test("review helpfulness vote keeps a stable disabled shell during auth loading", () => {
+  const reviewHelpfulnessVoteSource = readFileSync(
+    "app/components/review-helpfulness-vote.tsx",
+    "utf8",
+  );
+
+  assert.doesNotMatch(
+    reviewHelpfulnessVoteSource,
+    /if\s*\(\s*isAuthLoading\s*\|\|\s*!\s*user\s*\)\s*\{[\s\S]*?return null;[\s\S]*?\}/,
+  );
+  assert.match(reviewHelpfulnessVoteSource, /const isVoteDisabled =/);
+  assert.match(reviewHelpfulnessVoteSource, /const statusMessage =/);
+  assert.match(reviewHelpfulnessVoteSource, /로그인 상태를 확인하는 중입니다/);
+  assert.match(reviewHelpfulnessVoteSource, /로그인 후 투표할 수 있습니다/);
+  assert.match(reviewHelpfulnessVoteSource, /disabled=\{isVoteDisabled\}/);
+  assert.match(reviewHelpfulnessVoteSource, /min-h-4/);
 });
 
 test("feedback submission guide copy and actions use review and report routes", () => {

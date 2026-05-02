@@ -112,9 +112,12 @@ function isNoticeSentence(value: string) {
   return (
     normalized === siteDescriptionNoticeText ||
     normalized === legacyObservationDisclosureText ||
+    (/^본\s*설명은/.test(normalized) &&
+      /공개\s*HTML|HTML\s*자료|스크린샷/.test(normalized)) ||
     (/^이\s*설명은/.test(normalized) &&
-      /공개\s*HTML|스크린샷/.test(normalized)) ||
+      /공개\s*HTML|HTML\s*자료|스크린샷/.test(normalized)) ||
     /가입이나\s*이용을\s*권유하는\s*내용은\s*아닙니다/.test(normalized) ||
+    /가입\s*또는\s*이용을\s*권장하거나\s*유도하는\s*내용이\s*아닙니다/.test(normalized) ||
     (/^이\s*설명은\s*조회\s*시점\s*기준/.test(normalized) &&
       /공개\s*HTML|스크린샷|관측/.test(normalized))
   );

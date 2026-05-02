@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase/client";
 
 type SiteDomainSubmissionFormProps = {
   siteId: string;
+  siteName: string;
 };
 
 type DuplicateSite = {
@@ -26,8 +27,13 @@ function isValidUrl(value: string) {
   }
 }
 
+function normalizeSiteName(siteName: string) {
+  return siteName.replace(/\s+/g, " ").trim() || "해당 사이트";
+}
+
 export function SiteDomainSubmissionForm({
   siteId,
+  siteName,
 }: SiteDomainSubmissionFormProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -37,6 +43,7 @@ export function SiteDomainSubmissionForm({
   const [errorMessage, setErrorMessage] = useState("");
   const [duplicateSites, setDuplicateSites] = useState<DuplicateSite[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const normalizedSiteName = normalizeSiteName(siteName);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -117,7 +124,7 @@ export function SiteDomainSubmissionForm({
           disabled={isSubmitting}
           className="h-10 rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95 disabled:opacity-50"
         >
-          {isSubmitting ? "요청 중..." : user ? "도메인 추가" : "로그인 후 추가"}
+          {isSubmitting ? "요청 중..." : `${normalizedSiteName}도메인 추가`}
         </button>
       </div>
       {message ? (
