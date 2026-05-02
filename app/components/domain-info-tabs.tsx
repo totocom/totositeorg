@@ -23,6 +23,11 @@ type DomainInfoApiResponse = {
   error?: string;
 };
 
+type DomainInfoTabsProps = {
+  items: DomainInfoTabItem[];
+  variant?: "card" | "embedded";
+};
+
 function formatWhoisDate(value: string) {
   if (!value) return "확인 불가";
 
@@ -78,7 +83,7 @@ function DnsRecord({ label, values }: { label: string; values: string[] }) {
   );
 }
 
-export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
+export function DomainInfoTabs({ items, variant = "card" }: DomainInfoTabsProps) {
   const [domainItems, setDomainItems] = useState<DomainInfoTabItem[]>(items);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [loadingIndex, setLoadingIndex] = useState<number | null>(null);
@@ -91,8 +96,14 @@ export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
   async function loadDomainInfo(index: number) {
     const item = domainItems[index];
 
-    setActiveIndex(index);
     setErrorMessage("");
+
+    if (activeIndex === index) {
+      setActiveIndex(null);
+      return;
+    }
+
+    setActiveIndex(index);
 
     if (!item || item.isLoaded || loadingIndex === index) {
       return;
@@ -153,14 +164,28 @@ export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
   const dnsInfo = activeItem?.dnsInfo ?? null;
   const isLoadingActive = activeIndex !== null && loadingIndex === activeIndex;
   const isActiveLoaded = Boolean(activeItem?.isLoaded);
+  const sectionClassName =
+    variant === "embedded"
+      ? "scroll-mt-24"
+      : "scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm";
+  const headerClassName =
+    variant === "embedded" ? "pb-4" : "border-b border-line px-4 py-4";
+  const tabListClassName =
+    variant === "embedded"
+      ? "border-b border-line py-3"
+      : "border-b border-line px-4 py-3";
+  const contentClassName =
+    variant === "embedded"
+      ? "grid gap-4 pt-4 lg:grid-cols-2"
+      : "grid gap-4 p-4 lg:grid-cols-2";
 
   return (
-    <section id="dns" className="mt-6 scroll-mt-24 rounded-lg border border-line bg-surface shadow-sm">
-      <div className="border-b border-line px-5 py-4">
-        <p className="text-sm font-semibold uppercase text-accent">
+    <section id="dns" className={sectionClassName}>
+      <div className={headerClassName}>
+        <p className="text-xs font-semibold uppercase tracking-wider text-accent">
           도메인 조사 정보
         </p>
-        <h2 className="mt-1 text-xl font-bold">도메인 이력 및 DNS</h2>
+        <h2 className="mt-1 text-base font-bold">도메인 이력 및 DNS</h2>
       </div>
 
       <SiteDomainSubmissionForm
@@ -168,7 +193,7 @@ export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
         siteName={domainItems[0]?.siteName ?? ""}
       />
 
-      <div className="border-b border-line px-5 py-3">
+      <div className={tabListClassName}>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {domainItems.map((item, index) => {
             const isActive = index === activeIndex;
@@ -197,13 +222,13 @@ export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
       </div>
 
       {activeItem ? (
-        <div className="grid gap-4 p-5 lg:grid-cols-2">
+        <div className={contentClassName}>
           {errorMessage ? (
             <p className="rounded-md bg-red-50 p-3 text-sm font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-400 lg:col-span-2">
               {errorMessage}
             </p>
           ) : null}
-          <div>
+          <div className="min-w-0">
             <h3 className="text-sm font-semibold text-foreground">도메인 이력</h3>
             {isLoadingActive || !isActiveLoaded ? (
               <p className="mt-3 rounded-md bg-background p-3 text-sm text-muted">
@@ -215,7 +240,7 @@ export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
               </p>
             ) : (
               <>
-                <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+                <dl className="mt-3 grid gap-2">
                   <CompactInfo label="등록기관" value={whoisInfo.registrar} />
                   <CompactInfo
                     label="최초 등록일"
@@ -246,7 +271,7 @@ export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
             )}
           </div>
 
-          <div>
+          <div className="min-w-0">
             <h3 className="text-sm font-semibold text-foreground">DNS 정보</h3>
             {isLoadingActive || !isActiveLoaded ? (
               <p className="mt-3 rounded-md bg-background p-3 text-sm text-muted">
@@ -270,7 +295,7 @@ export function DomainInfoTabs({ items }: { items: DomainInfoTabItem[] }) {
           </div>
         </div>
       ) : (
-        <div className="p-5">
+        <div className="p-4">
           <p className="rounded-md bg-background p-4 text-sm font-semibold text-muted">
             도메인을 선택하면 상세 이력과 DNS 레코드가 표시됩니다.
           </p>

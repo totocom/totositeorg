@@ -20,6 +20,7 @@ import {
   buildSiteFeedbackSubmissionGuide,
   siteFeedbackSubmissionGuideForbiddenPhrases,
 } from "./site-feedback-submission-guide";
+import { formatKstDate } from "./date-format";
 
 const siteName = "벳톡";
 
@@ -118,7 +119,7 @@ test("site detail page renders the feedback and scam report submission guide", (
   assert.match(siteDetailPageSource, /<SiteFeedbackSubmissionGuide\s+siteId=\{site\.id\}\s+siteName=\{site\.siteName\}\s*\/>/);
   assert.match(
     siteDetailPageSource,
-    /<SiteDescriptionNotice\s+siteName=\{site\.siteName\}\s*\/>/,
+    /<SiteDescriptionNotice\s*\/>/,
   );
 });
 
@@ -135,8 +136,61 @@ test("site detail page uses the same two-column detail layout as blog posts", ()
   );
   assert.match(
     siteDetailPageSource,
-    /<aside className="grid content-start gap-4">[\s\S]*?<SiteShareActions[\s\S]*?상세 페이지 탐색[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<\/aside>/,
+    /<nav\s+className="border-t border-line px-5 py-4"\s+aria-label=\{`\$\{site\.siteName\} 상세 페이지 내부 링크`\}[\s\S]*?상세 페이지 탐색[\s\S]*?<\/nav>\s*\{\/\* 사이트 개요 \*\/\}/,
   );
+  assert.match(
+    siteDetailPageSource,
+    /등록 도메인[\s\S]*?<DomainInfoTabs items=\{domainInfoTabs\} variant="embedded" \/>[\s\S]*?신뢰 점수 산정/,
+  );
+  assert.match(
+    siteDetailPageSource,
+    /<aside className="grid content-start gap-4">[\s\S]*?<SiteShareActions[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<\/aside>/,
+  );
+  assert.doesNotMatch(
+    siteDetailPageSource,
+    /<aside className="grid content-start gap-4">[\s\S]*?<DomainInfoTabs[\s\S]*?<\/aside>/,
+  );
+  assert.doesNotMatch(
+    siteDetailPageSource,
+    /<aside className="grid content-start gap-4">[\s\S]*?상세 페이지 탐색[\s\S]*?<\/aside>/,
+  );
+});
+
+test("site detail review dates render as KST date-only text", () => {
+  const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
+  const publicReviewListSource = readFileSync(
+    "app/components/public-review-list.tsx",
+    "utf8",
+  );
+
+  assert.equal(formatKstDate("2026-05-02T14:40:44.749544+00:00"), "2026-05-02");
+  assert.equal(formatKstDate("2026-05-02T16:10:00.000Z"), "2026-05-03");
+  assert.equal(formatKstDate("not-a-date"), "not-a-date");
+  assert.match(siteDetailPageSource, /formatKstDate\(review\.createdAt\)/);
+  assert.doesNotMatch(siteDetailPageSource, /\{review\.createdAt\}/);
+  assert.match(publicReviewListSource, /formatKstDate\(review\.createdAt\)/);
+});
+
+test("domain info tabs close the active domain on second click", () => {
+  const domainInfoTabsSource = readFileSync(
+    "app/components/domain-info-tabs.tsx",
+    "utf8",
+  );
+
+  assert.match(
+    domainInfoTabsSource,
+    /if \(activeIndex === index\) \{\s*setActiveIndex\(null\);\s*return;\s*\}/,
+  );
+});
+
+test("domain info tabs split domain history and DNS on desktop", () => {
+  const domainInfoTabsSource = readFileSync(
+    "app/components/domain-info-tabs.tsx",
+    "utf8",
+  );
+
+  assert.match(domainInfoTabsSource, /lg:grid-cols-2/);
+  assert.match(domainInfoTabsSource, /도메인 이력[\s\S]*DNS 정보/);
 });
 
 test("site detail overview stacks trust and report summaries below the title", () => {
@@ -228,32 +282,47 @@ test("site detail domain submission button uses site-specific label", () => {
   );
   assert.match(
     siteDomainSubmissionFormSource,
-    /\$\{normalizedSiteName\}도메인 추가/,
+    /\$\{normalizedSiteName\} 도메인 추가/,
   );
   assert.match(
     siteDomainSubmissionFormSource,
-    /className="h-10 rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent\/80 active:scale-95 disabled:opacity-50"/,
+    /className="min-h-10 rounded-md bg-accent px-4 py-2 text-sm font-semibold leading-5 text-white transition hover:bg-accent\/80 active:scale-95 disabled:opacity-50"/,
   );
   assert.doesNotMatch(siteDomainSubmissionFormSource, /"도메인 추가"/);
   assert.doesNotMatch(siteDomainSubmissionFormSource, /"로그인 후 추가"/);
 });
 
-test("review helpfulness vote keeps a stable disabled shell during auth loading", () => {
+test("review helpfulness vote uses public IP-limited API without login copy", () => {
   const reviewHelpfulnessVoteSource = readFileSync(
     "app/components/review-helpfulness-vote.tsx",
     "utf8",
   );
-
-  assert.doesNotMatch(
-    reviewHelpfulnessVoteSource,
-    /if\s*\(\s*isAuthLoading\s*\|\|\s*!\s*user\s*\)\s*\{[\s\S]*?return null;[\s\S]*?\}/,
+  const helpfulnessVoteRouteSource = readFileSync(
+    "app/api/reviews/helpfulness-vote/route.ts",
+    "utf8",
   );
+  const schemaSource = readFileSync("supabase/schema.sql", "utf8");
+
+  assert.match(reviewHelpfulnessVoteSource, /\/api\/reviews\/helpfulness-vote/);
   assert.match(reviewHelpfulnessVoteSource, /const isVoteDisabled =/);
   assert.match(reviewHelpfulnessVoteSource, /const statusMessage =/);
-  assert.match(reviewHelpfulnessVoteSource, /로그인 상태를 확인하는 중입니다/);
-  assert.match(reviewHelpfulnessVoteSource, /로그인 후 투표할 수 있습니다/);
+  assert.match(reviewHelpfulnessVoteSource, /이미 반영된 투표입니다/);
   assert.match(reviewHelpfulnessVoteSource, /disabled=\{isVoteDisabled\}/);
   assert.match(reviewHelpfulnessVoteSource, /min-h-4/);
+  assert.doesNotMatch(reviewHelpfulnessVoteSource, /useAuth/);
+  assert.doesNotMatch(reviewHelpfulnessVoteSource, /로그인 후 투표할 수 있습니다/);
+  assert.doesNotMatch(
+    reviewHelpfulnessVoteSource,
+    /내가 작성한 리뷰에는 투표할 수 없습니다/,
+  );
+  assert.match(helpfulnessVoteRouteSource, /visitor_ip_hash/);
+  assert.match(helpfulnessVoteRouteSource, /x-forwarded-for/);
+  assert.match(helpfulnessVoteRouteSource, /createHash\("sha256"\)/);
+  assert.match(schemaSource, /visitor_ip_hash text null/);
+  assert.match(
+    schemaSource,
+    /review_helpfulness_votes_review_ip_unique[\s\S]*unique \(review_id, visitor_ip_hash\)/,
+  );
 });
 
 test("feedback submission guide copy and actions use review and report routes", () => {

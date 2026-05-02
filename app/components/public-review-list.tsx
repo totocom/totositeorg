@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary } from "@/app/components/review-summary";
+import { formatKstDate } from "@/app/data/date-format";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
 import type { PublicReviewListItem } from "@/app/data/public-sites";
 import { issueTypeLabels } from "@/app/data/sites";
@@ -34,13 +35,6 @@ const ratingFilters: { value: RatingFilter; label: string }[] = [
   { value: "2", label: "불만족" },
   { value: "1", label: "매우 불만족" },
 ];
-
-function formatDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("ko-KR");
-}
 
 function getTime(value: string) {
   const time = new Date(value).getTime();
@@ -176,7 +170,8 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
                 <div className="mt-2 flex items-center gap-3">
                   <Stars rating={review.rating} />
                   <span className="text-xs text-muted">
-                    {issueTypeLabels[review.issueType]} · {review.authorNickname ?? "익명"} · {formatDate(review.createdAt)}
+                    {issueTypeLabels[review.issueType]} ·{" "}
+                    {review.authorNickname ?? "익명"} · {formatKstDate(review.createdAt)}
                   </span>
                 </div>
               </div>

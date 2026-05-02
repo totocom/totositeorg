@@ -194,8 +194,9 @@ const emptyProhibitedPhraseCheck: ObservationDescriptionProhibitedPhraseCheck = 
 export const observationDisclosureText =
   "이 설명은 조회 시점 기준 관리자가 제공한 공개 HTML과 스크린샷을 바탕으로 작성되었습니다. 화면에 표시된 정보만 요약한 것이며, 가입이나 이용을 권유하는 내용은 아닙니다.";
 
-const detailDescriptionMinLength = 300;
-const detailDescriptionMaxLength = 600;
+const detailDescriptionTooShortLength = 500;
+const detailDescriptionRecommendedMinLength = 700;
+const detailDescriptionTooLongLength = 1200;
 const reportLikeRepeatedPhrases = [
   "관측되었습니다",
   "구성 요소",
@@ -611,16 +612,30 @@ export function buildObservationDescriptionFallback({
       : `${siteSubject}는 사이트 식별명과 주요 화면 흐름을 함께 사용하는 사이트입니다.`;
   const categorySentence =
     observationSummary.betting_feature_summary.length > 0
-      ? "주요 화면은 스포츠, 카지노, 슬롯 등 게임 카테고리를 중심으로 구성되어 있으며, 로그인과 고객센터처럼 계정·문의 관련 메뉴도 함께 배치되어 있습니다."
-      : "주요 화면은 사이트 식별 영역, 계정 관련 메뉴, 문의 또는 고객지원 요소를 중심으로 구성되어 있습니다.";
+      ? "전체 화면은 스포츠 경기 정보, 카지노 또는 슬롯 계열 콘텐츠, 라이브 콘텐츠로 보이는 영역을 함께 탐색하는 구조에 가깝습니다. 화면은 여러 기능을 한 페이지 안에서 구분해 보여주는 편입니다."
+      : "전체 화면은 사이트 식별 영역, 계정 관련 메뉴, 문의 또는 고객지원 요소를 중심으로 탐색하는 구조에 가깝습니다. 화면은 여러 기능을 한 페이지 안에서 구분해 보여주는 편입니다.";
+  const mainContentSentence =
+    observationSummary.betting_feature_summary.length > 0
+      ? "본문에는 콘텐츠를 구분해 보여주는 카드형 영역과 카테고리 이동 요소가 함께 배치되어 있습니다. 이용자는 화면의 구획을 따라 스포츠, 라이브 콘텐츠, 게임성 콘텐츠를 나누어 살펴보는 흐름으로 이해할 수 있습니다."
+      : "본문에는 여러 안내 영역과 화면 전환 요소가 함께 배치되어 있습니다. 이용자는 상단 식별 영역과 본문 구획을 따라 주요 메뉴와 고객지원 흐름을 구분해 살펴보는 구조로 이해할 수 있습니다.";
+  const accountSentence =
+    observationSummary.account_feature_summary.length > 0
+      ? "계정 접근, 문의, 이용 기록과 관련된 요소도 일부 확인됩니다. 다만 화면에 보이는 라벨만으로 실제 계정 생성 절차나 본인 확인 방식, 이용 조건이 어떻게 적용되는지는 판단하기 어렵습니다."
+      : "계정이나 문의 흐름과 관련된 세부 절차는 제공된 자료만으로 충분히 확인되지 않습니다. 실제 계정 생성 절차, 본인 확인 방식, 이용 조건은 별도 검토가 필요한 항목입니다.";
+  const categoryDetailSentence =
+    observationSummary.betting_feature_summary.length > 0
+      ? "게임 또는 경기 관련 카테고리는 여러 성격의 콘텐츠를 묶어 보여주는 방식으로 구성되어 있습니다. 세부 메뉴명과 개별 게임명은 본문에서 길게 나열하지 않고, 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있도록 분리했습니다."
+      : "세부 메뉴는 계정, 문의, 화면 이동 항목을 중심으로 정리할 수 있습니다. 반복되는 메뉴명과 하단 문구는 본문에 길게 나열하지 않고, 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있도록 분리했습니다.";
   const paymentRecordSentence =
     observationSummary.payment_feature_summary.length > 0
-      ? "일부 화면에는 결제나 이용 내역 관련 요소가 포함되어 있지만, 제공된 HTML과 스크린샷만으로 실제 결제 방식이나 이용 조건까지 확인할 수는 없습니다."
-      : "제공된 HTML과 스크린샷만으로 실제 결제 방식, 본인 확인 절차, 이용 조건까지 확인할 수는 없습니다.";
+      ? "금전 처리나 이용 내역과 관련된 항목으로 해석될 수 있는 요소가 일부 포함되어 있습니다. 실제 결제 방식, 본인 확인 절차, 접근 제한 여부, 세부 이용 조건은 제공된 자료만으로 확인되지 않습니다."
+      : "실제 결제 방식, 본인 확인 절차, 접근 제한 여부, 세부 이용 조건은 제공된 자료만으로 확인되지 않습니다. 공지성 안내나 캠페인성 영역이 있더라도 적용 조건과 기간은 별도 자료 없이는 단정하기 어렵습니다.";
   const paragraphs = [
     `${displayNameSentence} ${categorySentence}`,
-    `본문에는 여러 영역으로 이동하는 카드형 안내와 화면 전환 요소가 함께 배치되어 있습니다. ${paymentRecordSentence}`,
-    "하단에는 고객지원, 공지, 외부 연락 채널, 책임 있는 이용 관련 안내가 포함되어 있습니다. 자세한 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있습니다.",
+    mainContentSentence,
+    accountSentence,
+    categoryDetailSentence,
+    `${paymentRecordSentence} 세부 관측값은 상세 설명 본문에 반복하지 않고 원본 사이트 관측 정보 섹션에 남겨, 관리자가 화면 구성과 저장된 원문 자료를 함께 검토할 수 있게 했습니다.`,
   ];
 
   return {
@@ -1146,18 +1161,28 @@ function getNaturalDescriptionStyleWarnings(value: string) {
   );
   const hasRepeatedSourceDisclosurePhrase =
     countTextOccurrences(value, "공개 화면") >= 3 ||
-    countTextOccurrences(value, "공개 HTML") >= 2 ||
-    countTextOccurrences(value, "조회 시점 기준") >= 2;
+    countTextOccurrences(value, "공개 HTML") >= 1 ||
+    countTextOccurrences(value, "스크린샷") >= 1 ||
+    countTextOccurrences(value, "조회 시점 기준") >= 1;
 
-  if (paragraphs.length < 2 || paragraphs.length > 3) {
-    warnings.push("사이트 설명은 2~3문단으로 정리하는 것이 좋습니다.");
+  if (paragraphs.length < 3) {
+    warnings.push("paragraph_count_too_low");
   }
 
-  if (
-    plainTextLength < detailDescriptionMinLength ||
-    plainTextLength > detailDescriptionMaxLength
-  ) {
-    warnings.push("사이트 설명은 300~600자 정도로 조정하는 것이 좋습니다.");
+  if (paragraphs.length < 4 || paragraphs.length > 6) {
+    warnings.push("사이트 설명은 4~6문단으로 정리하는 것이 좋습니다.");
+  }
+
+  if (plainTextLength < detailDescriptionTooShortLength) {
+    warnings.push("too_short");
+  }
+
+  if (plainTextLength < detailDescriptionRecommendedMinLength) {
+    warnings.push("상세페이지 설명으로는 다소 짧습니다");
+  }
+
+  if (plainTextLength > detailDescriptionTooLongLength) {
+    warnings.push("too_long");
   }
 
   if (repeatedPhraseCount > 2 || hasRepeatedSourceDisclosurePhrase) {
@@ -1174,12 +1199,16 @@ function getNaturalDescriptionStyleWarnings(value: string) {
     warnings.push("'공개 화면' 표현이 3회 이상 반복됩니다.");
   }
 
-  if (countTextOccurrences(value, "조회 시점 기준") >= 2) {
-    warnings.push("'조회 시점 기준' 표현이 2회 이상 반복됩니다.");
+  if (countTextOccurrences(value, "조회 시점 기준") >= 1) {
+    warnings.push("'조회 시점 기준' 표현은 Notice 컴포넌트에서만 처리하세요.");
   }
 
-  if (countTextOccurrences(value, "공개 HTML") >= 2) {
-    warnings.push("'공개 HTML' 표현이 2회 이상 반복됩니다.");
+  if (countTextOccurrences(value, "공개 HTML") >= 1) {
+    warnings.push("'공개 HTML' 표현은 Notice 컴포넌트에서만 처리하세요.");
+  }
+
+  if (countTextOccurrences(value, "스크린샷") >= 1) {
+    warnings.push("'스크린샷' 표현은 Notice 컴포넌트에서만 처리하세요.");
   }
 
   if (/문서\s*제목은|페이지\s*제목은|메타\s*설명(?:에는|은)|대표\s*제목\s*영역(?:에는|은)|\bpage_title\b|\bmeta_description\b|\bh1\b|h1\s*(?:에는|은)/i.test(value)) {
@@ -1192,10 +1221,6 @@ function getNaturalDescriptionStyleWarnings(value: string) {
 
   if (/https?:\/\/\S+|www\.[^\s)]+/i.test(value)) {
     warnings.push("URL은 설명 본문에 길게 쓰지 말고 주소·도메인 섹션에서 표시하세요.");
-  }
-
-  if (plainTextLength > 700) {
-    warnings.push("사이트 설명이 700자를 초과합니다.");
   }
 
   if (hasLongMenuLikeEnumeration(value)) {
@@ -1254,13 +1279,25 @@ function hasLongMenuLikeEnumeration(value: string) {
 }
 
 function isPromotionalSentence(sentence: string) {
-  if (!/이벤트|보너스|첫충|매충|충전|환전|쿠폰/.test(sentence)) {
-    return false;
+  if (/입금|충전|환전/.test(sentence)) {
+    return /하세요|신청|진행|가능|받|지급|혜택|보너스|쿠폰|프로모션|바로|문의/.test(
+      sentence,
+    );
   }
 
-  return /확인|받|제공|혜택|참여|누리|지급|이용|가능|안내|홍보|강조|진행|신청|하세요|드립니다|있습니다|할 수 있습니다|첫충|매충|쿠폰/.test(
-    sentence,
-  );
+  if (/보너스|쿠폰|첫충|매충/.test(sentence)) {
+    return /확인|받|제공|혜택|참여|누리|지급|이용|가능|홍보|강조|진행|신청|하세요|드립니다|있습니다|할 수 있습니다|첫충|매충|쿠폰/.test(
+      sentence,
+    );
+  }
+
+  if (/이벤트/.test(sentence)) {
+    return /혜택|참여|누리|지급|보너스|쿠폰|프로모션|진행|신청|하세요|확인하세요|받을 수/.test(
+      sentence,
+    );
+  }
+
+  return false;
 }
 
 function isIgnoredCopySentence(sentence: string) {

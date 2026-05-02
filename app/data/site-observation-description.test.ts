@@ -18,6 +18,7 @@ import {
   type ObservationDescriptionSnapshot,
   type ObservationDescriptionSnapshotUpdate,
 } from "./site-observation-description";
+import { siteDescriptionNoticeText } from "./site-description-notice";
 
 const site: ObservationDescriptionSite = {
   id: "site-1",
@@ -63,9 +64,11 @@ const snapshot: ObservationDescriptionSnapshot = {
 };
 
 const validNaturalDescription = [
-  "관측 테스트 사이트는 공개 화면에서 \"관측 테스트 메인\"이라는 이름을 사용하는 사이트입니다. 주요 화면은 스포츠, 카지노, 슬롯 등 게임 카테고리를 중심으로 구성되어 있으며, 로그인과 고객센터처럼 계정·문의 관련 메뉴도 함께 배치되어 있습니다.",
-  "본문에는 여러 영역으로 이동하는 카드형 안내와 화면 전환 요소가 함께 배치되어 있습니다. 일부 화면에는 결제나 이용 내역 관련 요소가 포함되어 있지만, 제공된 HTML과 스크린샷만으로 실제 결제 방식이나 이용 조건까지 확인할 수는 없습니다.",
-  "하단에는 고객지원, 공지, 외부 연락 채널, 책임 있는 이용 관련 안내가 포함되어 있습니다. 자세한 메뉴와 화면 구성은 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있습니다.",
+  "관측 테스트 사이트는 공개 화면에서 \"관측 테스트 메인\"이라는 명칭이 사용된 사이트입니다. 화면 구성은 스포츠 경기 정보와 라이브 콘텐츠, 게임 카테고리를 중심으로 이루어져 있으며, 상단에는 계정 접근과 고객 문의 관련 항목도 함께 배치되어 있습니다. 화면은 여러 기능을 한 페이지 안에서 구분해 보여주는 편입니다.",
+  "본문 영역에서는 경기 일정, 스코어, 라이브 화면처럼 보이는 정보와 여러 콘텐츠 카드가 함께 표시됩니다. 이용자는 화면에 배치된 카테고리와 카드형 영역을 통해 스포츠, 라이브 콘텐츠, 카지노 또는 슬롯 계열 콘텐츠를 구분해 탐색하는 구조로 보입니다.",
+  "계정 관련 항목과 함께 거래 내역 또는 이용 기록으로 보이는 요소도 일부 확인됩니다. 다만 제공된 자료만으로는 실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부까지 확인할 수 없습니다.",
+  "게임 또는 경기 관련 카테고리는 여러 콘텐츠 유형을 묶어 보여주는 방식으로 구성되어 있습니다. 세부 메뉴명과 반복되는 화면 문구는 상세 설명 본문에 길게 나열하지 않고, 원본 사이트 관측 정보 섹션에 별도로 남기는 방식이 적절합니다.",
+  "공지성 안내나 캠페인성 요소로 보이는 영역도 일부 포함되어 있지만, 상세 조건이나 적용 기간은 제공된 자료만으로 판단하기 어렵습니다. 따라서 이 설명은 화면 구성과 확인 가능한 정보 흐름을 해석 중심으로 요약하고, 구체적인 원문 항목은 아래 원본 사이트 관측 정보 섹션에서 확인하도록 구성합니다.",
 ].join("\n\n");
 
 const validAiOutput: ObservationDescriptionAiOutput = {
@@ -279,7 +282,7 @@ test("fallback draft does not emphasize promotional flags in public description"
     /^#{1,6}\s|^\s*[-*+]\s/m.test(fallback.detail_description_md),
     false,
   );
-  assert.equal(paragraphs.length, 3);
+  assert.equal(paragraphs.length >= 4 && paragraphs.length <= 6, true);
   assert.equal(
     paragraphs.every((paragraph) => {
       const sentenceCount = getSentences(paragraph).length;
@@ -287,8 +290,8 @@ test("fallback draft does not emphasize promotional flags in public description"
     }),
     true,
   );
-  assert.equal(getPlainLength(fallback.detail_description_md) >= 300, true);
-  assert.equal(getPlainLength(fallback.detail_description_md) <= 600, true);
+  assert.equal(getPlainLength(fallback.detail_description_md) >= 700, true);
+  assert.equal(getPlainLength(fallback.detail_description_md) <= 1100, true);
   assert.equal(fallback.detail_description_md.includes(site.url ?? ""), false);
   assert.equal(fallback.detail_description_md.includes("홈, 스포츠, 고객센터"), false);
   assert.equal(countReportLikePhrases(fallback.detail_description_md) <= 2, true);
@@ -319,6 +322,85 @@ test("validateObservationDescriptionDraft does not require embedded disclosure",
   assert.deepEqual(validation.errors, []);
 });
 
+test("validateObservationDescriptionDraft warns with too_short under 500 chars", () => {
+  const validation = validateObservationDescriptionDraft({
+    detailDescriptionMd: buildRepeatedParagraphDescription(
+      4,
+      "짧은 설명 문장입니다. 화면 흐름을 간단히 요약합니다.",
+    ),
+    sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
+  });
+
+  assert.equal(validation.status, "warning");
+  assert.equal(validation.warnings.includes("too_short"), true);
+});
+
+test("validateObservationDescriptionDraft warns when under 700 chars", () => {
+  const validation = validateObservationDescriptionDraft({
+    detailDescriptionMd: buildRepeatedParagraphDescription(
+      4,
+      "중간 길이 설명 문장입니다. 화면 흐름과 계정 관련 요소를 자연스럽게 요약합니다.",
+    ),
+    sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
+  });
+
+  assert.equal(validation.status, "warning");
+  assert.equal(
+    validation.warnings.includes("상세페이지 설명으로는 다소 짧습니다"),
+    true,
+  );
+});
+
+test("validateObservationDescriptionDraft has no length warning for 700 to 1100 chars", () => {
+  const validation = validateObservationDescriptionDraft({
+    detailDescriptionMd: validNaturalDescription,
+    sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
+  });
+
+  assert.equal(validation.warnings.includes("too_short"), false);
+  assert.equal(
+    validation.warnings.includes("상세페이지 설명으로는 다소 짧습니다"),
+    false,
+  );
+  assert.equal(validation.warnings.includes("too_long"), false);
+});
+
+test("validateObservationDescriptionDraft warns with too_long over 1200 chars", () => {
+  const validation = validateObservationDescriptionDraft({
+    detailDescriptionMd: `${validNaturalDescription}\n\n${validNaturalDescription}`,
+    sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
+  });
+
+  assert.equal(validation.status, "warning");
+  assert.equal(validation.warnings.includes("too_long"), true);
+});
+
+test("validateObservationDescriptionDraft warns when paragraph count is under 3", () => {
+  const validation = validateObservationDescriptionDraft({
+    detailDescriptionMd: [
+      "첫 번째 문단입니다. 화면 흐름을 자연스럽게 설명합니다.",
+      "두 번째 문단입니다. 확인되지 않은 항목을 짧게 설명합니다.",
+    ].join("\n\n"),
+    sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
+  });
+
+  assert.equal(validation.status, "warning");
+  assert.equal(validation.warnings.includes("paragraph_count_too_low"), true);
+});
+
+test("validateObservationDescriptionDraft warns when bullet list is included", () => {
+  const validation = validateObservationDescriptionDraft({
+    detailDescriptionMd: `${validNaturalDescription}\n\n- 홈\n- 스포츠\n- 카지노`,
+    sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
+  });
+
+  assert.equal(validation.status, "warning");
+  assert.equal(
+    validation.warnings.some((warning) => warning.includes("목록")),
+    true,
+  );
+});
+
 test("validateObservationDescriptionDraft warns for repeated source-report wording", () => {
   const description = [
     "공개 화면 문구가 반복됩니다. 공개 화면 구성은 반복됩니다.",
@@ -344,10 +426,12 @@ test("validateObservationDescriptionDraft warns for repeated source-report wordi
 test("validateObservationDescriptionDraft fails hard prohibited phrases", () => {
   for (const phrase of [
     "가입하세요",
+    "추천합니다",
     "바로가기",
     "최신 주소",
     "먹튀 없음",
     "안전합니다",
+    "보너스 혜택을 확인하세요",
   ]) {
     const validation = validateObservationDescriptionDraft({
       detailDescriptionMd: `${observationDisclosureText}\n\n화면 구조와 메뉴 구성을 설명합니다. ${phrase}`,
@@ -435,6 +519,47 @@ test("approveObservationDescription updates site description after approval", as
   assert.equal(result.status, 200);
   assert.equal(result.body.ok, true);
   assert.equal(siteUpdate?.description, finalDescription);
+});
+
+test("approveObservationDescription separates notice from stored site description", async () => {
+  const finalDescription = `${siteDescriptionNoticeText}\n\n${validNaturalDescription}`;
+  const { result, siteUpdate } = await runApprove({ finalDescription });
+  const storedDescription = siteUpdate?.description ?? "";
+
+  assert.equal(result.status, 200);
+  assert.equal(storedDescription.includes(siteDescriptionNoticeText), false);
+  assert.equal(storedDescription.includes("공개 HTML"), false);
+  assert.equal(storedDescription.includes("스크린샷"), false);
+  assert.equal(getParagraphs(storedDescription).length, 5);
+});
+
+test("approveObservationDescription stores natural 4 to 6 paragraph descriptions", async () => {
+  const { result, siteUpdate } = await runApprove({
+    finalDescription: validNaturalDescription,
+  });
+  const storedDescription = siteUpdate?.description ?? "";
+
+  assert.equal(result.status, 200);
+  assert.equal(getParagraphs(storedDescription).length, 5);
+  assert.equal(/^#{1,6}\s|^\s*[-*+]\s/m.test(storedDescription), false);
+  assert.equal(storedDescription.includes("page_title"), false);
+  assert.equal(storedDescription.includes("meta_description"), false);
+  assert.equal(storedDescription.includes("h1"), false);
+});
+
+test("approveObservationDescription allows length-warning-only descriptions", async () => {
+  const finalDescription = buildRepeatedParagraphDescription(
+    4,
+    "중간 길이 설명 문장입니다. 화면 흐름과 계정 관련 요소를 자연스럽게 요약합니다.",
+  );
+  const { result, siteUpdate, snapshotUpdate } = await runApprove({
+    finalDescription,
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.validation_status, "warning");
+  assert.equal(siteUpdate?.description, finalDescription);
+  assert.equal(snapshotUpdate?.snapshot_status, "approved");
 });
 
 test("approveObservationDescription allows warning-only descriptions", async () => {
@@ -541,15 +666,17 @@ test("site observation description prompt requires natural bounded paragraphs", 
   });
   const combinedPrompt = `${siteObservationDescriptionSystemPrompt}\n${prompt}`;
 
-  assert.match(combinedPrompt, /2~3문단/);
-  assert.match(combinedPrompt, /300~600자/);
+  assert.match(combinedPrompt, /4~6문단/);
+  assert.match(combinedPrompt, /700~1,100자/);
   assert.match(combinedPrompt, /고지문은 별도/);
   assert.match(combinedPrompt, /page_title, meta_description, h1/);
   assert.match(combinedPrompt, /세부 메뉴, 게임명, footer, 이미지 alt, 배지/);
+  assert.match(combinedPrompt, /공개 HTML.*Notice/);
   assert.match(combinedPrompt, /URL은 설명 본문에 직접 길게 쓰지 말고/);
   assert.match(combinedPrompt, /실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부/);
   assert.match(combinedPrompt, /원본 사이트 관측 정보/);
   assert.match(combinedPrompt, /확인됩니다/);
+  assert.match(combinedPrompt, /본문 영역에서는 경기 일정/);
 });
 
 test("approveObservationDescription blocks forbidden final descriptions", async () => {
@@ -576,6 +703,10 @@ test("approveObservationDescription rejects non-admin callers", async () => {
 
 function getParagraphs(value: string) {
   return value.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean);
+}
+
+function buildRepeatedParagraphDescription(count: number, paragraph: string) {
+  return Array.from({ length: count }, () => paragraph).join("\n\n");
 }
 
 function getSentences(value: string) {

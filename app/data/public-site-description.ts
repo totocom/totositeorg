@@ -65,15 +65,26 @@ export function formatObservationDescriptionForPublic(
   value: string,
 ): ObservationDescriptionFormatResult {
   const normalizedDescription = normalizeObservationDescriptionText(value);
-  const warnings = getObservationDescriptionFormatWarnings(normalizedDescription);
+  const noticeRemoved = containsNoticeSentence(normalizedDescription);
   const paragraphs = normalizedDescription
     .split(/\n{2,}/)
+    .filter((block) => !isListBlock(block))
+    .filter((block) => !isHeadingOnlyBlock(block))
     .map(formatObservationDescriptionParagraph)
     .filter(Boolean);
+  const description = paragraphs.join("\n\n").trim();
+  const warnings = getObservationDescriptionFormatWarnings(
+    description,
+    normalizedDescription,
+  );
+
+  if (noticeRemoved) {
+    warnings.push("description_notice_removed");
+  }
 
   return {
-    description: paragraphs.join("\n\n").trim(),
-    warnings,
+    description,
+    warnings: Array.from(new Set(warnings)),
   };
 }
 
@@ -123,15 +134,27 @@ function isNoticeSentence(value: string) {
   );
 }
 
+function containsNoticeSentence(value: string) {
+  return value
+    .split(/\n{2,}/)
+    .flatMap((block) => splitDescriptionSentences(block))
+    .some(isNoticeSentence);
+}
+
 function isInternalExtractionSentence(value: string) {
   return /문서\s*제목은|페이지\s*제목은|메타\s*설명(?:에는|은)|대표\s*제목\s*영역(?:에는|은)|\bpage_title\b|\bmeta_description\b|\bh1\b|h1\s*(?:에는|은)/i.test(
     value,
   );
 }
 
-function getObservationDescriptionFormatWarnings(value: string) {
+function getObservationDescriptionFormatWarnings(value: string, sourceValue = value) {
   const warnings: string[] = [];
   const plainText = value.replace(/\s+/g, " ").trim();
+  const sourcePlainText = sourceValue.replace(/\s+/g, " ").trim();
+  const paragraphs = value
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
 
   if (countOccurrences(plainText, "관측되었습니다") >= 3) {
     warnings.push("'관측되었습니다' 표현이 3회 이상 반복됩니다.");
@@ -149,27 +172,61 @@ function getObservationDescriptionFormatWarnings(value: string) {
     warnings.push("'공개 HTML' 표현이 2회 이상 반복됩니다.");
   }
 
-  if (isInternalExtractionSentence(plainText)) {
+  if (isInternalExtractionSentence(sourcePlainText)) {
     warnings.push("page_title, meta_description, h1 같은 내부 추출 설명이 포함되어 있습니다.");
   }
 
-  if (/https?:\/\/\S+|www\.[^\s)]+/i.test(plainText)) {
+  if (/https?:\/\/\S+|www\.[^\s)]+/i.test(sourcePlainText)) {
     warnings.push("URL은 사이트 설명 본문보다 주소·도메인 섹션에서 표시하는 것이 좋습니다.");
   }
 
-  if (/^\s{0,3}(?:#{1,6}|[-*+]|\d+\.)\s/m.test(value)) {
+  if (/^\s{0,3}(?:#{1,6}|[-*+]|\d+\.)\s/m.test(sourceValue)) {
     warnings.push("사이트 설명에 제목 또는 bullet/list 형식이 포함되어 있습니다.");
   }
 
-  if (plainText.length > 700) {
-    warnings.push("사이트 설명이 700자를 초과합니다.");
+  if (plainText.length > 0 && plainText.length < 500) {
+    warnings.push("too_short");
   }
 
-  if (hasLongMenuLikeEnumeration(plainText)) {
+  if (plainText.length > 0 && plainText.length < 700) {
+    warnings.push("상세페이지 설명으로는 다소 짧습니다");
+  }
+
+  if (plainText.length > 1200) {
+    warnings.push("too_long");
+  }
+
+  if (paragraphs.length > 0 && paragraphs.length < 3) {
+    warnings.push("paragraph_count_too_low");
+  }
+
+  if (paragraphs.length > 0 && (paragraphs.length < 4 || paragraphs.length > 6)) {
+    warnings.push("사이트 상세 설명은 4~6문단으로 정리하는 것이 좋습니다.");
+  }
+
+  if (hasLongMenuLikeEnumeration(sourcePlainText)) {
     warnings.push("메뉴명이나 세부 항목이 과도하게 나열된 문장이 있습니다.");
   }
 
   return Array.from(new Set(warnings));
+}
+
+function isListBlock(value: string) {
+  const lines = value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.length > 0 && lines.every((line) => /^(?:[-*+]|\d+\.)\s+/.test(line));
+}
+
+function isHeadingOnlyBlock(value: string) {
+  const lines = value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.length === 1 && /^#{1,6}\s+/.test(lines[0]);
 }
 
 function hasLongMenuLikeEnumeration(value: string) {
@@ -263,7 +320,7 @@ export function getSiteOverviewMarkdownBlocks(value: string) {
   return getSafeMarkdownBlocks(value, {
     includeHeadings: false,
     includeLists: false,
-    maxBlocks: 3,
+    maxBlocks: 6,
   });
 }
 

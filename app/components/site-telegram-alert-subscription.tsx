@@ -171,7 +171,7 @@ export function SiteTelegramAlertSubscription({
 
   return (
     <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="grid gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-accent">
             Telegram alert
@@ -185,15 +185,15 @@ export function SiteTelegramAlertSubscription({
           </p>
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="grid gap-2">
           {isLoading ? (
-            <span className="inline-flex h-10 items-center rounded-md border border-line px-4 text-sm font-semibold text-muted">
+            <span className="inline-flex h-10 w-full items-center justify-center rounded-md border border-line px-4 text-sm font-semibold text-muted">
               확인 중
             </span>
           ) : !user ? (
             <Link
               href={loginHref}
-              className="inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95"
+              className="inline-flex h-10 w-full items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95"
             >
               로그인 후 구독
             </Link>
@@ -203,14 +203,14 @@ export function SiteTelegramAlertSubscription({
                 href={telegramStartUrl || "/telegram-guide"}
                 target={telegramStartUrl ? "_blank" : undefined}
                 rel={telegramStartUrl ? "noopener noreferrer" : undefined}
-                className="inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95"
+                className="inline-flex h-10 w-full items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95"
               >
                 텔레그램 연결
               </Link>
               <button
                 type="button"
                 onClick={loadSubscription}
-                className="h-10 rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
+                className="h-10 w-full rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
               >
                 연결 확인
               </button>
@@ -220,7 +220,7 @@ export function SiteTelegramAlertSubscription({
               type="button"
               onClick={toggleSubscription}
               disabled={isSaving}
-              className={`h-10 rounded-md px-4 text-sm font-semibold transition active:scale-95 disabled:opacity-50 ${
+              className={`h-10 w-full rounded-md px-4 text-sm font-semibold transition active:scale-95 disabled:opacity-50 ${
                 isSubscribed
                   ? "border border-line text-foreground hover:border-accent hover:text-accent"
                   : "bg-accent text-white hover:bg-accent/80"

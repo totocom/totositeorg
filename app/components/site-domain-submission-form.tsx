@@ -99,10 +99,10 @@ export function SiteDomainSubmissionForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="grid gap-3 border-t border-line px-5 py-4"
+      className="grid gap-3 border-t border-line px-4 py-4"
       noValidate
     >
-      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+      <div className="grid gap-2">
         <input
           value={domainUrl}
           onChange={(event) => {
@@ -122,9 +122,9 @@ export function SiteDomainSubmissionForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="h-10 rounded-md bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent/80 active:scale-95 disabled:opacity-50"
+          className="min-h-10 rounded-md bg-accent px-4 py-2 text-sm font-semibold leading-5 text-white transition hover:bg-accent/80 active:scale-95 disabled:opacity-50"
         >
-          {isSubmitting ? "요청 중..." : `${normalizedSiteName}도메인 추가`}
+          {isSubmitting ? "요청 중..." : `${normalizedSiteName} 도메인 추가`}
         </button>
       </div>
       {message ? (

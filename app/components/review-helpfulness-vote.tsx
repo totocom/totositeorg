@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/app/components/auth-provider";
-import { supabase } from "@/lib/supabase/client";
 
 type ReviewHelpfulnessVoteProps = {
   reviewId: string;
@@ -13,22 +11,18 @@ type ReviewHelpfulnessVoteProps = {
 
 type VoteValue = -1 | 1;
 
-type CountRow = {
-  helpful_count: number | null;
-  not_helpful_count: number | null;
-};
-
-type VoteRow = {
-  vote: VoteValue;
+type VoteStateResponse = {
+  helpfulCount: number;
+  notHelpfulCount: number;
+  currentVote: VoteValue | null;
+  error?: string;
 };
 
 export function ReviewHelpfulnessVote({
   reviewId,
-  authorUserId = null,
   initialHelpfulCount = 0,
   initialNotHelpfulCount = 0,
 }: ReviewHelpfulnessVoteProps) {
-  const { user, isLoading: isAuthLoading } = useAuth();
   const [helpfulCount, setHelpfulCount] = useState(initialHelpfulCount);
   const [notHelpfulCount, setNotHelpfulCount] = useState(initialNotHelpfulCount);
   const [currentVote, setCurrentVote] = useState<VoteValue | null>(null);
@@ -40,88 +34,68 @@ export function ReviewHelpfulnessVote({
     setIsLoading(true);
     setMessage("");
 
-    const [countsResult, userVoteResult] = await Promise.all([
-      supabase
-        .from("reviews")
-        .select("helpful_count, not_helpful_count")
-        .eq("id", reviewId)
-        .maybeSingle<CountRow>(),
-      user
-        ? supabase
-            .from("review_helpfulness_votes")
-            .select("vote")
-            .eq("review_id", reviewId)
-            .eq("user_id", user.id)
-            .maybeSingle<VoteRow>()
-        : Promise.resolve({ data: null, error: null }),
-    ]);
+    const response = await fetch(
+      `/api/reviews/helpfulness-vote?reviewId=${encodeURIComponent(reviewId)}`,
+    );
+    const payload = (await response.json().catch(() => null)) as
+      | VoteStateResponse
+      | null;
 
-    if (!countsResult.error && countsResult.data) {
-      setHelpfulCount(Number(countsResult.data.helpful_count ?? 0));
-      setNotHelpfulCount(Number(countsResult.data.not_helpful_count ?? 0));
+    if (response.ok && payload) {
+      setHelpfulCount(Number(payload.helpfulCount ?? 0));
+      setNotHelpfulCount(Number(payload.notHelpfulCount ?? 0));
+      setCurrentVote(payload.currentVote);
     } else {
       setHelpfulCount(initialHelpfulCount);
       setNotHelpfulCount(initialNotHelpfulCount);
-    }
-
-    if (!userVoteResult.error && userVoteResult.data) {
-      setCurrentVote(userVoteResult.data.vote);
-    } else {
       setCurrentVote(null);
+      setMessage("투표 상태를 불러오지 못했습니다.");
     }
 
     setIsLoading(false);
   }
 
   useEffect(() => {
-    if (isAuthLoading) return;
-
     const timeoutId = window.setTimeout(() => {
       void loadVoteState();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthLoading, reviewId, user?.id]);
+  }, [reviewId]);
 
   async function submitVote(nextVote: VoteValue) {
-    if (isSaving) return;
+    if (isSaving || isLoading) return;
 
-    if (!user) {
-      setMessage("로그인 후 투표할 수 있습니다.");
-      return;
-    }
-
-    if (authorUserId && user.id === authorUserId) {
-      setMessage("내가 작성한 리뷰에는 투표할 수 없습니다.");
+    if (currentVote === nextVote) {
+      setMessage("이미 반영된 투표입니다.");
       return;
     }
 
     setIsSaving(true);
     setMessage("");
 
-    const previousVote = currentVote;
-    const shouldRemoveVote = previousVote === nextVote;
+    const response = await fetch("/api/reviews/helpfulness-vote", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        reviewId,
+        vote: nextVote,
+      }),
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | VoteStateResponse
+      | null;
 
-    const result = shouldRemoveVote
-      ? await supabase
-          .from("review_helpfulness_votes")
-          .delete()
-          .eq("review_id", reviewId)
-          .eq("user_id", user.id)
-      : await supabase.from("review_helpfulness_votes").upsert(
-          {
-            review_id: reviewId,
-            user_id: user.id,
-            vote: nextVote,
-          },
-          { onConflict: "review_id,user_id" },
-        );
-
-    if (result.error) {
+    if (!response.ok || !payload) {
       setMessage("투표를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.");
     } else {
-      await loadVoteState();
+      setHelpfulCount(Number(payload.helpfulCount ?? 0));
+      setNotHelpfulCount(Number(payload.notHelpfulCount ?? 0));
+      setCurrentVote(payload.currentVote);
+      setMessage("투표가 반영되었습니다.");
     }
 
     setIsSaving(false);
@@ -129,18 +103,10 @@ export function ReviewHelpfulnessVote({
 
   const helpfulSelected = currentVote === 1;
   const notHelpfulSelected = currentVote === -1;
-  const isOwnReview = Boolean(user && authorUserId && user.id === authorUserId);
-  const isVoteDisabled =
-    isAuthLoading || !user || isOwnReview || isLoading || isSaving;
+  const isVoteDisabled = isLoading || isSaving;
   const statusMessage =
     message ||
-    (isAuthLoading
-      ? "로그인 상태를 확인하는 중입니다."
-      : !user
-        ? "로그인 후 투표할 수 있습니다."
-        : isOwnReview
-          ? "내가 작성한 리뷰에는 투표할 수 없습니다."
-          : "");
+    (isLoading ? "투표 상태를 확인하는 중입니다." : "");
 
   return (
     <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">

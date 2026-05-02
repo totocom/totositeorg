@@ -14,6 +14,7 @@ import { SiteFeedbackSubmissionGuide } from "@/app/components/site-feedback-subm
 import { SiteObservationSnapshotCard } from "@/app/components/site-observation-snapshot-card";
 import { SiteShareActions } from "@/app/components/site-share-actions";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
+import { formatKstDate } from "@/app/data/date-format";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
 import { extractDomain } from "@/app/data/domain-whois";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
@@ -442,6 +443,13 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </div>
           ) : null}
 
+          {/* 도메인 & DNS */}
+          {domainInfoTabs.length > 0 ? (
+            <div className="border-t border-line px-5 py-4">
+              <DomainInfoTabs items={domainInfoTabs} variant="embedded" />
+            </div>
+          ) : null}
+
           <div className="border-t border-line px-5 py-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">
               신뢰 점수 산정
@@ -465,11 +473,31 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </p>
           </div>
 
+          <nav
+            className="border-t border-line px-5 py-4"
+            aria-label={`${site.siteName} 상세 페이지 내부 링크`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+              상세 페이지 탐색
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {siteDetailInternalLinks.map((link) => (
+                <Link
+                  key={link.key}
+                  href={link.href}
+                  className="inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </nav>
+
           {/* 사이트 개요 */}
           {overviewBlocks.length > 0 ? (
             <div className="px-5 pb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">사이트 개요</p>
-              <SiteDescriptionNotice siteName={site.siteName} />
+              <SiteDescriptionNotice />
               <SafeMarkdown
                 value={site.shortDescription}
                 blocks={overviewBlocks}
@@ -519,9 +547,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             logoUrl: site.logoUrl,
           }}
         />
-
-        {/* 도메인 & DNS */}
-        <DomainInfoTabs items={domainInfoTabs} />
 
         {/* 먹튀 피해 이력 */}
         <section id="reports" className="mt-5 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
@@ -622,7 +647,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                       <h3 className="mt-1.5 font-bold text-foreground">{review.title}</h3>
                     </div>
                     <p className="shrink-0 text-xs text-muted">
-                      {review.authorNickname ?? "익명"} · {review.createdAt}
+                      {review.authorNickname ?? "익명"} · {formatKstDate(review.createdAt)}
                     </p>
                   </div>
                   <ReviewSummary siteName={site.siteName} experience={review.experience} />
@@ -655,26 +680,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             title={shareTitle}
             description={shareDescription}
           />
-
-          <nav
-            className="rounded-xl border border-line bg-surface px-5 py-4 shadow-sm"
-            aria-label={`${site.siteName} 상세 페이지 내부 링크`}
-          >
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-              상세 페이지 탐색
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {siteDetailInternalLinks.map((link) => (
-                <Link
-                  key={link.key}
-                  href={link.href}
-                  className="inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          </nav>
 
           <SiteTelegramAlertSubscription siteId={site.id} siteName={site.siteName} />
 

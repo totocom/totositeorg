@@ -873,14 +873,62 @@ create table if not exists public.site_domain_submissions (
 create table if not exists public.review_helpfulness_votes (
   id uuid primary key default gen_random_uuid(),
   review_id uuid not null references public.reviews(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid null references auth.users(id) on delete cascade,
+  visitor_ip_hash text null,
   vote smallint not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
   constraint review_helpfulness_votes_review_user_unique unique (review_id, user_id),
+  constraint review_helpfulness_votes_review_ip_unique unique (review_id, visitor_ip_hash),
+  constraint review_helpfulness_votes_voter_identity_required check (
+    user_id is not null
+    or visitor_ip_hash is not null
+  ),
+  constraint review_helpfulness_votes_visitor_ip_hash_not_blank check (
+    visitor_ip_hash is null
+    or length(trim(visitor_ip_hash)) > 0
+  ),
   constraint review_helpfulness_votes_vote_allowed check (vote in (-1, 1))
 );
+
+alter table public.review_helpfulness_votes
+  alter column user_id drop not null;
+
+alter table public.review_helpfulness_votes
+  add column if not exists visitor_ip_hash text null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'review_helpfulness_votes_review_ip_unique'
+      and conrelid = 'public.review_helpfulness_votes'::regclass
+  ) then
+    alter table public.review_helpfulness_votes
+      add constraint review_helpfulness_votes_review_ip_unique
+      unique (review_id, visitor_ip_hash);
+  end if;
+
+  alter table public.review_helpfulness_votes
+    drop constraint if exists review_helpfulness_votes_voter_identity_required;
+
+  alter table public.review_helpfulness_votes
+    add constraint review_helpfulness_votes_voter_identity_required check (
+      user_id is not null
+      or visitor_ip_hash is not null
+    );
+
+  alter table public.review_helpfulness_votes
+    drop constraint if exists review_helpfulness_votes_visitor_ip_hash_not_blank;
+
+  alter table public.review_helpfulness_votes
+    add constraint review_helpfulness_votes_visitor_ip_hash_not_blank check (
+      visitor_ip_hash is null
+      or length(trim(visitor_ip_hash)) > 0
+    );
+end $$;
 
 create table if not exists public.blog_posts (
   id uuid primary key default gen_random_uuid(),
@@ -2439,6 +2487,9 @@ create index if not exists review_helpfulness_votes_review_id_idx
 
 create index if not exists review_helpfulness_votes_user_id_idx
   on public.review_helpfulness_votes (user_id);
+
+create index if not exists review_helpfulness_votes_visitor_ip_hash_idx
+  on public.review_helpfulness_votes (visitor_ip_hash);
 
 create index if not exists blog_posts_status_idx
   on public.blog_posts (status);
