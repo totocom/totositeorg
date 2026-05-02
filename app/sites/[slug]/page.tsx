@@ -10,6 +10,7 @@ import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summ
 import { SafeMarkdown } from "@/app/components/safe-markdown";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteAuthorActions } from "@/app/components/site-author-actions";
+import { SiteFeedbackSubmissionGuide } from "@/app/components/site-feedback-submission-guide";
 import { SiteObservationSnapshotCard } from "@/app/components/site-observation-snapshot-card";
 import { SiteShareActions } from "@/app/components/site-share-actions";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
@@ -631,6 +632,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </div>
           )}
         </section>
+
+        <SiteFeedbackSubmissionGuide siteId={site.id} siteName={site.siteName} />
 
       </main>
     </>

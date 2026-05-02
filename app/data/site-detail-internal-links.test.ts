@@ -16,6 +16,10 @@ import {
   getSiteDetailAllowedAnchorText,
   hasForbiddenSiteDetailAnchorText,
 } from "./site-detail-internal-links";
+import {
+  buildSiteFeedbackSubmissionGuide,
+  siteFeedbackSubmissionGuideForbiddenPhrases,
+} from "./site-feedback-submission-guide";
 
 const siteName = "벳톡";
 
@@ -105,6 +109,48 @@ test("site header renders mobile nav only after the mobile menu is open", () => 
 
   assert.match(headerSource, /isDesktopViewport\s*\?\s*\(/);
   assert.match(headerSource, /!\s*isDesktopViewport\s*&&\s*isMenuOpen\s*\?/);
+});
+
+test("site detail page renders the feedback and scam report submission guide", () => {
+  const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
+
+  assert.match(siteDetailPageSource, /import\s+\{\s*SiteFeedbackSubmissionGuide\s*\}/);
+  assert.match(siteDetailPageSource, /<SiteFeedbackSubmissionGuide\s+siteId=\{site\.id\}\s+siteName=\{site\.siteName\}\s*\/>/);
+});
+
+test("feedback submission guide copy and actions use review and report routes", () => {
+  const guide = buildSiteFeedbackSubmissionGuide({
+    siteId: "site-1",
+    siteName,
+  });
+  const combinedCopy = [
+    guide.title,
+    ...guide.paragraphs,
+    ...guide.actions.map((action) => action.label),
+  ].join("\n");
+  const buttonLabels = guide.actions.map((action) => action.label).join("\n");
+
+  assert.equal(guide.title, "벳톡 후기 및 먹튀 제보 등록 안내");
+  assert.match(combinedCopy, /벳톡 후기/);
+  assert.match(combinedCopy, /벳톡 먹튀 제보/);
+  assert.match(combinedCopy, /실제 이용 경험이 있는 분/);
+  assert.match(combinedCopy, /관리자 검토를 거쳐 공개될 수 있으며/);
+  assert.match(
+    combinedCopy,
+    /개인정보가 포함된 내용은 승인되지 않을 수 있습니다/,
+  );
+  assert.equal(guide.reviewHref, "/submit-review?siteId=site-1");
+  assert.equal(guide.scamReportHref, "/submit-scam-report?siteId=site-1");
+  assert.deepEqual(
+    guide.actions.map((action) => action.href),
+    [guide.reviewHref, guide.scamReportHref],
+  );
+  assert.equal(
+    siteFeedbackSubmissionGuideForbiddenPhrases.some((phrase) =>
+      buttonLabels.includes(phrase),
+    ),
+    false,
+  );
 });
 
 function findDuplicateStrings(values: string[]) {
