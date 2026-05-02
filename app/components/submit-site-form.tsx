@@ -9,7 +9,6 @@ type SiteFormValues = {
   siteNameEn: string;
   siteUrl: string;
   domainsText: string;
-  shortDescription: string;
 };
 
 type SiteFormErrors = Partial<Record<keyof SiteFormValues, string>>;
@@ -35,14 +34,14 @@ type DuplicateResult = {
 
 const defaultSiteCategory = "기타 베팅";
 const defaultLicenseInfo = "관리자 등록 사이트";
-const minDescriptionLength = 10;
+const defaultSiteDescription =
+  "회원이 등록 요청한 사이트입니다. 도메인과 기본 정보는 관리자 검토 대상입니다.";
 
 const initialValues = (): SiteFormValues => ({
   siteNameKo: "",
   siteNameEn: "",
   siteUrl: "",
   domainsText: "",
-  shortDescription: "",
 });
 
 function isValidUrl(url: string) {
@@ -98,14 +97,6 @@ function createSlug(name: string) {
   return `${baseSlug}-${suffix}`;
 }
 
-function normalizeDescription(value: string) {
-  return value.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
-}
-
-function getVisibleTextLength(value: string) {
-  return Array.from(normalizeDescription(value)).length;
-}
-
 function getSiteSubmissionErrorMessage(error: SupabaseWriteError) {
   const message = error.message ?? "";
   const details = error.details ?? "";
@@ -124,7 +115,7 @@ function getSiteSubmissionErrorMessage(error: SupabaseWriteError) {
     error.code === "23514" &&
     message.includes("sites_description_length")
   ) {
-    return `간단 설명은 공백을 제외하고 최소 ${minDescriptionLength}자 이상 입력해주세요.`;
+    return "사이트 설명 기본값이 데이터베이스 검증 조건을 통과하지 못했습니다. 관리자에게 문의해주세요.";
   }
 
   if (error.code === "23514") {
@@ -266,14 +257,6 @@ export function SubmitSiteForm() {
         "같은 이름의 사이트가 있습니다. 동일명 다른 사이트인 경우 확인 체크를 해주세요.";
     }
 
-    const descriptionLength = getVisibleTextLength(values.shortDescription);
-
-    if (!normalizeDescription(values.shortDescription)) {
-      nextErrors.shortDescription = "간단 설명을 입력해주세요.";
-    } else if (descriptionLength < minDescriptionLength) {
-      nextErrors.shortDescription = `사이트 설명은 최소 ${minDescriptionLength}자 이상 입력해주세요.`;
-    }
-
     return nextErrors;
   }
 
@@ -322,17 +305,6 @@ export function SubmitSiteForm() {
       }
     }
 
-    const description = normalizeDescription(values.shortDescription);
-
-    if (Array.from(description).length < minDescriptionLength) {
-      setFormStatus("idle");
-      setErrors((current) => ({
-        ...current,
-        shortDescription: `사이트 설명은 최소 ${minDescriptionLength}자 이상 입력해주세요.`,
-      }));
-      return;
-    }
-
     const { data: insertedSite, error } = await supabase
       .from("sites")
       .insert({
@@ -346,7 +318,7 @@ export function SubmitSiteForm() {
         category: defaultSiteCategory,
         available_states: ["전체"],
         license_info: defaultLicenseInfo,
-        description,
+        description: defaultSiteDescription,
         status: "pending",
       })
       .select("id")
@@ -565,26 +537,6 @@ export function SubmitSiteForm() {
         </span>
         {errors.domainsText ? (
           <span className="text-xs text-red-700">{errors.domainsText}</span>
-        ) : null}
-      </label>
-
-      <label className="grid gap-1 text-sm font-medium">
-        간단 설명
-        <textarea
-          value={values.shortDescription}
-          onChange={(event) =>
-            updateField("shortDescription", event.target.value)
-          }
-          className="min-h-32 rounded-md border border-line px-3 py-3 text-sm"
-          placeholder="사이트의 서비스 범위와 확인이 필요한 정보를 중립적으로 작성해주세요."
-        />
-        <span className="text-xs text-muted">
-          현재 {getVisibleTextLength(values.shortDescription)} / {minDescriptionLength}자
-        </span>
-        {errors.shortDescription ? (
-          <span className="text-xs text-red-700">
-            {errors.shortDescription}
-          </span>
         ) : null}
       </label>
 

@@ -15,11 +15,6 @@ export default function SiteRegistrationPage() {
           사이트 등록
         </p>
         <h1 className="mt-1 text-3xl font-bold">새 사이트 등록 요청</h1>
-        <p className="mt-2 text-sm leading-6 text-muted">
-          로그인한 회원만 사이트를 등록 요청할 수 있습니다. 대표 URL은
-          필수이며, 추가 URL은 여러 개를 선택적으로 입력할 수 있습니다.
-          WHOIS, DNS, 페이지 캡처 등 검수 정보는 관리자가 확인합니다.
-        </p>
       </div>
 
       <SubmitSiteForm />
