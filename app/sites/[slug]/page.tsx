@@ -674,21 +674,21 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
         </div>
 
         <aside className="grid content-start gap-4">
-          <SiteShareActions
-            siteName={site.siteName}
-            shareUrl={shareUrl}
-            title={shareTitle}
-            description={shareDescription}
-          />
-
-          <SiteTelegramAlertSubscription siteId={site.id} siteName={site.siteName} />
+          <SiteFeedbackSubmissionGuide siteId={site.id} siteName={site.siteName} />
 
           <RelatedBlogReportCard
             siteName={site.siteName}
             report={relatedBlogReport}
           />
 
-          <SiteFeedbackSubmissionGuide siteId={site.id} siteName={site.siteName} />
+          <SiteTelegramAlertSubscription siteId={site.id} siteName={site.siteName} />
+
+          <SiteShareActions
+            siteName={site.siteName}
+            shareUrl={shareUrl}
+            title={shareTitle}
+            description={shareDescription}
+          />
         </aside>
       </main>
     </>

@@ -144,7 +144,7 @@ test("site detail page uses the same two-column detail layout as blog posts", ()
   );
   assert.match(
     siteDetailPageSource,
-    /<aside className="grid content-start gap-4">[\s\S]*?<SiteShareActions[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<\/aside>/,
+    /<aside className="grid content-start gap-4">[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<SiteShareActions[\s\S]*?<\/aside>/,
   );
   assert.doesNotMatch(
     siteDetailPageSource,
