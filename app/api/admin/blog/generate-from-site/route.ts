@@ -1227,6 +1227,17 @@ function getEnvString(name: string) {
   return process.env[name]?.trim() ?? "";
 }
 
+class AiProviderTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AiProviderTimeoutError";
+  }
+}
+
+function isAiProviderTimeoutError(error: unknown) {
+  return error instanceof AiProviderTimeoutError;
+}
+
 function getPositiveIntegerEnv(name: string, fallback: number) {
   const rawValue = getEnvString(name);
 
@@ -1267,6 +1278,14 @@ function getEnv() {
     blogGenerationMaxScamReports: getPositiveIntegerEnv(
       "BLOG_GENERATION_MAX_SCAM_REPORTS",
       20,
+    ),
+    blogAiProviderTimeoutMs: getPositiveIntegerEnv(
+      "BLOG_AI_PROVIDER_TIMEOUT_MS",
+      12_000,
+    ),
+    blogAiGenerationDeadlineMs: getPositiveIntegerEnv(
+      "BLOG_AI_GENERATION_DEADLINE_MS",
+      45_000,
     ),
   };
 }
@@ -1467,6 +1486,33 @@ function getOpenAiErrorMessage(payload: unknown) {
     : "OpenAI API 요청에 실패했습니다.";
 }
 
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  label: string,
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new AiProviderTimeoutError(
+        `${label} 응답이 ${Math.round(timeoutMs / 1000)}초 안에 완료되지 않아 검토용 fallback 초안으로 전환합니다.`,
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function callOpenAiJson<T>({
   apiKey,
   model,
@@ -1474,6 +1520,7 @@ async function callOpenAiJson<T>({
   schema,
   system,
   user,
+  timeoutMs,
 }: {
   apiKey: string;
   model: string;
@@ -1481,36 +1528,42 @@ async function callOpenAiJson<T>({
   schema: unknown;
   system: string;
   user: string;
+  timeoutMs: number;
 }): Promise<T> {
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
-          role: "system",
-          content: [{ type: "input_text", text: system }],
-        },
-        {
-          role: "user",
-          content: [{ type: "input_text", text: user }],
-        },
-      ],
-      max_output_tokens: 12_000,
-      text: {
-        format: {
-          type: "json_schema",
-          name: schemaName,
-          strict: true,
-          schema,
-        },
+  const response = await fetchWithTimeout(
+    "https://api.openai.com/v1/responses",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        model,
+        input: [
+          {
+            role: "system",
+            content: [{ type: "input_text", text: system }],
+          },
+          {
+            role: "user",
+            content: [{ type: "input_text", text: user }],
+          },
+        ],
+        max_output_tokens: 8_000,
+        text: {
+          format: {
+            type: "json_schema",
+            name: schemaName,
+            strict: true,
+            schema,
+          },
+        },
+      }),
+    },
+    timeoutMs,
+    "OpenAI",
+  );
 
   const payload = await response.json().catch(() => null);
 
@@ -1531,31 +1584,38 @@ async function callClaudeText({
   model,
   system,
   user,
+  timeoutMs,
 }: {
   apiKey: string;
   model: string;
   system: string;
   user: string;
+  timeoutMs: number;
 }) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
+  const response = await fetchWithTimeout(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 8_000,
+        system,
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "text", text: user }],
+          },
+        ],
+      }),
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: 12_000,
-      system,
-      messages: [
-        {
-          role: "user",
-          content: [{ type: "text", text: user }],
-        },
-      ],
-    }),
-  });
+    timeoutMs,
+    "Claude",
+  );
 
   const payload = await response.json().catch(() => null);
 
@@ -1590,17 +1650,20 @@ async function callClaudeJson<T>({
   model,
   system,
   user,
+  timeoutMs,
 }: {
   apiKey: string;
   model: string;
   system: string;
   user: string;
+  timeoutMs: number;
 }) {
   const outputText = await callClaudeText({
     apiKey,
     model,
     system,
     user,
+    timeoutMs,
   });
   const jsonText = extractJsonObjectText(outputText);
 
@@ -5525,66 +5588,333 @@ function buildAdminWarnings({
   ]).slice(0, 50);
 }
 
-async function generateDraft({
+function getAiCallTimeoutMs({
+  startedAt,
+  providerTimeoutMs,
+  generationDeadlineMs,
+  stepLabel,
+}: {
+  startedAt: number;
+  providerTimeoutMs: number;
+  generationDeadlineMs: number;
+  stepLabel: string;
+}) {
+  const elapsedMs = Date.now() - startedAt;
+  const remainingMs = generationDeadlineMs - elapsedMs;
+
+  if (remainingMs < 1_500) {
+    throw new AiProviderTimeoutError(
+      `${stepLabel} 실행 전 AI 생성 제한 시간 ${Math.round(
+        generationDeadlineMs / 1000,
+      )}초를 초과해 검토용 fallback 초안으로 전환합니다.`,
+    );
+  }
+
+  return Math.max(1_000, Math.min(providerTimeoutMs, remainingMs));
+}
+
+function formatKstDateTime(value: string | null | undefined) {
+  const date = value ? new Date(value) : new Date();
+
+  if (!Number.isFinite(date.getTime())) {
+    return "조회 시점";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const values = parts.reduce<Record<string, string>>((acc, part) => {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+
+  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute} KST`;
+}
+
+function getDeterministicFactLines(snapshot: SourceSnapshot) {
+  const siteName = snapshot.site.name;
+  const primaryDomain =
+    snapshot.derived_facts.primary_domain_display ||
+    snapshot.site.display_domain ||
+    snapshot.site.domain ||
+    "확인되지 않음";
+  const dnsTypes = uniqueStrings(
+    snapshot.dns_records.map((record) => record.record_type),
+  );
+  const nameServers = snapshot.derived_facts.name_servers;
+  const resolvedIps = snapshot.derived_facts.resolved_ips;
+  const crawlCheckedAt = snapshot.crawl_snapshot?.collected_at ?? null;
+
+  return uniqueStrings([
+    `${siteName} 대표 도메인: ${primaryDomain}`,
+    `추가 승인 도메인 수: ${snapshot.derived_facts.additional_domains.length}개`,
+    `DNS 레코드 유형: ${dnsTypes.length ? dnsTypes.join(", ") : "저장된 레코드 없음"}`,
+    `WHOIS 등록일: ${snapshot.derived_facts.domain_created_date ?? "확인되지 않음"}`,
+    `네임서버 수: ${nameServers.length}개`,
+    `관측 IP 수: ${resolvedIps.length}개`,
+    `승인 리뷰 수: ${snapshot.reviews_summary.approved_review_count}건`,
+    `승인 피해 제보 수: ${snapshot.scam_reports_summary.approved_public_report_count}건`,
+    crawlCheckedAt
+      ? `원본 사이트 관측 시각: ${formatKstDateTime(crawlCheckedAt)}`
+      : "원본 사이트 관측 스냅샷: 확인되지 않음",
+  ]);
+}
+
+function getDeterministicUnknownLines(snapshot: SourceSnapshot) {
+  const unknowns: string[] = [];
+
+  if (!snapshot.derived_facts.domain_created_date) {
+    unknowns.push("WHOIS 등록일은 조회 시점 기준 확인되지 않았습니다.");
+  }
+
+  if (snapshot.derived_facts.dns_lookup_statuses.some(
+    (status) => status.lookup_status === "failed",
+  )) {
+    unknowns.push("일부 DNS 정보는 조회 시점에 확인되지 않았습니다.");
+  }
+
+  if (snapshot.derived_facts.whois_lookup_statuses.some(
+    (status) => status.lookup_status === "failed",
+  )) {
+    unknowns.push("일부 WHOIS 정보는 조회 시점에 확인되지 않았습니다.");
+  }
+
+  if (snapshot.reviews_summary.approved_review_count === 0) {
+    unknowns.push("승인 리뷰는 아직 확인되지 않았습니다.");
+  }
+
+  if (snapshot.scam_reports_summary.approved_public_report_count === 0) {
+    unknowns.push("조회 시점 기준 승인된 피해 제보는 확인되지 않았습니다.");
+  }
+
+  return uniqueStrings(unknowns);
+}
+
+function buildDeterministicSeoPlan(
+  snapshot: SourceSnapshot,
+  updateContext?: BlogUpdateContext | null,
+): SeoPlanningOutput {
+  const { primaryKeyword, secondaryKeywords } = getSeoKeywords(snapshot);
+  const confirmedFacts = getDeterministicFactLines(snapshot);
+  const unknowns = getDeterministicUnknownLines(snapshot);
+  const title = getSeoTitle(snapshot);
+  const metaTitle = getSeoMetaTitle(snapshot);
+  const metaDescription = getSeoMetaDescription(snapshot);
+  const sectionPlan = getRequiredBlogReportHeadings(snapshot.site.name).map(
+    (heading) => ({
+      heading,
+      purpose:
+        "서버 수집 데이터 기준으로 사이트 관측 정보, 주소·도메인, DNS·WHOIS, 먹튀 제보, 후기 현황을 구분해 정리합니다.",
+      must_include_facts: confirmedFacts,
+      must_avoid: [
+        "추천, 홍보, 가입 유도 표현",
+        "안전 보장 또는 먹튀 없음 단정",
+        "외부 토토사이트 링크",
+      ],
+    }),
+  );
+
+  return normalizeSeoPlan(
+    {
+      primary_keyword: primaryKeyword,
+      secondary_keywords: secondaryKeywords,
+      search_intent: {
+        main_intent: "정보 확인",
+        sub_intents: [
+          "주소와 도메인 현황 확인",
+          "DNS/WHOIS 조회 결과 확인",
+          "먹튀 제보와 후기 현황 확인",
+        ],
+      },
+      recommended_title: title,
+      title_candidates: [title],
+      title_strategy: getSeoTitleStrategy(snapshot),
+      category_strategy: getBlogCategoryStrategy(snapshot, updateContext),
+      meta_title: metaTitle,
+      meta_description: metaDescription,
+      section_plan: sectionPlan,
+      confirmed_facts: confirmedFacts,
+      inferences: [
+        "DNS, WHOIS, 원본 화면 관측값은 조회 시점에 따라 달라질 수 있는 기술 정보입니다.",
+      ],
+      unknowns,
+      claim_map: confirmedFacts.map((claim) => ({
+        claim,
+        claim_type: "confirmed_fact" as const,
+        source: claim.includes("리뷰")
+          ? ("reviews" as const)
+          : claim.includes("피해 제보")
+            ? ("scam_reports" as const)
+            : claim.includes("WHOIS")
+              ? ("whois" as const)
+              : claim.includes("DNS") || claim.includes("IP") || claim.includes("네임서버")
+                ? ("dns" as const)
+                : ("sites" as const),
+        confidence: "medium" as const,
+      })),
+      writing_brief_for_claude:
+        "AI provider timeout fallback에서 사용한 서버 결정형 브리프입니다. 공개 본문에는 이 내부 설명을 출력하지 않습니다.",
+      risk_warnings: [
+        "AI provider 응답 지연으로 서버 수집 데이터 기반 fallback 초안을 생성했습니다.",
+        "관리자 검토 후 발행 여부를 결정해야 합니다.",
+      ],
+    },
+    snapshot,
+    updateContext,
+  );
+}
+
+function buildDeterministicMarkdown(snapshot: SourceSnapshot) {
+  const h1 = getSeoH1(snapshot);
+  const siteName = snapshot.site.name;
+  const checkedAt = formatKstDateTime(
+    snapshot.snapshot_at ??
+      snapshot.generatedAt ??
+      snapshot.derived_facts.dns_last_checked_at ??
+      snapshot.derived_facts.whois_last_checked_at,
+  );
+  const intro = `${siteName} 토토사이트는 조회 시점 기준 저장된 사이트 설명, 원본 화면 관측 정보, 주소·도메인, DNS·WHOIS, 먹튀 제보와 후기 데이터를 함께 확인하는 정보 리포트 대상입니다. 마지막 정보 확인 시각: ${checkedAt}.`;
+  const sections = getRequiredBlogReportHeadings(siteName).map((heading) =>
+    [`## ${heading}`, buildRequiredSectionFallbackText(heading, snapshot)]
+      .filter(Boolean)
+      .join("\n\n"),
+  );
+
+  return appendRequiredBlogNotices(
+    [`# ${h1}`, intro, ...sections].filter(Boolean).join("\n\n"),
+  );
+}
+
+function buildDeterministicFaq(snapshot: SourceSnapshot): FinalReviewOutput["faq_json"] {
+  const siteName = snapshot.site.name;
+
+  return [
+    {
+      question: `${siteName} 주소는 어떤 기준으로 확인하나요?`,
+      answer:
+        "내부 사이트 상세 기록에 저장된 대표 도메인과 승인된 추가 도메인, DNS 조회 시각을 함께 확인합니다. 외부 사이트로 이동하는 링크는 제공하지 않습니다.",
+      risk_level: "low" as const,
+    },
+    {
+      question: `${siteName} 먹튀 제보는 어떻게 해석하나요?`,
+      answer: `조회 시점 기준 승인되어 공개 처리된 피해 제보 ${snapshot.scam_reports_summary.approved_public_report_count}건을 기준으로 봅니다. 제보가 없더라도 안전성을 보장한다는 의미는 아닙니다.`,
+      risk_level: "medium" as const,
+    },
+    {
+      question: `${siteName} 후기는 어떤 데이터로 보나요?`,
+      answer: `승인 리뷰 ${snapshot.reviews_summary.approved_review_count}건과 작성 시점, 반복되는 이용 경험 신호를 보조 자료로 확인합니다.`,
+      risk_level: "low" as const,
+    },
+  ];
+}
+
+function buildDeterministicChecklist(
+  snapshot: SourceSnapshot,
+): FinalReviewOutput["checklist_json"] {
+  return [
+    {
+      item: "대표 도메인과 추가 도메인 확인",
+      reason: `대표 도메인과 추가 승인 도메인 ${snapshot.derived_facts.additional_domains.length}개가 내부 상세 기록과 일치하는지 확인합니다.`,
+    },
+    {
+      item: "DNS·WHOIS 조회 시각 확인",
+      reason:
+        "DNS와 WHOIS 정보는 조회 시점에 따라 달라질 수 있어 마지막 조회 시각과 함께 봅니다.",
+    },
+    {
+      item: "먹튀 제보와 후기 현황 분리 확인",
+      reason:
+        "피해 제보 수와 후기 수를 함께 보되, 제보 부재를 안전성 보장으로 해석하지 않습니다.",
+    },
+  ];
+}
+
+function buildDeterministicGeneratedDraft({
   snapshot,
   preferredSlug,
   updateContext,
-  openaiApiKey,
-  openaiPlannerModel,
-  openaiValidatorModel,
-  anthropicApiKey,
-  anthropicModel,
+  reason,
 }: {
   snapshot: SourceSnapshot;
   preferredSlug: string;
   updateContext?: BlogUpdateContext | null;
-  openaiApiKey: string;
-  openaiPlannerModel: string;
-  openaiValidatorModel: string;
-  anthropicApiKey: string;
-  anthropicModel: string;
+  reason: string;
 }) {
-  const seoPlan = normalizeSeoPlan(
-    await callOpenAiJson<SeoPlanningOutput>({
-      apiKey: openaiApiKey,
-      model: openaiPlannerModel,
-      schemaName: "site_blog_seo_plan",
-      schema: seoPlanningSchema,
-      system: OPENAI_PLANNER_SYSTEM_PROMPT,
-      user: buildOpenAiAnalysisPrompt(snapshot, preferredSlug, updateContext),
-    }),
-    snapshot,
-    updateContext,
-  );
-
+  const seoPlan = buildDeterministicSeoPlan(snapshot, updateContext);
+  const bodyMd = buildDeterministicMarkdown(snapshot);
+  const faqJson = buildDeterministicFaq(snapshot);
+  const checklistJson = buildDeterministicChecklist(snapshot);
+  const confirmedFacts = getDeterministicFactLines(snapshot);
+  const unknowns = getDeterministicUnknownLines(snapshot);
+  const uniqueFactScore = Math.max(5, Math.min(10, confirmedFacts.length));
   const claudeDraft = normalizeClaudeDraft(
-    await callClaudeJson<ClaudeDraftOutput>({
-      apiKey: anthropicApiKey,
-      model: anthropicModel,
-      system: CLAUDE_WRITER_SYSTEM_PROMPT,
-      user: buildClaudePrompt(snapshot, seoPlan, updateContext),
-    }),
+    {
+      draft_markdown: bodyMd,
+      faq: faqJson.map(({ question, answer }) => ({ question, answer })),
+      checklist: checklistJson,
+      editor_notes: [
+        `AI provider timeout fallback 사용: ${reason}`,
+        "서버 수집 데이터로 구성한 초안이므로 관리자 검토가 필요합니다.",
+      ],
+    },
     snapshot,
   );
-
-  let finalReview = normalizeFinalReviewCategoryStrategy(
-    await callOpenAiJson<FinalReviewOutput>({
-      apiKey: openaiApiKey,
-      model: openaiValidatorModel,
-      schemaName: "site_blog_final_review",
-      schema: finalReviewSchema,
-      system: OPENAI_VALIDATOR_SYSTEM_PROMPT,
-      user: buildFinalOpenAiPrompt({
-        snapshot,
-        seoPlan,
-        claudeDraft,
-        preferredSlug,
-        updateContext,
-      }),
-    }),
+  const finalReview = normalizeFinalReviewCategoryStrategy(
+    {
+      title: getSeoTitle(snapshot),
+      slug: preferredSlug,
+      meta_title: getSeoMetaTitle(snapshot),
+      meta_description: getSeoMetaDescription(snapshot),
+      h1: getSeoH1(snapshot),
+      primary_keyword: getSeoKeywords(snapshot).primaryKeyword,
+      secondary_keywords: getSeoKeywords(snapshot).secondaryKeywords,
+      content_angle: "AI provider timeout fallback draft",
+      category_strategy: seoPlan.category_strategy,
+      duplicate_risk_check: {
+        title_pattern_reused: false,
+        h2_pattern_reused: false,
+        intro_too_similar: false,
+        faq_too_similar: false,
+        unique_fact_score: uniqueFactScore,
+        estimated_duplicate_risk: "medium",
+        reason:
+          "AI provider timeout으로 서버 수집 데이터 기반 fallback 구조를 사용했으므로 관리자 중복 검토가 필요합니다.",
+      },
+      unique_fact_score: uniqueFactScore,
+      internal_links: buildSiteInternalLinks(snapshot),
+      external_references: [],
+      body_md: claudeDraft.draft_markdown,
+      faq_json: faqJson,
+      checklist_json: checklistJson,
+      summary: {
+        confirmed_facts: confirmedFacts,
+        inferences: seoPlan.inferences,
+        unknowns,
+      },
+      admin_warnings: [
+        `AI provider timeout fallback 사용: ${reason}`,
+        "AI provider 응답 지연으로 서버 수집 데이터 기반 검토용 초안을 저장했습니다.",
+        "발행 전 본문 자연스러움, 중복성, 금지 표현을 관리자가 확인해야 합니다.",
+      ],
+      prohibited_phrase_check: {
+        contains_recommendation: false,
+        contains_signup_cta: false,
+        contains_bonus_or_event_promo: false,
+        contains_absolute_safety_claim: false,
+        contains_uncited_claims: false,
+        contains_access_facilitation: false,
+      },
+      needs_human_legal_review: true,
+    },
     seoPlan,
   );
-  let finalDraft = normalizeDraft(
+  const finalDraft = normalizeDraft(
     normalizeFinalReviewOutput({
       output: finalReview,
       snapshot,
@@ -5594,32 +5924,97 @@ async function generateDraft({
     }),
     preferredSlug,
   );
-
-  let safetyViolations = [
+  const safetyViolations = [
     ...prohibitedCheckViolations(finalReview),
     ...scanDraft(finalDraft),
   ];
 
-  if (safetyViolations.length > 0) {
-    finalReview = normalizeFinalReviewCategoryStrategy(
+  return {
+    seoPlan,
+    claudeDraft,
+    finalReview,
+    finalDraft,
+    safetyViolations,
+  };
+}
+
+async function generateDraft({
+  snapshot,
+  preferredSlug,
+  updateContext,
+  openaiApiKey,
+  openaiPlannerModel,
+  openaiValidatorModel,
+  anthropicApiKey,
+  anthropicModel,
+  aiProviderTimeoutMs,
+  aiGenerationDeadlineMs,
+}: {
+  snapshot: SourceSnapshot;
+  preferredSlug: string;
+  updateContext?: BlogUpdateContext | null;
+  openaiApiKey: string;
+  openaiPlannerModel: string;
+  openaiValidatorModel: string;
+  anthropicApiKey: string;
+  anthropicModel: string;
+  aiProviderTimeoutMs: number;
+  aiGenerationDeadlineMs: number;
+}) {
+  const startedAt = Date.now();
+  const getStepTimeoutMs = (stepLabel: string) =>
+    getAiCallTimeoutMs({
+      startedAt,
+      providerTimeoutMs: aiProviderTimeoutMs,
+      generationDeadlineMs: aiGenerationDeadlineMs,
+      stepLabel,
+    });
+
+  try {
+    const seoPlan = normalizeSeoPlan(
+      await callOpenAiJson<SeoPlanningOutput>({
+        apiKey: openaiApiKey,
+        model: openaiPlannerModel,
+        schemaName: "site_blog_seo_plan",
+        schema: seoPlanningSchema,
+        system: OPENAI_PLANNER_SYSTEM_PROMPT,
+        user: buildOpenAiAnalysisPrompt(snapshot, preferredSlug, updateContext),
+        timeoutMs: getStepTimeoutMs("OpenAI SEO 설계"),
+      }),
+      snapshot,
+      updateContext,
+    );
+
+    const claudeDraft = normalizeClaudeDraft(
+      await callClaudeJson<ClaudeDraftOutput>({
+        apiKey: anthropicApiKey,
+        model: anthropicModel,
+        system: CLAUDE_WRITER_SYSTEM_PROMPT,
+        user: buildClaudePrompt(snapshot, seoPlan, updateContext),
+        timeoutMs: getStepTimeoutMs("Claude 본문 작성"),
+      }),
+      snapshot,
+    );
+
+    let finalReview = normalizeFinalReviewCategoryStrategy(
       await callOpenAiJson<FinalReviewOutput>({
         apiKey: openaiApiKey,
         model: openaiValidatorModel,
         schemaName: "site_blog_final_review",
         schema: finalReviewSchema,
-        system: OPENAI_VALIDATOR_REPAIR_SYSTEM_PROMPT,
+        system: OPENAI_VALIDATOR_SYSTEM_PROMPT,
         user: buildFinalOpenAiPrompt({
           snapshot,
           seoPlan,
           claudeDraft,
           preferredSlug,
           updateContext,
-          previousViolations: safetyViolations,
         }),
+        timeoutMs: getStepTimeoutMs("OpenAI 최종 검수"),
       }),
       seoPlan,
     );
-    finalDraft = normalizeDraft(
+    let finalDraft = normalizeDraft(
       normalizeFinalReviewOutput({
         output: finalReview,
         snapshot,
@@ -5629,19 +6024,67 @@ async function generateDraft({
       }),
       preferredSlug,
     );
-    safetyViolations = [
+
+    let safetyViolations = [
       ...prohibitedCheckViolations(finalReview),
       ...scanDraft(finalDraft),
     ];
-  }
 
-  return {
-    seoPlan,
-    claudeDraft,
-    finalReview,
-    finalDraft,
-    safetyViolations,
-  };
+    if (safetyViolations.length > 0) {
+      finalReview = normalizeFinalReviewCategoryStrategy(
+        await callOpenAiJson<FinalReviewOutput>({
+          apiKey: openaiApiKey,
+          model: openaiValidatorModel,
+          schemaName: "site_blog_final_review",
+          schema: finalReviewSchema,
+          system: OPENAI_VALIDATOR_REPAIR_SYSTEM_PROMPT,
+          user: buildFinalOpenAiPrompt({
+            snapshot,
+            seoPlan,
+            claudeDraft,
+            preferredSlug,
+            updateContext,
+            previousViolations: safetyViolations,
+          }),
+          timeoutMs: getStepTimeoutMs("OpenAI 금지 표현 보정"),
+        }),
+        seoPlan,
+      );
+      finalDraft = normalizeDraft(
+        normalizeFinalReviewOutput({
+          output: finalReview,
+          snapshot,
+          seoPlan,
+          preferredSlug,
+          updateContext,
+        }),
+        preferredSlug,
+      );
+      safetyViolations = [
+        ...prohibitedCheckViolations(finalReview),
+        ...scanDraft(finalDraft),
+      ];
+    }
+
+    return {
+      seoPlan,
+      claudeDraft,
+      finalReview,
+      finalDraft,
+      safetyViolations,
+    };
+  } catch (error) {
+    if (isAiProviderTimeoutError(error)) {
+      return buildDeterministicGeneratedDraft({
+        snapshot,
+        preferredSlug,
+        updateContext,
+        reason: error.message,
+      });
+    }
+
+    throw error;
+  }
 }
 
 export async function POST(request: Request) {
@@ -5661,6 +6104,8 @@ export async function POST(request: Request) {
     blogPromptVersion,
     blogGenerationMaxReviews,
     blogGenerationMaxScamReports,
+    blogAiProviderTimeoutMs,
+    blogAiGenerationDeadlineMs,
   } = getEnv();
 
   if (!openaiApiKey) {
@@ -5911,6 +6356,8 @@ export async function POST(request: Request) {
       openaiValidatorModel,
       anthropicApiKey,
       anthropicModel,
+      aiProviderTimeoutMs: blogAiProviderTimeoutMs,
+      aiGenerationDeadlineMs: blogAiGenerationDeadlineMs,
     });
 
     const rawFinalSlug = existingBlog?.slug ?? generated.finalDraft.slug;
