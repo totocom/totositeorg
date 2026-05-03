@@ -91,29 +91,27 @@ test("buildSiteDescriptionNoticeText renders site-specific non-promo disclosure"
   );
 });
 
-test("formatObservationDescriptionForPublic warns when description is under 500 chars", () => {
+test("formatObservationDescriptionForPublic warns when description is under 160 chars", () => {
   const formatted = formatObservationDescriptionForPublic(
-    buildDescriptionParagraphs(4, "짧은 설명 문장입니다. 화면 흐름을 간단히 요약합니다."),
+    "짧은 설명 문장입니다.",
   );
 
   assert.equal(formatted.warnings.includes("too_short"), true);
 });
 
-test("formatObservationDescriptionForPublic warns when description is under 700 chars", () => {
+test("formatObservationDescriptionForPublic allows concise data-based descriptions", () => {
   const formatted = formatObservationDescriptionForPublic(
     buildDescriptionParagraphs(
-      4,
-      "중간 길이 설명 문장입니다. 화면 흐름과 계정 관련 요소를 자연스럽게 요약합니다.",
+      2,
+      "중간 길이 설명 문장입니다. 화면 흐름과 계정 관련 요소를 자연스럽게 요약합니다. 확인되지 않은 항목은 추정하지 않고 입력 데이터 범위 안에서 짧게 남깁니다.",
     ),
   );
 
-  assert.equal(
-    formatted.warnings.includes("상세페이지 설명으로는 다소 짧습니다"),
-    true,
-  );
+  assert.equal(formatted.warnings.includes("too_short"), false);
+  assert.equal(formatted.warnings.includes("상세페이지 설명으로는 다소 짧습니다"), false);
 });
 
-test("formatObservationDescriptionForPublic has no length warning for 700 to 1100 chars", () => {
+test("formatObservationDescriptionForPublic has no length warning for rich descriptions", () => {
   const formatted = formatObservationDescriptionForPublic(
     buildNaturalLongDescription(),
   );
@@ -136,10 +134,7 @@ test("formatObservationDescriptionForPublic warns when description is over 1200 
 
 test("formatObservationDescriptionForPublic warns when paragraph count is under 3", () => {
   const formatted = formatObservationDescriptionForPublic(
-    [
-      "첫 번째 문단입니다. 화면 흐름을 자연스럽게 설명합니다.",
-      "두 번째 문단입니다. 확인되지 않은 항목을 짧게 설명합니다.",
-    ].join("\n\n"),
+    "첫 번째 문단입니다. 화면 흐름을 자연스럽게 설명합니다.",
   );
 
   assert.equal(formatted.warnings.includes("paragraph_count_too_low"), true);

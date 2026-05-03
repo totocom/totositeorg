@@ -65,11 +65,19 @@ export type ObservationDescriptionProhibitedPhraseCheck = {
   contains_access_facilitation: boolean;
 };
 
+export type ObservationDescriptionContentQuality = {
+  unique_fact_count: number;
+  data_sufficiency: "low" | "medium" | "high";
+  public_index_recommendation: "index" | "noindex";
+  reason: string;
+};
+
 export type ObservationDescriptionAiOutput = {
   detail_description_md: string;
   observation_summary: ObservationDescriptionSummary;
   admin_warnings: string[];
   prohibited_phrase_check: ObservationDescriptionProhibitedPhraseCheck;
+  content_quality: ObservationDescriptionContentQuality;
 };
 
 export type ObservationDescriptionValidationStatus =
@@ -194,8 +202,7 @@ const emptyProhibitedPhraseCheck: ObservationDescriptionProhibitedPhraseCheck = 
 export const observationDisclosureText =
   "이 설명은 조회 시점 기준 관리자가 제공한 공개 HTML과 스크린샷을 바탕으로 작성되었습니다. 화면에 표시된 정보만 요약한 것이며, 가입이나 이용을 권유하는 내용은 아닙니다.";
 
-const detailDescriptionTooShortLength = 500;
-const detailDescriptionRecommendedMinLength = 700;
+const detailDescriptionTooShortLength = 160;
 const detailDescriptionTooLongLength = 1200;
 const reportLikeRepeatedPhrases = [
   "관측되었습니다",
@@ -385,6 +392,7 @@ export async function generateObservationDescription({
   };
   const aiObservationSummaryJson = {
     observation_summary: resultOutput.observation_summary,
+    content_quality: resultOutput.content_quality,
     admin_warnings: adminWarnings,
     validation_errors: validation.errors,
     prohibited_phrase_check: resultOutput.prohibited_phrase_check,
@@ -415,6 +423,7 @@ export async function generateObservationDescription({
       siteId,
       detail_description_md: resultOutput.detail_description_md,
       observation_summary: resultOutput.observation_summary,
+      content_quality: resultOutput.content_quality,
       admin_warnings: adminWarnings,
       validation_errors: validation.errors,
       prohibited_phrase_check: resultOutput.prohibited_phrase_check,
@@ -597,6 +606,9 @@ export function buildObservationDescriptionFallback({
   snapshot: ObservationDescriptionSnapshot;
 }): ObservationDescriptionAiOutput {
   const observationSummary = buildObservationSummary(snapshot);
+  const contentQuality = buildObservationDescriptionContentQuality(
+    observationSummary,
+  );
   const siteName = safePublicText(site.name) || "해당 사이트";
   const titleSummary = safePublicText(snapshot.page_title);
   const h1Summary = safePublicText(snapshot.h1);
@@ -630,6 +642,10 @@ export function buildObservationDescriptionFallback({
     observationSummary.payment_feature_summary.length > 0
       ? "금전 처리나 이용 내역과 관련된 항목으로 해석될 수 있는 요소가 일부 포함되어 있습니다. 실제 결제 방식, 본인 확인 절차, 접근 제한 여부, 세부 이용 조건은 제공된 자료만으로 확인되지 않습니다."
       : "실제 결제 방식, 본인 확인 절차, 접근 제한 여부, 세부 이용 조건은 제공된 자료만으로 확인되지 않습니다. 공지성 안내나 캠페인성 영역이 있더라도 적용 조건과 기간은 별도 자료 없이는 단정하기 어렵습니다.";
+  const shortFallbackParagraphs = [
+    `${displayNameSentence} 제공된 관측 항목이 많지 않아 화면 구성은 기본 정보 중심으로만 정리합니다.`,
+    "승인된 후기나 피해 제보와 연결해 판단할 수 있는 추가 자료는 별도 검토가 필요합니다. 확인되지 않은 항목은 추정하지 않았습니다.",
+  ];
   const paragraphs = [
     `${displayNameSentence} ${categorySentence}`,
     mainContentSentence,
@@ -637,12 +653,19 @@ export function buildObservationDescriptionFallback({
     categoryDetailSentence,
     `${paymentRecordSentence} 세부 관측값은 상세 설명 본문에 반복하지 않고 원본 사이트 관측 정보 섹션에 남겨, 관리자가 화면 구성과 저장된 원문 자료를 함께 검토할 수 있게 했습니다.`,
   ];
+  const detailDescriptionMd =
+    contentQuality.unique_fact_count < 5
+      ? shortFallbackParagraphs.join("\n\n")
+      : paragraphs.join("\n\n");
+  const adminWarnings =
+    contentQuality.unique_fact_count < 5 ? ["insufficient_unique_data"] : [];
 
   return {
-    detail_description_md: paragraphs.join("\n\n"),
+    detail_description_md: detailDescriptionMd,
     observation_summary: observationSummary,
-    admin_warnings: [],
+    admin_warnings: adminWarnings,
     prohibited_phrase_check: emptyProhibitedPhraseCheck,
+    content_quality: contentQuality,
   };
 }
 
@@ -693,50 +716,55 @@ export function normalizeObservationDescriptionAiOutput(
   const summaryRecord = isRecord(record.observation_summary)
     ? record.observation_summary
     : {};
+  const normalizedSummary = {
+    page_title:
+      normalizeNullableString(summaryRecord.page_title) ??
+      fallback.observation_summary.page_title,
+    h1:
+      normalizeNullableString(summaryRecord.h1) ??
+      fallback.observation_summary.h1,
+    menu_summary: stringArrayOrFallback(
+      summaryRecord.menu_summary,
+      fallback.observation_summary.menu_summary,
+    ),
+    account_feature_summary: stringArrayOrFallback(
+      summaryRecord.account_feature_summary,
+      fallback.observation_summary.account_feature_summary,
+    ),
+    betting_feature_summary: stringArrayOrFallback(
+      summaryRecord.betting_feature_summary,
+      fallback.observation_summary.betting_feature_summary,
+    ),
+    payment_feature_summary: stringArrayOrFallback(
+      summaryRecord.payment_feature_summary,
+      fallback.observation_summary.payment_feature_summary,
+    ),
+    notice_summary: stringArrayOrFallback(
+      summaryRecord.notice_summary,
+      fallback.observation_summary.notice_summary,
+    ),
+    footer_summary: stringArrayOrFallback(
+      summaryRecord.footer_summary,
+      fallback.observation_summary.footer_summary,
+    ),
+    excluded_promotional_terms: stringArrayOrFallback(
+      summaryRecord.excluded_promotional_terms,
+      fallback.observation_summary.excluded_promotional_terms,
+    ),
+  };
 
   return {
     detail_description_md:
       normalizeDescriptionMarkdown(record.detail_description_md) ||
       fallback.detail_description_md,
-    observation_summary: {
-      page_title:
-        normalizeNullableString(summaryRecord.page_title) ??
-        fallback.observation_summary.page_title,
-      h1:
-        normalizeNullableString(summaryRecord.h1) ??
-        fallback.observation_summary.h1,
-      menu_summary: stringArrayOrFallback(
-        summaryRecord.menu_summary,
-        fallback.observation_summary.menu_summary,
-      ),
-      account_feature_summary: stringArrayOrFallback(
-        summaryRecord.account_feature_summary,
-        fallback.observation_summary.account_feature_summary,
-      ),
-      betting_feature_summary: stringArrayOrFallback(
-        summaryRecord.betting_feature_summary,
-        fallback.observation_summary.betting_feature_summary,
-      ),
-      payment_feature_summary: stringArrayOrFallback(
-        summaryRecord.payment_feature_summary,
-        fallback.observation_summary.payment_feature_summary,
-      ),
-      notice_summary: stringArrayOrFallback(
-        summaryRecord.notice_summary,
-        fallback.observation_summary.notice_summary,
-      ),
-      footer_summary: stringArrayOrFallback(
-        summaryRecord.footer_summary,
-        fallback.observation_summary.footer_summary,
-      ),
-      excluded_promotional_terms: stringArrayOrFallback(
-        summaryRecord.excluded_promotional_terms,
-        fallback.observation_summary.excluded_promotional_terms,
-      ),
-    },
+    observation_summary: normalizedSummary,
     admin_warnings: asStringArray(record.admin_warnings),
     prohibited_phrase_check: normalizeProhibitedPhraseCheck(
       record.prohibited_phrase_check,
+    ),
+    content_quality: normalizeObservationDescriptionContentQuality(
+      record.content_quality,
+      buildObservationDescriptionContentQuality(normalizedSummary),
     ),
   };
 }
@@ -989,6 +1017,67 @@ function normalizeProhibitedPhraseCheck(
   };
 }
 
+function buildObservationDescriptionContentQuality(
+  summary: ObservationDescriptionSummary,
+): ObservationDescriptionContentQuality {
+  const uniqueFactCount = countObservationSummaryFacts(summary);
+  const dataSufficiency =
+    uniqueFactCount >= 10 ? "high" : uniqueFactCount >= 5 ? "medium" : "low";
+
+  return {
+    unique_fact_count: uniqueFactCount,
+    data_sufficiency: dataSufficiency,
+    public_index_recommendation: uniqueFactCount >= 5 ? "index" : "noindex",
+    reason:
+      uniqueFactCount >= 5
+        ? "관측 항목이 5개 이상 있어 공개 설명에 반영할 고유 사실이 있습니다."
+        : "관측 항목이 5개 미만이라 짧은 설명과 추가 검수가 필요합니다.",
+  };
+}
+
+function normalizeObservationDescriptionContentQuality(
+  value: unknown,
+  fallback: ObservationDescriptionContentQuality,
+): ObservationDescriptionContentQuality {
+  const record = isRecord(value) ? value : {};
+  const uniqueFactCount =
+    typeof record.unique_fact_count === "number" &&
+    Number.isFinite(record.unique_fact_count)
+      ? Math.max(0, Math.round(record.unique_fact_count))
+      : fallback.unique_fact_count;
+  const dataSufficiency =
+    record.data_sufficiency === "low" ||
+    record.data_sufficiency === "medium" ||
+    record.data_sufficiency === "high"
+      ? record.data_sufficiency
+      : fallback.data_sufficiency;
+  const publicIndexRecommendation =
+    record.public_index_recommendation === "index" ||
+    record.public_index_recommendation === "noindex"
+      ? record.public_index_recommendation
+      : fallback.public_index_recommendation;
+
+  return {
+    unique_fact_count: uniqueFactCount,
+    data_sufficiency: dataSufficiency,
+    public_index_recommendation: publicIndexRecommendation,
+    reason: normalizeString(record.reason) || fallback.reason,
+  };
+}
+
+function countObservationSummaryFacts(summary: ObservationDescriptionSummary) {
+  return [
+    summary.page_title,
+    summary.h1,
+    ...summary.menu_summary,
+    ...summary.account_feature_summary,
+    ...summary.betting_feature_summary,
+    ...summary.payment_feature_summary,
+    ...summary.notice_summary,
+    ...summary.footer_summary,
+  ].filter((value) => typeof value === "string" && value.trim()).length;
+}
+
 function mergeProhibitedPhraseChecks(
   left: ObservationDescriptionProhibitedPhraseCheck,
   right: ObservationDescriptionProhibitedPhraseCheck,
@@ -1165,20 +1254,12 @@ function getNaturalDescriptionStyleWarnings(value: string) {
     countTextOccurrences(value, "스크린샷") >= 1 ||
     countTextOccurrences(value, "조회 시점 기준") >= 1;
 
-  if (paragraphs.length < 3) {
+  if (paragraphs.length < 2) {
     warnings.push("paragraph_count_too_low");
-  }
-
-  if (paragraphs.length < 4 || paragraphs.length > 6) {
-    warnings.push("사이트 설명은 4~6문단으로 정리하는 것이 좋습니다.");
   }
 
   if (plainTextLength < detailDescriptionTooShortLength) {
     warnings.push("too_short");
-  }
-
-  if (plainTextLength < detailDescriptionRecommendedMinLength) {
-    warnings.push("상세페이지 설명으로는 다소 짧습니다");
   }
 
   if (plainTextLength > detailDescriptionTooLongLength) {

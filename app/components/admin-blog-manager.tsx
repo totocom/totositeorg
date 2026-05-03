@@ -942,7 +942,13 @@ function formValuesToPayload(values: BlogPostFormValues): BlogPostPayload {
   };
 }
 
-export function AdminBlogManager() {
+type AdminBlogManagerProps = {
+  initialSourceSiteInput?: string;
+};
+
+export function AdminBlogManager({
+  initialSourceSiteInput = "",
+}: AdminBlogManagerProps) {
   const [posts, setPosts] = useState<BlogPostRow[]>([]);
   const [formValues, setFormValues] =
     useState<BlogPostFormValues>(emptyFormValues);
@@ -950,7 +956,9 @@ export function AdminBlogManager() {
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
-  const [sourceSiteInput, setSourceSiteInput] = useState(getInitialSourceSiteInput);
+  const [sourceSiteInput, setSourceSiteInput] = useState(() =>
+    normalizeSiteSourceInput(initialSourceSiteInput || getInitialSourceSiteInput()),
+  );
   const [generationSummary, setGenerationSummary] =
     useState<GenerateBlogDraftResponse["snapshotSummary"]>(undefined);
   const [message, setMessage] = useState("");

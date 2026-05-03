@@ -7,7 +7,15 @@ import {
 } from "@/app/components/admin-dashboard";
 import { useAuth } from "@/app/components/auth-provider";
 
-export function AdminGate({ section = "home" }: { section?: AdminSection }) {
+type AdminGateProps = {
+  section?: AdminSection;
+  initialBlogSourceSiteInput?: string;
+};
+
+export function AdminGate({
+  section = "home",
+  initialBlogSourceSiteInput = "",
+}: AdminGateProps) {
   const { user, isAdmin, isLoading, errorMessage } = useAuth();
 
   if (isLoading) {
@@ -64,5 +72,10 @@ export function AdminGate({ section = "home" }: { section?: AdminSection }) {
     );
   }
 
-  return <AdminDashboard section={section} />;
+  return (
+    <AdminDashboard
+      section={section}
+      initialBlogSourceSiteInput={initialBlogSourceSiteInput}
+    />
+  );
 }

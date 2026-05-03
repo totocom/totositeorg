@@ -94,6 +94,12 @@ const validAiOutput: ObservationDescriptionAiOutput = {
     contains_absolute_safety_claim: false,
     contains_access_facilitation: false,
   },
+  content_quality: {
+    unique_fact_count: 12,
+    data_sufficiency: "high",
+    public_index_recommendation: "index",
+    reason: "테스트 관측 항목이 충분합니다.",
+  },
 };
 
 async function runGenerate(options: {
@@ -292,6 +298,7 @@ test("fallback draft does not emphasize promotional flags in public description"
   );
   assert.equal(getPlainLength(fallback.detail_description_md) >= 700, true);
   assert.equal(getPlainLength(fallback.detail_description_md) <= 1100, true);
+  assert.equal(fallback.content_quality.public_index_recommendation, "index");
   assert.equal(fallback.detail_description_md.includes(site.url ?? ""), false);
   assert.equal(fallback.detail_description_md.includes("홈, 스포츠, 고객센터"), false);
   assert.equal(countReportLikePhrases(fallback.detail_description_md) <= 2, true);
@@ -322,11 +329,11 @@ test("validateObservationDescriptionDraft does not require embedded disclosure",
   assert.deepEqual(validation.errors, []);
 });
 
-test("validateObservationDescriptionDraft warns with too_short under 500 chars", () => {
+test("validateObservationDescriptionDraft warns with too_short under 160 chars", () => {
   const validation = validateObservationDescriptionDraft({
     detailDescriptionMd: buildRepeatedParagraphDescription(
-      4,
-      "짧은 설명 문장입니다. 화면 흐름을 간단히 요약합니다.",
+      1,
+      "짧은 설명 문장입니다.",
     ),
     sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
   });
@@ -335,23 +342,20 @@ test("validateObservationDescriptionDraft warns with too_short under 500 chars",
   assert.equal(validation.warnings.includes("too_short"), true);
 });
 
-test("validateObservationDescriptionDraft warns when under 700 chars", () => {
+test("validateObservationDescriptionDraft allows concise data-based descriptions", () => {
   const validation = validateObservationDescriptionDraft({
     detailDescriptionMd: buildRepeatedParagraphDescription(
-      4,
-      "중간 길이 설명 문장입니다. 화면 흐름과 계정 관련 요소를 자연스럽게 요약합니다.",
+      2,
+      "중간 길이 설명 문장입니다. 화면 흐름과 계정 관련 요소를 자연스럽게 요약합니다. 확인되지 않은 항목은 추정하지 않고 짧게 남깁니다. 공개 설명에는 입력 데이터로 확인되는 범위만 반영합니다.",
     ),
     sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
   });
 
-  assert.equal(validation.status, "warning");
-  assert.equal(
-    validation.warnings.includes("상세페이지 설명으로는 다소 짧습니다"),
-    true,
-  );
+  assert.equal(validation.warnings.includes("too_short"), false);
+  assert.equal(validation.warnings.includes("상세페이지 설명으로는 다소 짧습니다"), false);
 });
 
-test("validateObservationDescriptionDraft has no length warning for 700 to 1100 chars", () => {
+test("validateObservationDescriptionDraft has no length warning for rich descriptions", () => {
   const validation = validateObservationDescriptionDraft({
     detailDescriptionMd: validNaturalDescription,
     sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
@@ -377,10 +381,7 @@ test("validateObservationDescriptionDraft warns with too_long over 1200 chars", 
 
 test("validateObservationDescriptionDraft warns when paragraph count is under 3", () => {
   const validation = validateObservationDescriptionDraft({
-    detailDescriptionMd: [
-      "첫 번째 문단입니다. 화면 흐름을 자연스럽게 설명합니다.",
-      "두 번째 문단입니다. 확인되지 않은 항목을 짧게 설명합니다.",
-    ].join("\n\n"),
+    detailDescriptionMd: "첫 번째 문단입니다. 화면 흐름을 자연스럽게 설명합니다.",
     sourceTextChunks: ["메뉴 영역", "공지 영역", "푸터 영역"],
   });
 
@@ -547,17 +548,20 @@ test("approveObservationDescription stores natural 4 to 6 paragraph descriptions
   assert.equal(storedDescription.includes("h1"), false);
 });
 
-test("approveObservationDescription allows length-warning-only descriptions", async () => {
-  const finalDescription = buildRepeatedParagraphDescription(
-    4,
-    "중간 길이 설명 문장입니다. 화면 흐름과 계정 관련 요소를 자연스럽게 요약합니다.",
-  );
+test("approveObservationDescription allows concise descriptions", async () => {
+  const finalDescription = [
+    "중간 길이 설명 문장입니다. 화면 흐름과 계정 관련 요소를 자연스럽게 요약합니다. 확인되지 않은 항목은 추정하지 않고 짧게 남깁니다.",
+    "두 번째 문단은 공지와 하단 영역처럼 입력 데이터로 확인되는 범위만 반영합니다. 이용 조건이나 접근 제한 여부는 별도 확인이 필요한 항목으로 남깁니다.",
+  ].join("\n\n");
   const { result, siteUpdate, snapshotUpdate } = await runApprove({
     finalDescription,
   });
 
   assert.equal(result.status, 200);
-  assert.equal(result.body.validation_status, "warning");
+  assert.equal(
+    ["passed", "warning"].includes(String(result.body.validation_status)),
+    true,
+  );
   assert.equal(siteUpdate?.description, finalDescription);
   assert.equal(snapshotUpdate?.snapshot_status, "approved");
 });
@@ -634,7 +638,7 @@ test("validateObservationDescriptionDraft warns on report-like repetition and lo
   );
 });
 
-test("site observation description prompt requires natural bounded paragraphs", () => {
+test("site observation description prompt requires data-based bounded paragraphs", () => {
   const prompt = buildSiteObservationDescriptionPrompt({
     site: {
       id: site.id,
@@ -666,8 +670,10 @@ test("site observation description prompt requires natural bounded paragraphs", 
   });
   const combinedPrompt = `${siteObservationDescriptionSystemPrompt}\n${prompt}`;
 
-  assert.match(combinedPrompt, /4~6문단/);
-  assert.match(combinedPrompt, /700~1,100자/);
+  assert.match(combinedPrompt, /3~5문단/);
+  assert.match(combinedPrompt, /150~350자/);
+  assert.match(combinedPrompt, /insufficient_unique_data/);
+  assert.match(combinedPrompt, /content_quality/);
   assert.match(combinedPrompt, /고지문은 별도/);
   assert.match(combinedPrompt, /page_title, meta_description, h1/);
   assert.match(combinedPrompt, /세부 메뉴, 게임명, footer, 이미지 alt, 배지/);

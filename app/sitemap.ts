@@ -9,7 +9,12 @@ import {
   getPublishedBlogPostsForSitemap,
   type PublicBlogPost,
 } from "@/app/data/public-blog-posts";
-import { getApprovedSites } from "@/app/data/sites";
+import { getPublicSitesForSitemap } from "@/app/data/public-sites-sitemap";
+import {
+  calculateSiteDetailIndexability,
+  type SiteDetailIndexabilityResult,
+} from "@/app/data/site-detail-indexability";
+import type { ReviewTarget } from "@/app/data/sites";
 import { siteUrl } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +37,10 @@ function getPublishedPostCountByCategory(
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const sites = getApprovedSites();
-  const blogPosts = await getPublishedBlogPostsForSitemap();
+  const [publicSitesForSitemapResult, blogPosts] = await Promise.all([
+    getPublicSitesForSitemap(),
+    getPublishedBlogPostsForSitemap(),
+  ]);
   const sitemapBlogCategories = blogCategories.filter((category) => {
     const publishedPostCount = getPublishedPostCountByCategory(
       blogPosts,
@@ -43,12 +50,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return canIndexBlogCategory(category, publishedPostCount);
   });
 
-  const siteEntries: MetadataRoute.Sitemap = sites.map((site) => ({
-    url: `${siteUrl}/sites/${site.slug}`,
-    lastModified: new Date(),
-    changeFrequency: "weekly",
-    priority: 0.8,
-  }));
+  const siteEntries: MetadataRoute.Sitemap = publicSitesForSitemapResult.entries
+    .map((entry) => ({
+      ...entry,
+      indexability: calculateSiteDetailIndexability({
+        site: entry.site,
+        reviewsCount: entry.site.reviewCount,
+        scamReportsCount: entry.site.scamReportCount,
+        observationSnapshot: entry.observationSnapshot,
+        relatedBlogReport: entry.relatedBlogReport,
+        source: publicSitesForSitemapResult.source,
+      }),
+    }))
+    .filter(({ indexability }) => indexability.shouldIndex)
+    .map(({ site, indexability, lastModified }) => ({
+      url: `${siteUrl}/sites/${site.slug}`,
+      lastModified: lastModified ? new Date(lastModified) : new Date(),
+      changeFrequency: "weekly" as const,
+      priority: getSiteSitemapPriority(site, indexability),
+    }));
   const blogEntries: MetadataRoute.Sitemap = [
     ...(isBlogIndexActive
       ? [
@@ -114,4 +134,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     ...siteEntries,
   ];
+}
+
+function getSiteSitemapPriority(
+  site: ReviewTarget,
+  indexability: SiteDetailIndexabilityResult,
+) {
+  if ((site.scamReportCount ?? 0) > 0) return 0.8;
+  if (site.reviewCount > 0) return 0.75;
+  if (indexability.uniqueFactScore >= 5) return 0.65;
+
+  return 0.55;
 }

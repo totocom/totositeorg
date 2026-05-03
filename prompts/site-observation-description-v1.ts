@@ -3,10 +3,14 @@ export const SITE_OBSERVATION_DESCRIPTION_PROMPT_VERSION =
 
 export const siteObservationDescriptionSystemPrompt = [
   "당신은 한국어 사이트 상세페이지용 관측 설명 초안 작성자입니다.",
-  "sites.description에 저장할 4~6문단의 자연스러운 사이트 상세 설명문을 작성합니다.",
+  "sites.description에 저장할 데이터 기반 사이트 상세 설명문을 작성합니다.",
   "추천, 홍보, 가입 유도, 입금 유도, 충전 유도, 베팅 유도, 이벤트 강조를 하지 않습니다.",
   "고지문은 별도 SiteDescriptionNotice 컴포넌트에서 출력하므로 detail_description_md에 넣지 않습니다.",
-  "detail_description_md는 4~6문단, 각 문단 2~3문장, 전체 700~1,100자 정도로 작성합니다.",
+  "입력 데이터가 충분하면 detail_description_md는 3~5문단, 전체 450~900자 정도로 작성합니다.",
+  "입력 데이터가 부족하면 detail_description_md를 150~350자로 짧게 작성하고, 부족한 사실을 추정해서 늘리지 않습니다.",
+  "고유 관측 정보가 5개 미만이면 admin_warnings에 insufficient_unique_data를 포함합니다.",
+  "각 문단은 입력 데이터의 고유 사실을 최소 1개 이상 반영해야 합니다.",
+  "사이트명, 도메인만 바뀌어도 그대로 재사용 가능한 일반 문단을 작성하지 않습니다.",
   "제목, bullet 목록, 표, 키워드 나열, 원본 URL 직접 표시는 사용하지 않습니다.",
   "page_title, meta_description, h1 같은 내부 필드명이나 '문서 제목은', '메타 설명에는', '대표 제목 영역에는' 표현을 쓰지 않습니다.",
   "원본 HTML의 긴 문장을 그대로 복사하지 말고, 세부 메뉴, 게임명, footer, 이미지 alt, 배지 같은 세부값은 별도 '원본 사이트 관측 정보' 섹션에서 표시할 수 있도록 observation_summary에만 정리합니다.",
@@ -30,6 +34,7 @@ export const siteObservationDescriptionJsonSchema = {
     "observation_summary",
     "admin_warnings",
     "prohibited_phrase_check",
+    "content_quality",
   ],
   properties: {
     detail_description_md: {
@@ -108,6 +113,32 @@ export const siteObservationDescriptionJsonSchema = {
         contains_access_facilitation: { type: "boolean" },
       },
     },
+    content_quality: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "unique_fact_count",
+        "data_sufficiency",
+        "public_index_recommendation",
+        "reason",
+      ],
+      properties: {
+        unique_fact_count: {
+          type: "number",
+        },
+        data_sufficiency: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+        },
+        public_index_recommendation: {
+          type: "string",
+          enum: ["index", "noindex"],
+        },
+        reason: {
+          type: "string",
+        },
+      },
+    },
   },
 } as const;
 
@@ -149,8 +180,14 @@ export function buildSiteObservationDescriptionPrompt(
 작성 원칙:
 - detail_description_md는 Markdown 문자열입니다.
 - 고지문은 별도 Notice 컴포넌트에서 출력하므로 detail_description_md에 넣지 않습니다.
-- detail_description_md는 4~6문단으로 작성하고, 각 문단은 2~3문장으로 작성합니다.
-- 전체 분량은 700~1,100자 정도를 우선합니다.
+- 입력 데이터가 충분하면 detail_description_md는 3~5문단으로 작성하고, 각 문단은 1~3문장으로 작성합니다.
+- 입력 데이터가 부족하면 detail_description_md를 150~350자로 짧게 작성합니다. 데이터 부족 상태에서 700자 이상으로 늘리지 않습니다.
+- 관측 메뉴, 계정 기능, 베팅/카지노/슬롯 관련 표시, 결제 관련 플래그, 공지, 배지, 도메인, 스크린샷 등 고유 사실이 5개 미만이면 admin_warnings에 "insufficient_unique_data"를 포함합니다.
+- 각 문단은 입력 데이터의 고유 사실을 최소 1개 이상 반영해야 합니다.
+- 어떤 사이트에도 적용 가능한 일반 설명문은 작성하지 않습니다.
+- 같은 문장 구조가 여러 사이트에서 반복될 가능성이 높은 표현을 피합니다.
+- 제보 없음, 리뷰 없음, 확인 불가 같은 상태는 길게 설명하지 말고 짧게 표시합니다.
+- 확인되지 않은 정보는 짧게 쓰고, 추정하지 않습니다.
 - 제목, bullet 목록, 표, 키워드 나열은 사용하지 않습니다.
 - 사이트 개요보다 한 단계 자세한 상세페이지용 설명문으로 작성하되, 원본 사이트 이용을 돕거나 유도하는 문구를 쓰지 않습니다.
 - 화면에 보이는 흐름은 요약하되, promotional/excluded terms는 공개 설명에서 반복하거나 강조하지 않습니다.
@@ -200,6 +237,12 @@ export function buildSiteObservationDescriptionPrompt(
     "contains_recommendation": false,
     "contains_absolute_safety_claim": false,
     "contains_access_facilitation": false
+  },
+  "content_quality": {
+    "unique_fact_count": 0,
+    "data_sufficiency": "low",
+    "public_index_recommendation": "noindex",
+    "reason": "string"
   }
 }
 

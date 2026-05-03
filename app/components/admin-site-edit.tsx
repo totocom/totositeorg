@@ -481,14 +481,18 @@ function AdminSiteCrawlSnapshots({
   descriptionSnapshotId,
   errorMessage,
   deletingSnapshotId,
+  approvingSnapshotId,
   onDeleteSnapshot,
+  onApproveSnapshot,
 }: {
   snapshots: SiteCrawlSnapshotRow[];
   latestSnapshotId: string | null;
   descriptionSnapshotId: string | null;
   errorMessage: string;
   deletingSnapshotId: string | null;
+  approvingSnapshotId: string | null;
   onDeleteSnapshot: (snapshotId: string) => void;
+  onApproveSnapshot: (snapshotId: string) => void;
 }) {
   return (
     <section className="grid gap-4 rounded-md border border-line bg-background p-4">
@@ -520,10 +524,13 @@ function AdminSiteCrawlSnapshots({
           {snapshots.map((snapshot) => {
             const imageCandidates =
               snapshot.image_candidates_json as SiteCrawlSnapshotImageCandidates;
+            const isLatestSnapshot = snapshot.id === latestSnapshotId;
+            const isDescriptionSnapshot = snapshot.id === descriptionSnapshotId;
+            const isPublicVisibleSnapshot = snapshot.snapshot_status === "approved";
             const isAppliedSnapshot =
-              snapshot.snapshot_status === "approved" ||
-              snapshot.id === latestSnapshotId ||
-              snapshot.id === descriptionSnapshotId;
+              isPublicVisibleSnapshot ||
+              isLatestSnapshot ||
+              isDescriptionSnapshot;
 
             return (
               <article
@@ -536,12 +543,17 @@ function AdminSiteCrawlSnapshots({
                       <span className="rounded-md border border-line bg-surface px-2 py-1 text-xs font-semibold text-foreground">
                         {snapshotStatusLabels[snapshot.snapshot_status]}
                       </span>
-                      {snapshot.id === latestSnapshotId ? (
+                      {isLatestSnapshot && isPublicVisibleSnapshot ? (
                         <span className="rounded-md border border-accent bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
-                          공개 상세 반영
+                          공개 상세 노출
                         </span>
                       ) : null}
-                      {snapshot.id === descriptionSnapshotId ? (
+                      {isLatestSnapshot && !isPublicVisibleSnapshot ? (
+                        <span className="rounded-md border border-yellow-300 bg-yellow-50 px-2 py-1 text-xs font-semibold text-yellow-700 dark:border-yellow-900 dark:bg-yellow-950/40 dark:text-yellow-300">
+                          공개 상세 참조 · 승인 필요
+                        </span>
+                      ) : null}
+                      {isDescriptionSnapshot ? (
                         <span className="rounded-md border border-accent bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
                           설명 출처
                         </span>
@@ -553,15 +565,40 @@ function AdminSiteCrawlSnapshots({
                     <p className="mt-1 break-all text-xs text-muted">
                       ID: {snapshot.id}
                     </p>
+                    {isLatestSnapshot && !isPublicVisibleSnapshot ? (
+                      <p className="mt-2 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-800 dark:border-yellow-900 dark:bg-yellow-950/40 dark:text-yellow-200">
+                        이 snapshot은 최신 참조로 연결되어 있지만 아직 공개 반영
+                        상태가 아니어서 /sites 상세의 관측 기록 섹션에는 표시되지
+                        않습니다.
+                      </p>
+                    ) : null}
                   </div>
                   <div className="grid justify-items-end gap-2 text-right text-xs text-muted">
                     <p>관측: {formatOptionalDateTime(snapshot.collected_at)}</p>
                     <p>수정: {formatOptionalDateTime(snapshot.updated_at)}</p>
+                    {!isPublicVisibleSnapshot ? (
+                      <button
+                        type="button"
+                        onClick={() => onApproveSnapshot(snapshot.id)}
+                        disabled={
+                          deletingSnapshotId !== null ||
+                          approvingSnapshotId !== null
+                        }
+                        className="h-9 rounded-md border border-accent px-3 text-xs font-semibold text-accent transition hover:bg-accent-soft disabled:opacity-50"
+                      >
+                        {approvingSnapshotId === snapshot.id
+                          ? "반영 중..."
+                          : "공개 반영"}
+                      </button>
+                    ) : null}
                     {!isAppliedSnapshot ? (
                       <button
                         type="button"
                         onClick={() => onDeleteSnapshot(snapshot.id)}
-                        disabled={deletingSnapshotId !== null}
+                        disabled={
+                          deletingSnapshotId !== null ||
+                          approvingSnapshotId !== null
+                        }
                         className="h-9 rounded-md border border-red-200 px-3 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
                       >
                         {deletingSnapshotId === snapshot.id
@@ -743,6 +780,9 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     useState<string | null>(null);
   const [snapshotErrorMessage, setSnapshotErrorMessage] = useState("");
   const [deletingSnapshotId, setDeletingSnapshotId] = useState<string | null>(
+    null,
+  );
+  const [approvingSnapshotId, setApprovingSnapshotId] = useState<string | null>(
     null,
   );
   const [message, setMessage] = useState("");
@@ -950,6 +990,62 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       setSnapshotErrorMessage("관측 snapshot을 삭제하지 못했습니다.");
     } finally {
       setDeletingSnapshotId(null);
+    }
+  }
+
+  async function approveCrawlSnapshot(snapshotId: string) {
+    const confirmed = window.confirm(
+      "이 관측 snapshot을 공개 상세 페이지에 반영하시겠습니까?",
+    );
+
+    if (!confirmed) return;
+
+    setMessage("");
+    setErrorMessage("");
+    setSnapshotErrorMessage("");
+    setApprovingSnapshotId(snapshotId);
+
+    try {
+      const token = await getAdminToken();
+
+      if (!token) {
+        setErrorMessage("관리자 로그인 세션을 확인하지 못했습니다.");
+        return;
+      }
+
+      const response = await fetch("/api/admin/sites/crawl-snapshots/review", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "approve_snapshot",
+          siteId,
+          snapshotId,
+        }),
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; preview_path?: string | null }
+        | null;
+
+      if (!response.ok || !result?.ok) {
+        setSnapshotErrorMessage(
+          result?.error ?? "관측 snapshot을 공개 반영하지 못했습니다.",
+        );
+        return;
+      }
+
+      await refreshSnapshotContext();
+      setMessage(
+        result.preview_path
+          ? `관측 snapshot을 공개 반영했습니다. ${result.preview_path}에서 확인할 수 있습니다.`
+          : "관측 snapshot을 공개 반영했습니다.",
+      );
+    } catch {
+      setSnapshotErrorMessage("관측 snapshot을 공개 반영하지 못했습니다.");
+    } finally {
+      setApprovingSnapshotId(null);
     }
   }
 
@@ -1265,7 +1361,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     }`;
   }
 
-  async function saveSite(nextStatus?: SiteRow["status"]) {
+  async function saveSite(nextStatus: SiteRow["status"] = "approved") {
     const nextErrors = validate();
     setErrors(nextErrors);
 
@@ -1307,7 +1403,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         screenshot_url: storedScreenshotUrl,
         screenshot_thumb_url: storedScreenshotThumbUrl,
         favicon_url: faviconUrl || null,
-        ...(nextStatus ? { status: nextStatus } : {}),
+        status: nextStatus,
         description: values.description.trim(),
       })
       .eq("id", siteId);
@@ -1332,9 +1428,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     const statusChangedToApproved =
       nextStatus === "approved" && siteStatus !== "approved";
 
-    if (nextStatus) {
-      setSiteStatus(nextStatus);
-    }
+    setSiteStatus(nextStatus);
 
     const token = await getAdminToken();
 
@@ -1625,7 +1719,9 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
             descriptionSnapshotId={descriptionSourceSnapshotId}
             errorMessage={snapshotErrorMessage}
             deletingSnapshotId={deletingSnapshotId}
+            approvingSnapshotId={approvingSnapshotId}
             onDeleteSnapshot={(snapshotId) => void deleteCrawlSnapshot(snapshotId)}
+            onApproveSnapshot={(snapshotId) => void approveCrawlSnapshot(snapshotId)}
           />
 
           <label className="grid gap-1 text-sm font-medium">
@@ -1737,7 +1833,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
               disabled={isSaving}
               className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {isSaving ? "저장 중..." : "수정 저장"}
+              {isSaving ? "저장 중..." : "수정 저장 및 승인"}
             </button>
           </div>
         </form>

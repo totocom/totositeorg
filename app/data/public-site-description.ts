@@ -184,24 +184,16 @@ function getObservationDescriptionFormatWarnings(value: string, sourceValue = va
     warnings.push("사이트 설명에 제목 또는 bullet/list 형식이 포함되어 있습니다.");
   }
 
-  if (plainText.length > 0 && plainText.length < 500) {
+  if (plainText.length > 0 && plainText.length < 160) {
     warnings.push("too_short");
-  }
-
-  if (plainText.length > 0 && plainText.length < 700) {
-    warnings.push("상세페이지 설명으로는 다소 짧습니다");
   }
 
   if (plainText.length > 1200) {
     warnings.push("too_long");
   }
 
-  if (paragraphs.length > 0 && paragraphs.length < 3) {
+  if (paragraphs.length > 0 && paragraphs.length < 2) {
     warnings.push("paragraph_count_too_low");
-  }
-
-  if (paragraphs.length > 0 && (paragraphs.length < 4 || paragraphs.length > 6)) {
-    warnings.push("사이트 상세 설명은 4~6문단으로 정리하는 것이 좋습니다.");
   }
 
   if (hasLongMenuLikeEnumeration(sourcePlainText)) {

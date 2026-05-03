@@ -69,11 +69,8 @@ test("site detail meta description does not use full markdown description", () =
   assert.equal(description.includes("카지노"), false);
   assert.equal(description.includes("<script"), false);
   assert.equal(description.length >= 80, true);
-  assert.match(description, /^벳톡 토토사이트의 주소, 도메인/);
-  assert.equal(
-    description,
-    "벳톡 토토사이트의 주소, 도메인, DNS·WHOIS 정보와 승인된 먹튀 피해 제보 및 후기 현황을 조회 시점 기준으로 정리한 정보 페이지입니다.",
-  );
+  assert.match(description, /^벳톡의 대표 도메인 bettok\.example/);
+  assert.match(description, /승인 후기와 피해 제보가 부족/);
 });
 
 test("stripMarkdownForMeta removes markdown html newlines lists and long urls", () => {
@@ -112,7 +109,7 @@ test("open graph and twitter descriptions use short site specific plain text", (
   assert.equal(twitter.description, buildSiteDetailMetaDescription(createSite()));
   assertShortPlainMetaDescription(openGraph.description);
   assertShortPlainMetaDescription(twitter.description);
-  assert.match(twitter.description ?? "", /^벳톡 토토사이트의 주소, 도메인/);
+  assert.match(twitter.description ?? "", /^벳톡의 대표 도메인 bettok\.example/);
   assert.equal(twitter.card, "summary_large_image");
 });
 
@@ -123,9 +120,9 @@ test("site detail title avoids duplicated 토토사이트 정보 suffix", () => 
 
   assert.equal(
     title,
-    "벳톡 토토사이트 정보 | 주소·도메인·먹튀 제보 현황",
+    "벳톡 주소·기본 정보",
   );
-  assert.equal(countOccurrences(title, "토토사이트 정보"), 1);
+  assert.equal(countOccurrences(title, "토토사이트 정보"), 0);
 });
 
 test("site detail H1 uses descriptive site report wording", () => {
@@ -133,8 +130,9 @@ test("site detail H1 uses descriptive site report wording", () => {
   const heading = buildSiteDetailHeading(site);
 
   assert.equal(heading.endsWith(site.siteName), false);
-  assert.equal(heading.includes(`${site.siteName} 토토사이트`), true);
-  assert.equal(heading.length >= 20, true);
+  assert.equal(heading.includes(site.siteName), true);
+  assert.match(heading, /기본 정보|주소·도메인|후기·제보/);
+  assert.equal(heading.length >= 15, true);
 });
 
 test("site detail H1 removes prohibited promotional terms", () => {
@@ -147,7 +145,7 @@ test("site detail H1 removes prohibited promotional terms", () => {
     forbiddenTerms.some((term) => heading.includes(term)),
     false,
   );
-  assert.equal(heading.includes("토토사이트 정보"), true);
+  assert.equal(heading.includes("기본 정보"), true);
 });
 
 test("twitter title is generated from the site detail title", () => {
@@ -156,7 +154,37 @@ test("twitter title is generated from the site detail title", () => {
 
   assert.equal(
     twitter.title,
-    "벳톡 토토사이트 정보 | 주소·도메인·먹튀 제보 현황",
+    "벳톡 주소·기본 정보",
+  );
+});
+
+test("site detail title reflects approved reports reviews and domains", () => {
+  assert.equal(
+    buildSiteDetailTitle(createSite({ scamReportCount: 2, reviewCount: 1 })),
+    "벳톡 피해 제보 2건·도메인 현황",
+  );
+  assert.equal(
+    buildSiteDetailTitle(createSite({ reviewCount: 3 })),
+    "벳톡 후기 3건·관측 정보",
+  );
+  assert.equal(
+    buildSiteDetailTitle(
+      createSite({
+        siteUrl: "https://bettok.example",
+        domains: ["https://bettok.example", "https://bettok.kr"],
+      }),
+    ),
+    "벳톡 도메인 2개·확인 항목",
+  );
+  assert.equal(
+    buildSiteDetailTitle(createSite(), {
+      observationSnapshot: {
+        observed_betting_features: Array.from({ length: 55 }, (_, index) =>
+          `관측 항목 ${index}`,
+        ),
+      },
+    }),
+    "벳톡 화면 관측 55개·도메인 정보",
   );
 });
 
@@ -225,7 +253,8 @@ test("empty site description still produces valid meta description", () => {
 
   assertShortPlainMetaDescription(description);
   assert.equal(description.length >= 80, true);
-  assert.equal(description.includes("벳톡 토토사이트"), true);
+  assert.equal(description.includes("벳톡"), true);
+  assert.equal(description.includes("bettok.example"), true);
 });
 
 test("long site description is never copied into metadata description", () => {

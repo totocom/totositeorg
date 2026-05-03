@@ -388,7 +388,15 @@ async function fetchAdminData(): Promise<AdminDataResult> {
   };
 }
 
-export function AdminDashboard({ section = "home" }: { section?: AdminSection }) {
+type AdminDashboardProps = {
+  section?: AdminSection;
+  initialBlogSourceSiteInput?: string;
+};
+
+export function AdminDashboard({
+  section = "home",
+  initialBlogSourceSiteInput = "",
+}: AdminDashboardProps) {
   const { user } = useAuth();
   const [sites, setSites] = useState<SiteRow[]>([]);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
@@ -566,31 +574,32 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
     setUpdatingItem({ table, id, status });
     setErrorMessage("");
 
-    const updatePayload =
-      table === "scam_reports"
-        ? {
-            review_status: status,
-            is_published: status === "approved",
-            reviewed_at: new Date().toISOString(),
-            approved_at: status === "approved" ? new Date().toISOString() : null,
-            published_at: status === "approved" ? new Date().toISOString() : null,
-          }
-        : { status };
+    const { data: sessionResult } = await supabase.auth.getSession();
+    const token = sessionResult.session?.access_token;
 
-    const { error } = await supabase.from(table).update(updatePayload).eq("id", id);
+    if (!token) {
+      setUpdatingItem(null);
+      setErrorMessage("관리자 로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    const response = await fetch("/api/admin/moderation/status", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ table, id, status }),
+    });
+    const result = (await response.json().catch(() => null)) as
+      | { ok?: boolean; error?: string }
+      | null;
 
     setUpdatingItem(null);
 
-    if (error) {
-      if (isRlsError(error.code)) {
-        setErrorMessage(
-          "상태 변경 권한이 없습니다. 현재 RLS 정책에서 public update가 막혀 있을 수 있습니다. 다음 단계에서 관리자 권한 정책을 추가해야 합니다.",
-        );
-        return;
-      }
-
+    if (!response.ok || !result?.ok) {
       setErrorMessage(
-        "상태 변경 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        result?.error ?? "상태 변경 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
       );
       return;
     }
@@ -1684,7 +1693,12 @@ export function AdminDashboard({ section = "home" }: { section?: AdminSection })
         />
       ) : null}
 
-      {showBlog ? <AdminBlogManager /> : null}
+      {showBlog ? (
+        <AdminBlogManager
+          key={initialBlogSourceSiteInput}
+          initialSourceSiteInput={initialBlogSourceSiteInput}
+        />
+      ) : null}
 
       {showSiteRegistration ? (
       <section

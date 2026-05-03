@@ -19,6 +19,7 @@ import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display
 import { extractDomain } from "@/app/data/domain-whois";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
 import { getSiteOverviewMarkdownBlocks } from "@/app/data/public-site-description";
+import { calculateSiteDetailIndexability } from "@/app/data/site-detail-indexability";
 import {
   buildSiteDetailHeading,
   buildMissingSiteMetadata,
@@ -161,13 +162,37 @@ export async function generateMetadata({
 }: SiteDetailPageProps): Promise<Metadata> {
   const { slug: rawSlug } = await params;
   const slug = rawSlug.trim();
-  const { site } = await getCachedPublicSiteDetail(slug);
+  const detail = await getCachedPublicSiteDetail(slug);
+  const {
+    site,
+    reviews,
+    scamReports,
+    observationSnapshot,
+    domainCreationDates,
+    relatedBlogReport,
+    source,
+  } = detail;
 
   if (!site) {
     return buildMissingSiteMetadata();
   }
 
-  return buildSiteDetailMetadata(site, slug);
+  const indexability = calculateSiteDetailIndexability({
+    site,
+    reviewsCount: reviews.length,
+    scamReportsCount: scamReports.length,
+    observationSnapshot,
+    domainCreationDates,
+    relatedBlogReport,
+    source,
+  });
+
+  return buildSiteDetailMetadata(site, slug, {
+    shouldIndex: indexability.shouldIndex,
+    indexability,
+    observationSnapshot,
+    relatedBlogReport,
+  });
 }
 
 export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
@@ -213,10 +238,34 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     );
   }
 
-  const siteDetailMetaDescription = buildSiteDetailMetaDescription(site);
-  const siteDetailHeading = buildSiteDetailHeading(site);
-  const shareTitle = buildSiteDetailShareTitle(site);
-  const shareDescription = buildSiteDetailShareDescription(site);
+  const indexability = calculateSiteDetailIndexability({
+    site,
+    reviewsCount: reviews.length,
+    scamReportsCount: scamReports.length,
+    observationSnapshot,
+    domainCreationDates,
+    relatedBlogReport,
+    source,
+  });
+  const siteDetailMetadataOptions = {
+    shouldIndex: indexability.shouldIndex,
+    indexability,
+    observationSnapshot,
+    relatedBlogReport,
+  };
+  const siteDetailMetaDescription = buildSiteDetailMetaDescription(
+    site,
+    siteDetailMetadataOptions,
+  );
+  const siteDetailHeading = buildSiteDetailHeading(
+    site,
+    siteDetailMetadataOptions,
+  );
+  const shareTitle = buildSiteDetailShareTitle(site, siteDetailMetadataOptions);
+  const shareDescription = buildSiteDetailShareDescription(
+    site,
+    siteDetailMetadataOptions,
+  );
   const shareUrl = `${siteUrl.replace(/\/$/, "")}/sites/${encodeURIComponent(slug)}`;
   const itemListJsonLd = {
     "@context": "https://schema.org",
@@ -413,7 +462,11 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 </div>
               )}
               <div className="sm:col-span-2">
-                <AdminSiteDetailActions siteId={site.id} siteSlug={site.slug} />
+                <AdminSiteDetailActions
+                  siteId={site.id}
+                  siteSlug={site.slug}
+                  indexability={indexability}
+                />
               </div>
             </div>
           </div>
@@ -593,12 +646,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               ))}
             </div>
           ) : (
-            <div className="p-10 text-center">
-              <p className="text-3xl">⚠️</p>
-              <h3 className="mt-3 font-bold">아직 승인된 피해 제보가 없습니다</h3>
-              <p className="mt-2 text-sm text-muted">
-                이 사이트에 대한 먹튀 피해 이력은 관리자 검토 후 공개됩니다.
-              </p>
+            <div className="px-5 py-4">
+              <p className="text-sm text-muted">승인된 피해 제보 없음</p>
             </div>
           )}
         </section>
@@ -661,12 +710,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               ))}
             </div>
           ) : (
-            <div className="p-10 text-center">
-              <p className="text-3xl">📝</p>
-              <h3 className="mt-3 font-bold">아직 승인된 리뷰가 없습니다</h3>
-              <p className="mt-2 text-sm text-muted">
-                이 사이트에 대한 이용 경험은 관리자 검토 후 공개됩니다.
-              </p>
+            <div className="px-5 py-4">
+              <p className="text-sm text-muted">승인된 리뷰 없음</p>
             </div>
           )}
         </section>
@@ -674,7 +719,11 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
         </div>
 
         <aside className="grid content-start gap-4">
-          <SiteFeedbackSubmissionGuide siteId={site.id} siteName={site.siteName} />
+          <SiteFeedbackSubmissionGuide
+            siteId={site.id}
+            siteName={site.siteName}
+            reduced={!indexability.shouldIndex}
+          />
 
           <RelatedBlogReportCard
             siteName={site.siteName}

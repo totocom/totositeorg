@@ -116,7 +116,10 @@ test("site detail page renders the feedback and scam report submission guide", (
   const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
 
   assert.match(siteDetailPageSource, /import\s+\{\s*SiteFeedbackSubmissionGuide\s*\}/);
-  assert.match(siteDetailPageSource, /<SiteFeedbackSubmissionGuide\s+siteId=\{site\.id\}\s+siteName=\{site\.siteName\}\s*\/>/);
+  assert.match(
+    siteDetailPageSource,
+    /<SiteFeedbackSubmissionGuide[\s\S]*siteId=\{site\.id\}[\s\S]*siteName=\{site\.siteName\}[\s\S]*reduced=\{!indexability\.shouldIndex\}/,
+  );
   assert.match(
     siteDetailPageSource,
     /<SiteDescriptionNotice\s+siteName=\{site\.siteName\}\s*\/>/,
@@ -260,8 +263,8 @@ test("site detail scam report submission action is rendered in the scam reports 
     siteDetailPageSource,
     /<p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">승인된 피해 제보<\/h2>[\s\S]*?primarySubmissionActionClassName/,
   );
-  assert.doesNotMatch(feedbackSubmissionGuideSource, /guide\.actions\[/);
-  assert.doesNotMatch(feedbackSubmissionGuideSource, /Action\.href/);
+  assert.match(feedbackSubmissionGuideSource, /guide\.actions\.map/);
+  assert.match(feedbackSubmissionGuideSource, /href=\{action\.href\}/);
 });
 
 test("site detail domain submission button uses site-specific label", () => {
@@ -337,11 +340,9 @@ test("feedback submission guide copy and actions use review and report routes", 
   ].join("\n");
   const buttonLabels = guide.actions.map((action) => action.label).join("\n");
 
-  assert.equal(guide.title, "벳톡 후기 및 먹튀 제보 등록 안내");
-  assert.match(combinedCopy, /벳톡 후기/);
-  assert.match(combinedCopy, /벳톡 먹튀 제보/);
-  assert.match(combinedCopy, /실제 이용 경험이 있는 분/);
-  assert.match(combinedCopy, /관리자 검토를 거쳐 공개될 수 있으며/);
+  assert.equal(guide.title, "후기 및 제보 등록");
+  assert.match(combinedCopy, /벳톡 관련 승인 후기와 피해 제보/);
+  assert.match(combinedCopy, /관리자 검토 후 공개 정보에 반영/);
   assert.match(
     combinedCopy,
     /개인정보가 포함된 내용은 승인되지 않을 수 있습니다/,

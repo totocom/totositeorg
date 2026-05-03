@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
+import { domainToASCII } from "node:url";
 
 export type ActiveWhoisProvider = "api-ninjas" | "apilayer";
 export type WhoisProvider = ActiveWhoisProvider | "auto";
@@ -62,19 +63,25 @@ export function normalizeWhoisProvider(value: unknown): WhoisProvider {
 }
 
 export function extractDomain(value: string) {
+  const input = value.trim();
+  if (!input) return "";
+
   try {
     const url = new URL(
-      value.startsWith("http://") || value.startsWith("https://")
-        ? value
-        : `https://${value}`,
+      input.startsWith("http://") || input.startsWith("https://")
+        ? input
+        : `https://${input}`,
     );
 
-    const hostname = url.hostname
-      .toLowerCase()
-      .replace(/^www\./, "")
-      .replace(/\.$/, "");
+    const hostname = domainToASCII(
+      url.hostname.toLowerCase().replace(/^www\./, "").replace(/\.$/, ""),
+    );
 
-    return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(hostname) ? hostname : "";
+    return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})$/i.test(
+      hostname,
+    )
+      ? hostname
+      : "";
   } catch {
     return "";
   }
