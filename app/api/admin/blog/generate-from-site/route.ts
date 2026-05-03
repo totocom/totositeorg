@@ -70,7 +70,7 @@ import {
 } from "@/prompts/blog/openai-validator-v1";
 
 export const runtime = "nodejs";
-export const maxDuration = 900;
+export const maxDuration = 800;
 
 type BlogPriority = "상" | "중" | "하";
 
