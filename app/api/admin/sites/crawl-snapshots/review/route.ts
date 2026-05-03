@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import {
   getAdminSession,
   getBearerToken,
@@ -17,6 +18,14 @@ function normalizeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getAction(value: unknown) {
+  if (value === "reject") return "reject";
+  if (value === "approve_snapshot") return "approve_snapshot";
+  if (value === "delete") return "delete";
+
+  return "apply";
+}
+
 export async function POST(request: Request) {
   const token = getBearerToken(request);
   const adminSession = await getAdminSession(token);
@@ -31,7 +40,7 @@ export async function POST(request: Request) {
     snapshotId?: unknown;
     description?: unknown;
   } | null;
-  const action = body?.action === "reject" ? "reject" : "apply";
+  const action = getAction(body?.action);
   const siteId = normalizeString(body?.siteId);
   const snapshotId = normalizeString(body?.snapshotId);
   const description = normalizeString(body?.description);
@@ -44,6 +53,72 @@ export async function POST(request: Request) {
   }
 
   const supabase = getServiceClient();
+
+  if (action === "delete") {
+    const { data: snapshot, error: snapshotError } = await supabase
+      .from("site_crawl_snapshots")
+      .select("id, snapshot_status")
+      .eq("id", snapshotId)
+      .eq("site_id", siteId)
+      .maybeSingle();
+
+    if (snapshotError) {
+      return NextResponse.json(
+        { error: "관측 snapshot을 조회하지 못했습니다." },
+        { status: 500 },
+      );
+    }
+
+    if (!snapshot) {
+      return NextResponse.json(
+        { error: "관측 snapshot을 찾지 못했습니다." },
+        { status: 404 },
+      );
+    }
+
+    const { data: site, error: siteError } = await supabase
+      .from("sites")
+      .select("latest_crawl_snapshot_id, description_source_snapshot_id")
+      .eq("id", siteId)
+      .maybeSingle();
+
+    if (siteError) {
+      return NextResponse.json(
+        { error: "사이트의 snapshot 반영 상태를 확인하지 못했습니다." },
+        { status: 500 },
+      );
+    }
+
+    const row = site as Record<string, unknown> | null;
+    const isAppliedSnapshot =
+      snapshot.snapshot_status === "approved" ||
+      row?.latest_crawl_snapshot_id === snapshotId ||
+      row?.description_source_snapshot_id === snapshotId;
+
+    if (isAppliedSnapshot) {
+      return NextResponse.json(
+        { error: "반영된 관측 snapshot은 삭제할 수 없습니다." },
+        { status: 400 },
+      );
+    }
+
+    const { error: deleteError } = await supabase
+      .from("site_crawl_snapshots")
+      .delete()
+      .eq("id", snapshotId)
+      .eq("site_id", siteId);
+
+    if (deleteError) {
+      return NextResponse.json(
+        { error: "관측 snapshot을 삭제하지 못했습니다." },
+        { status: 500 },
+      );
+    }
+
+    revalidateTag("public-sites", "max");
+
+    return NextResponse.json({ ok: true });
+  }
 
   if (action === "reject") {
     const { error } = await supabase
@@ -62,7 +137,77 @@ export async function POST(request: Request) {
       );
     }
 
+    revalidateTag("public-sites", "max");
+
     return NextResponse.json({ ok: true });
+  }
+
+  if (action === "approve_snapshot") {
+    const { data: snapshot, error: snapshotError } = await supabase
+      .from("site_crawl_snapshots")
+      .select("id, site_id, collected_at")
+      .eq("id", snapshotId)
+      .eq("site_id", siteId)
+      .maybeSingle();
+
+    if (snapshotError) {
+      return NextResponse.json(
+        { error: "관측 snapshot을 조회하지 못했습니다." },
+        { status: 500 },
+      );
+    }
+
+    if (!snapshot) {
+      return NextResponse.json(
+        { error: "관측 snapshot을 찾지 못했습니다." },
+        { status: 404 },
+      );
+    }
+
+    const now = new Date().toISOString();
+    const collectedAt =
+      typeof snapshot.collected_at === "string" ? snapshot.collected_at : now;
+    const { error: snapshotUpdateError } = await supabase
+      .from("site_crawl_snapshots")
+      .update({
+        snapshot_status: "approved",
+        updated_at: now,
+      })
+      .eq("id", snapshotId)
+      .eq("site_id", siteId);
+
+    if (snapshotUpdateError) {
+      return NextResponse.json(
+        { error: "관측 snapshot을 공개 반영하지 못했습니다." },
+        { status: 500 },
+      );
+    }
+
+    const { data: site, error: siteUpdateError } = await supabase
+      .from("sites")
+      .update({
+        latest_crawl_snapshot_id: snapshotId,
+        content_crawled_at: collectedAt,
+      })
+      .eq("id", siteId)
+      .select("slug")
+      .maybeSingle();
+
+    if (siteUpdateError) {
+      return NextResponse.json(
+        { error: "사이트의 최신 관측 snapshot 참조를 갱신하지 못했습니다." },
+        { status: 500 },
+      );
+    }
+
+    revalidateTag("public-sites", "max");
+
+    return NextResponse.json({
+      ok: true,
+      snapshotId,
+      preview_path:
+        site && typeof site.slug === "string" ? `/sites/${site.slug}` : null,
+    });
   }
 
   const result = await approveObservationDescription({
@@ -217,6 +362,10 @@ export async function POST(request: Request) {
       };
     },
   });
+
+  if (result.status >= 200 && result.status < 300) {
+    revalidateTag("public-sites", "max");
+  }
 
   return NextResponse.json(result.body, { status: result.status });
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import type { SiteHtmlObservation } from "@/app/data/site-html-observation";
 import { getAllowedStoredImageUrl } from "@/app/data/storage-image-url";
 import {
@@ -173,6 +174,10 @@ export async function POST(request: Request) {
       content_crawled_at: collectedAt,
     })
     .eq("id", siteId);
+
+  if (snapshotStatus === "approved") {
+    revalidateTag("public-sites", "max");
+  }
 
   return NextResponse.json({ snapshotId: snapshot.id });
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AdminSiteObservationPanel } from "@/app/components/admin-site-observation-panel";
 import { useAuth } from "@/app/components/auth-provider";
 import { ScreenshotUploadControl } from "@/app/components/screenshot-upload-control";
@@ -11,7 +11,11 @@ import {
   automaticCrawlSupportGuideText,
 } from "@/app/data/automatic-crawl-support";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
-import type { SiteCrawlSnapshotSiteColumns } from "@/app/data/site-crawl-snapshots";
+import type {
+  SiteCrawlSnapshotRow,
+  SiteCrawlSnapshotSiteColumns,
+  SiteCrawlSnapshotStatus,
+} from "@/app/data/site-crawl-snapshots";
 import { getAllowedStoredImageUrl } from "@/app/data/storage-image-url";
 import { supabase } from "@/lib/supabase/client";
 
@@ -48,6 +52,14 @@ type AdminSiteEditProps = {
   siteId: string;
 };
 
+type SiteCrawlSnapshotImageCandidates = Partial<{
+  og_images: unknown[];
+  twitter_images: unknown[];
+  favicon_candidates: unknown[];
+  logo_candidates: unknown[];
+  image_alts: unknown[];
+}>;
+
 const initialValues: EditValues = {
   nameKo: "",
   nameEn: "",
@@ -64,6 +76,68 @@ const statusLabels = {
   approved: "승인됨",
   rejected: "거절됨",
 };
+
+const snapshotStatusLabels: Record<SiteCrawlSnapshotStatus, string> = {
+  draft: "초안",
+  extracted: "추출됨",
+  ai_generated: "AI 생성됨",
+  approved: "공개 반영",
+  rejected: "반려됨",
+};
+
+const snapshotSourceTypeLabels: Record<SiteCrawlSnapshotRow["source_type"], string> = {
+  manual_html: "수동 HTML",
+  crawler: "크롤러",
+};
+
+const snapshotHtmlInputTypeLabels: Record<
+  SiteCrawlSnapshotRow["html_input_type"],
+  string
+> = {
+  source_html: "원본 HTML",
+  rendered_html: "렌더링 HTML",
+  unknown: "확인 불가",
+};
+
+const siteCrawlSnapshotSelect = [
+  "id",
+  "site_id",
+  "source_type",
+  "html_input_type",
+  "source_url",
+  "final_url",
+  "domain",
+  "page_title",
+  "meta_description",
+  "h1",
+  "observed_menu_labels",
+  "observed_account_features",
+  "observed_betting_features",
+  "observed_payment_flags",
+  "observed_notice_items",
+  "observed_event_items",
+  "observed_footer_text",
+  "observed_badges",
+  "image_candidates_json",
+  "favicon_candidates_json",
+  "logo_candidates_json",
+  "promotional_flags_json",
+  "excluded_terms_json",
+  "screenshot_url",
+  "screenshot_thumb_url",
+  "favicon_url",
+  "logo_url",
+  "html_sha256",
+  "visible_text_sha256",
+  "raw_html_storage_path",
+  "snapshot_status",
+  "ai_detail_description_md",
+  "ai_observation_summary_json",
+  "collected_at",
+  "created_by",
+  "created_at",
+  "updated_at",
+].join(", ");
 
 const automaticMetadataFailureFallback = `도메인 정보를 가져오지 못했습니다. ${automaticCrawlManualHtmlFallbackText} ${automaticCrawlSupportGuideText}`;
 const automaticCaptureFailureFallback = `페이지 캡처 이미지를 생성하지 못했습니다. ${automaticCrawlManualHtmlFallbackText} ${automaticCrawlSupportGuideText}`;
@@ -189,6 +263,136 @@ function formatOptionalDate(value: string) {
   }).format(new Date(value));
 }
 
+function formatOptionalDateTime(value: string | null | undefined) {
+  if (!value) return "확인 불가";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "확인 불가";
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatSnapshotJson(value: unknown) {
+  return JSON.stringify(value ?? null, null, 2);
+}
+
+function getSnapshotListItems(value: unknown, limit = 12) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (typeof item === "string") return item.trim();
+      if (typeof item === "number" || typeof item === "boolean") {
+        return String(item);
+      }
+      return formatSnapshotJson(item);
+    })
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function SnapshotInfoField({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | undefined;
+}) {
+  return (
+    <div className="rounded-md bg-surface p-3">
+      <dt className="text-xs font-semibold text-muted">{label}</dt>
+      <dd className="mt-1 break-words text-foreground">{value || "없음"}</dd>
+    </div>
+  );
+}
+
+function SnapshotList({
+  title,
+  values,
+}: {
+  title: string;
+  values: unknown;
+}) {
+  const items = getSnapshotListItems(values);
+
+  return (
+    <div className="grid gap-2 rounded-md border border-line bg-surface p-3">
+      <p className="text-xs font-semibold text-muted">{title}</p>
+      {items.length > 0 ? (
+        <ul className="grid gap-1 text-xs text-foreground">
+          {items.map((item, index) => (
+            <li key={`${title}-${index}`} className="break-all">
+              {item}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-muted">관측값 없음</p>
+      )}
+    </div>
+  );
+}
+
+function SnapshotJsonDetails({
+  title,
+  value,
+}: {
+  title: string;
+  value: unknown;
+}) {
+  return (
+    <details className="rounded-md border border-line bg-surface p-3">
+      <summary className="cursor-pointer text-xs font-semibold uppercase text-accent">
+        {title}
+      </summary>
+      <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs text-foreground">
+        {formatSnapshotJson(value)}
+      </pre>
+    </details>
+  );
+}
+
+function SnapshotAssetLink({
+  label,
+  url,
+}: {
+  label: string;
+  url: string | null | undefined;
+}) {
+  const previewUrl = getAllowedStoredImageUrl(url);
+
+  if (!url) return null;
+
+  return (
+    <div className="grid gap-2 rounded-md border border-line bg-surface p-3 text-xs">
+      <p className="font-semibold text-muted">{label}</p>
+      {previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={previewUrl}
+          alt={`${label} 미리보기`}
+          className="max-h-32 w-full rounded-md border border-line bg-background object-contain"
+        />
+      ) : null}
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="break-all font-semibold text-accent underline"
+      >
+        {url}
+      </a>
+    </div>
+  );
+}
+
 function DnsRecord({ label, values }: { label: string; values: string[] }) {
   return (
     <div className="rounded-md bg-surface p-3">
@@ -271,6 +475,246 @@ function WhoisInfoCard({ whoisInfo }: { whoisInfo: WhoisLookupResult }) {
   );
 }
 
+function AdminSiteCrawlSnapshots({
+  snapshots,
+  latestSnapshotId,
+  descriptionSnapshotId,
+  errorMessage,
+  deletingSnapshotId,
+  onDeleteSnapshot,
+}: {
+  snapshots: SiteCrawlSnapshotRow[];
+  latestSnapshotId: string | null;
+  descriptionSnapshotId: string | null;
+  errorMessage: string;
+  deletingSnapshotId: string | null;
+  onDeleteSnapshot: (snapshotId: string) => void;
+}) {
+  return (
+    <section className="grid gap-4 rounded-md border border-line bg-background p-4">
+      <div>
+        <p className="text-xs font-semibold uppercase text-accent">
+          저장된 관측 snapshot
+        </p>
+        <h3 className="mt-1 text-base font-bold text-foreground">
+          관측 snapshot 내용
+        </h3>
+        <p className="mt-1 text-xs text-muted">
+          최신 5개 snapshot의 추출 필드, AI 설명, 내부 JSON 후보를 관리자용으로
+          확인합니다. 원본 HTML 본문은 표시하지 않습니다.
+        </p>
+      </div>
+
+      {errorMessage ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      {snapshots.length === 0 ? (
+        <div className="rounded-md border border-line bg-surface px-4 py-3 text-sm text-muted">
+          저장된 관측 snapshot이 없습니다.
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {snapshots.map((snapshot) => {
+            const imageCandidates =
+              snapshot.image_candidates_json as SiteCrawlSnapshotImageCandidates;
+            const isAppliedSnapshot =
+              snapshot.snapshot_status === "approved" ||
+              snapshot.id === latestSnapshotId ||
+              snapshot.id === descriptionSnapshotId;
+
+            return (
+              <article
+                key={snapshot.id}
+                className="grid gap-4 rounded-md border border-line bg-background p-4 text-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-md border border-line bg-surface px-2 py-1 text-xs font-semibold text-foreground">
+                        {snapshotStatusLabels[snapshot.snapshot_status]}
+                      </span>
+                      {snapshot.id === latestSnapshotId ? (
+                        <span className="rounded-md border border-accent bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
+                          공개 상세 반영
+                        </span>
+                      ) : null}
+                      {snapshot.id === descriptionSnapshotId ? (
+                        <span className="rounded-md border border-accent bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
+                          설명 출처
+                        </span>
+                      ) : null}
+                    </div>
+                    <h4 className="mt-2 break-all text-base font-bold text-foreground">
+                      {snapshot.page_title || snapshot.domain || snapshot.id}
+                    </h4>
+                    <p className="mt-1 break-all text-xs text-muted">
+                      ID: {snapshot.id}
+                    </p>
+                  </div>
+                  <div className="grid justify-items-end gap-2 text-right text-xs text-muted">
+                    <p>관측: {formatOptionalDateTime(snapshot.collected_at)}</p>
+                    <p>수정: {formatOptionalDateTime(snapshot.updated_at)}</p>
+                    {!isAppliedSnapshot ? (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteSnapshot(snapshot.id)}
+                        disabled={deletingSnapshotId !== null}
+                        className="h-9 rounded-md border border-red-200 px-3 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {deletingSnapshotId === snapshot.id
+                          ? "삭제 중..."
+                          : "삭제"}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <dl className="grid gap-3 md:grid-cols-3">
+                  <SnapshotInfoField
+                    label="source type"
+                    value={snapshotSourceTypeLabels[snapshot.source_type]}
+                  />
+                  <SnapshotInfoField
+                    label="HTML 입력 타입"
+                    value={snapshotHtmlInputTypeLabels[snapshot.html_input_type]}
+                  />
+                  <SnapshotInfoField label="도메인" value={snapshot.domain} />
+                  <SnapshotInfoField label="원본 URL" value={snapshot.source_url} />
+                  <SnapshotInfoField label="최종 URL" value={snapshot.final_url} />
+                  <SnapshotInfoField label="h1" value={snapshot.h1} />
+                </dl>
+
+                <dl className="grid gap-3 md:grid-cols-2">
+                  <SnapshotInfoField
+                    label="meta description"
+                    value={snapshot.meta_description}
+                  />
+                  <SnapshotInfoField
+                    label="raw HTML 저장 경로"
+                    value={snapshot.raw_html_storage_path}
+                  />
+                  <SnapshotInfoField
+                    label="HTML SHA-256"
+                    value={snapshot.html_sha256}
+                  />
+                  <SnapshotInfoField
+                    label="visible text SHA-256"
+                    value={snapshot.visible_text_sha256}
+                  />
+                </dl>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <SnapshotList
+                    title="주요 메뉴"
+                    values={snapshot.observed_menu_labels}
+                  />
+                  <SnapshotList
+                    title="계정 관련 요소"
+                    values={snapshot.observed_account_features}
+                  />
+                  <SnapshotList
+                    title="베팅 관련 요소"
+                    values={snapshot.observed_betting_features}
+                  />
+                  <SnapshotList
+                    title="결제/입출금 관련 관측 요소"
+                    values={snapshot.observed_payment_flags}
+                  />
+                  <SnapshotList
+                    title="공지 영역"
+                    values={snapshot.observed_notice_items}
+                  />
+                  <SnapshotList
+                    title="이벤트 영역"
+                    values={snapshot.observed_event_items}
+                  />
+                  <SnapshotList
+                    title="footer/copyright"
+                    values={snapshot.observed_footer_text}
+                  />
+                  <SnapshotList
+                    title="관측 badge"
+                    values={snapshot.observed_badges}
+                  />
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <SnapshotList
+                    title="og:image 후보"
+                    values={imageCandidates.og_images}
+                  />
+                  <SnapshotList
+                    title="twitter:image 후보"
+                    values={imageCandidates.twitter_images}
+                  />
+                  <SnapshotList
+                    title="favicon 후보"
+                    values={snapshot.favicon_candidates_json}
+                  />
+                  <SnapshotList
+                    title="logo 후보"
+                    values={snapshot.logo_candidates_json}
+                  />
+                  <SnapshotList
+                    title="image alt"
+                    values={imageCandidates.image_alts}
+                  />
+                  <SnapshotList
+                    title="image_candidates_json favicon"
+                    values={imageCandidates.favicon_candidates}
+                  />
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <SnapshotAssetLink
+                    label="snapshot screenshot"
+                    url={snapshot.screenshot_thumb_url ?? snapshot.screenshot_url}
+                  />
+                  <SnapshotAssetLink label="snapshot favicon" url={snapshot.favicon_url} />
+                  <SnapshotAssetLink label="snapshot logo" url={snapshot.logo_url} />
+                </div>
+
+                {snapshot.ai_detail_description_md ? (
+                  <div className="grid gap-2 rounded-md border border-line bg-surface p-3">
+                    <p className="text-xs font-semibold uppercase text-accent">
+                      AI 상세 설명
+                    </p>
+                    <div className="max-h-72 overflow-auto whitespace-pre-wrap break-words text-sm text-foreground">
+                      {snapshot.ai_detail_description_md}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <SnapshotJsonDetails
+                    title="promotional flags json"
+                    value={snapshot.promotional_flags_json}
+                  />
+                  <SnapshotJsonDetails
+                    title="excluded terms json"
+                    value={snapshot.excluded_terms_json}
+                  />
+                  <SnapshotJsonDetails
+                    title="image candidates json"
+                    value={snapshot.image_candidates_json}
+                  />
+                  <SnapshotJsonDetails
+                    title="AI observation summary json"
+                    value={snapshot.ai_observation_summary_json}
+                  />
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   const router = useRouter();
   const { user, isAdmin, isLoading } = useAuth();
@@ -289,8 +733,61 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   const [dnsInfo, setDnsInfo] = useState<DnsInfo | null>(null);
   const [isCapturingPage, setIsCapturingPage] = useState(false);
   const [isStoringFavicon, setIsStoringFavicon] = useState(false);
+  const [crawlSnapshots, setCrawlSnapshots] = useState<SiteCrawlSnapshotRow[]>(
+    [],
+  );
+  const [latestCrawlSnapshotId, setLatestCrawlSnapshotId] = useState<
+    string | null
+  >(null);
+  const [descriptionSourceSnapshotId, setDescriptionSourceSnapshotId] =
+    useState<string | null>(null);
+  const [snapshotErrorMessage, setSnapshotErrorMessage] = useState("");
+  const [deletingSnapshotId, setDeletingSnapshotId] = useState<string | null>(
+    null,
+  );
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+  const loadCrawlSnapshots = useCallback(async () => {
+    if (!isAdmin) {
+      setCrawlSnapshots([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("site_crawl_snapshots")
+      .select(siteCrawlSnapshotSelect)
+      .eq("site_id", siteId)
+      .order("collected_at", { ascending: false })
+      .limit(5);
+
+    if (error) {
+      setSnapshotErrorMessage("관측 snapshot을 불러오지 못했습니다.");
+      setCrawlSnapshots([]);
+      return;
+    }
+
+    setSnapshotErrorMessage("");
+    setCrawlSnapshots((data ?? []) as unknown as SiteCrawlSnapshotRow[]);
+  }, [isAdmin, siteId]);
+
+  const refreshSnapshotContext = useCallback(async () => {
+    if (!isAdmin) return;
+
+    const { data } = await supabase
+      .from("sites")
+      .select("latest_crawl_snapshot_id, description_source_snapshot_id")
+      .eq("id", siteId)
+      .single();
+
+    if (data) {
+      const site = data as SiteCrawlSnapshotSiteColumns;
+      setLatestCrawlSnapshotId(site.latest_crawl_snapshot_id ?? null);
+      setDescriptionSourceSnapshotId(site.description_source_snapshot_id ?? null);
+    }
+
+    await loadCrawlSnapshots();
+  }, [isAdmin, loadCrawlSnapshots, siteId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -310,9 +807,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         .eq("id", siteId)
         .single();
 
-      if (!isMounted) {
-        return;
-      }
+      if (!isMounted) return;
 
       if (error || !data) {
         setErrorMessage("사이트 정보를 불러오지 못했습니다.");
@@ -324,17 +819,23 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       setValues(valuesFromSite(site));
       setSiteSlug(site.slug);
       setSiteStatus(site.status);
+      setLatestCrawlSnapshotId(site.latest_crawl_snapshot_id ?? null);
+      setDescriptionSourceSnapshotId(site.description_source_snapshot_id ?? null);
+      await loadCrawlSnapshots();
+
+      if (!isMounted) return;
+
       setIsLoadingSite(false);
     }
 
     if (!isLoading) {
-      loadSite();
+      void loadSite();
     }
 
     return () => {
       isMounted = false;
     };
-  }, [isAdmin, isLoading, siteId]);
+  }, [isAdmin, isLoading, loadCrawlSnapshots, siteId]);
 
   function updateField<K extends keyof EditValues>(key: K, value: EditValues[K]) {
     setValues((current) => {
@@ -398,6 +899,58 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   async function getAdminToken() {
     const { data: sessionResult } = await supabase.auth.getSession();
     return sessionResult.session?.access_token ?? "";
+  }
+
+  async function deleteCrawlSnapshot(snapshotId: string) {
+    const confirmed = window.confirm(
+      "반영되지 않은 관측 snapshot을 삭제하시겠습니까?",
+    );
+
+    if (!confirmed) return;
+
+    setMessage("");
+    setErrorMessage("");
+    setSnapshotErrorMessage("");
+    setDeletingSnapshotId(snapshotId);
+
+    try {
+      const token = await getAdminToken();
+
+      if (!token) {
+        setErrorMessage("관리자 로그인 세션을 확인하지 못했습니다.");
+        return;
+      }
+
+      const response = await fetch("/api/admin/sites/crawl-snapshots/review", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "delete",
+          siteId,
+          snapshotId,
+        }),
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string }
+        | null;
+
+      if (!response.ok || !result?.ok) {
+        setSnapshotErrorMessage(
+          result?.error ?? "관측 snapshot을 삭제하지 못했습니다.",
+        );
+        return;
+      }
+
+      await refreshSnapshotContext();
+      setMessage("관측 snapshot을 삭제했습니다.");
+    } catch {
+      setSnapshotErrorMessage("관측 snapshot을 삭제하지 못했습니다.");
+    } finally {
+      setDeletingSnapshotId(null);
+    }
   }
 
   async function storeFaviconUrl(faviconUrl: string) {
@@ -776,6 +1329,9 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
       return;
     }
 
+    const statusChangedToApproved =
+      nextStatus === "approved" && siteStatus !== "approved";
+
     if (nextStatus) {
       setSiteStatus(nextStatus);
     }
@@ -795,7 +1351,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
     let notificationError = "";
 
-    if (nextStatus === "approved") {
+    if (statusChangedToApproved) {
       notificationError = await sendSiteApprovalNotification();
     }
 
@@ -806,7 +1362,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
     }
 
     setMessage(
-      nextStatus === "approved"
+      statusChangedToApproved
         ? "사이트 정보가 저장되고 승인되었습니다."
         : "사이트 정보가 수정되었습니다.",
     );
@@ -887,7 +1443,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void saveSite();
+            void saveSite("approved");
           }}
           className="grid gap-4"
           noValidate
@@ -1056,10 +1612,20 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
             onSnapshotApplied={({ snapshotId }) => {
               setMessage(`관측 snapshot ${snapshotId}의 설명을 반영했습니다.`);
             }}
+            onSnapshotChanged={() => void refreshSnapshotContext()}
             screenshotUrl={values.screenshotUrl}
             screenshotThumbUrl={values.screenshotThumbUrl}
             faviconUrl={values.faviconUrl}
             descriptionError={errors.description}
+          />
+
+          <AdminSiteCrawlSnapshots
+            snapshots={crawlSnapshots}
+            latestSnapshotId={latestCrawlSnapshotId}
+            descriptionSnapshotId={descriptionSourceSnapshotId}
+            errorMessage={snapshotErrorMessage}
+            deletingSnapshotId={deletingSnapshotId}
+            onDeleteSnapshot={(snapshotId) => void deleteCrawlSnapshot(snapshotId)}
           />
 
           <label className="grid gap-1 text-sm font-medium">
@@ -1173,16 +1739,6 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
             >
               {isSaving ? "저장 중..." : "수정 저장"}
             </button>
-            {siteStatus !== "approved" ? (
-              <button
-                type="button"
-                onClick={() => void saveSite("approved")}
-                disabled={isSaving}
-                className="h-11 rounded-md border border-accent px-4 text-sm font-semibold text-accent transition hover:bg-accent-soft disabled:opacity-50"
-              >
-                {isSaving ? "승인 중..." : "저장 후 승인"}
-              </button>
-            ) : null}
           </div>
         </form>
       </section>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import {
   getAdminSession,
   getBearerToken,
@@ -190,6 +191,10 @@ export async function POST(
         };
       },
     });
+
+    if (result.status >= 200 && result.status < 300) {
+      revalidateTag("public-sites", "max");
+    }
 
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {

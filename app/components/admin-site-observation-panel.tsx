@@ -39,6 +39,7 @@ type AdminSiteObservationPanelProps = {
     description: string;
     previewPath?: string | null;
   }) => void;
+  onSnapshotChanged?: () => void;
   screenshotUrl?: string;
   screenshotThumbUrl?: string;
   faviconUrl?: string;
@@ -76,6 +77,13 @@ type ApproveDescriptionResponse = {
   preview_path?: string | null;
   validation_status?: string;
   admin_warnings?: string[];
+  error?: string;
+};
+
+type ApproveSnapshotResponse = {
+  ok?: boolean;
+  snapshotId?: string;
+  preview_path?: string | null;
   error?: string;
 };
 
@@ -144,6 +152,7 @@ export function AdminSiteObservationPanel({
   onDescriptionErrorClear,
   onPendingSnapshotChange,
   onSnapshotApplied,
+  onSnapshotChanged,
   screenshotUrl,
   screenshotThumbUrl,
   faviconUrl,
@@ -167,11 +176,13 @@ export function AdminSiteObservationPanel({
     Record<string, unknown>
   >({});
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [isSnapshotPublicApplied, setIsSnapshotPublicApplied] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
+  const [isApprovingSnapshot, setIsApprovingSnapshot] = useState(false);
   const [isApplyingDescription, setIsApplyingDescription] = useState(false);
   const [isRejectingSnapshot, setIsRejectingSnapshot] = useState(false);
   const [descriptionPreviewPath, setDescriptionPreviewPath] = useState<
@@ -194,7 +205,11 @@ export function AdminSiteObservationPanel({
       aiDetailDescriptionMd: aiDraft,
       aiObservationSummaryJson,
       adminWarnings,
-      snapshotStatus: aiDraft ? "ai_generated" : "extracted",
+      snapshotStatus: isSnapshotPublicApplied
+        ? "approved"
+        : aiDraft
+          ? "ai_generated"
+          : "extracted",
       snapshotId,
       descriptionApplied: description.trim() === aiDraft.trim() && Boolean(aiDraft),
     } satisfies AdminSiteObservationDraft;
@@ -208,6 +223,7 @@ export function AdminSiteObservationPanel({
     effectiveFinalUrl,
     effectiveSourceUrl,
     htmlInputType,
+    isSnapshotPublicApplied,
     observation,
     snapshotId,
   ]);
@@ -263,6 +279,7 @@ export function AdminSiteObservationPanel({
     setAdminWarnings([]);
     setAiObservationSummaryJson({});
     setSnapshotId(null);
+    setIsSnapshotPublicApplied(false);
     setMessage("HTML 관측 정보를 추출했습니다. 공개 화면에 원본 HTML은 렌더링하지 않습니다.");
     setDescriptionPreviewPath(null);
   }
@@ -312,6 +329,7 @@ export function AdminSiteObservationPanel({
     setAiObservationSummaryJson(result.aiObservationSummaryJson ?? {});
     setAdminWarnings(result.adminWarnings ?? []);
     setSnapshotId(null);
+    setIsSnapshotPublicApplied(false);
     setMessage(
       result.provider === "openai"
         ? "AI 상세 설명 초안을 생성했습니다."
@@ -384,6 +402,40 @@ export function AdminSiteObservationPanel({
     return result.snapshotId;
   }
 
+  async function approveSnapshotRequest(targetSnapshotId: string) {
+    const token = await getAdminToken();
+
+    if (!token) {
+      throw new Error("관리자 로그인 세션을 확인하지 못했습니다.");
+    }
+
+    if (!siteId) {
+      throw new Error("사이트 등록 전에는 snapshot을 즉시 공개 반영할 수 없습니다.");
+    }
+
+    const response = await fetch("/api/admin/sites/crawl-snapshots/review", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "approve_snapshot",
+        siteId,
+        snapshotId: targetSnapshotId,
+      }),
+    });
+    const result = (await response.json().catch(() => null)) as
+      | ApproveSnapshotResponse
+      | null;
+
+    if (!response.ok || !result?.ok) {
+      throw new Error(result?.error ?? "관측 snapshot을 공개 반영하지 못했습니다.");
+    }
+
+    return result;
+  }
+
   async function saveSnapshot() {
     if (!currentDraft) {
       setErrorMessage("저장할 관측 정보가 없습니다.");
@@ -403,7 +455,9 @@ export function AdminSiteObservationPanel({
 
       const savedSnapshotId = await saveSnapshotRequest(currentDraft);
       setSnapshotId(savedSnapshotId);
+      setIsSnapshotPublicApplied(currentDraft.snapshotStatus === "approved");
       setMessage("관측 snapshot을 저장했습니다.");
+      onSnapshotChanged?.();
       return savedSnapshotId;
     } catch (error) {
       setErrorMessage(
@@ -414,6 +468,57 @@ export function AdminSiteObservationPanel({
       return null;
     } finally {
       setIsSavingSnapshot(false);
+    }
+  }
+
+  async function approveSnapshotForPublicDetail() {
+    if (!currentDraft) {
+      setErrorMessage("공개 반영할 관측 정보가 없습니다.");
+      return;
+    }
+
+    setMessage("");
+    setErrorMessage("");
+    setIsApprovingSnapshot(true);
+
+    try {
+      if (!siteId) {
+        setPendingDraft({
+          ...currentDraft,
+          snapshotStatus: "approved",
+        });
+        setIsSnapshotPublicApplied(true);
+        setMessage(
+          "사이트 등록 시 관측 snapshot이 공개 반영 상태로 함께 저장됩니다. 공개 상세 페이지에는 사이트 승인 후 표시됩니다.",
+        );
+        return;
+      }
+
+      const activeSnapshotId =
+        snapshotId ?? (await saveSnapshotRequest(currentDraft, "approved"));
+      const result = snapshotId
+        ? await approveSnapshotRequest(activeSnapshotId)
+        : {
+            preview_path: siteSlug ? `/sites/${siteSlug}` : null,
+          };
+
+      setSnapshotId(activeSnapshotId);
+      setIsSnapshotPublicApplied(true);
+      setDescriptionPreviewPath(
+        result.preview_path ?? (siteSlug ? `/sites/${siteSlug}` : null),
+      );
+      setMessage(
+        "관측 snapshot을 공개 상세 페이지에 반영했습니다. 사이트가 승인된 상태라면 /sites 상세에서 표시됩니다.",
+      );
+      onSnapshotChanged?.();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "관측 snapshot을 공개 반영하지 못했습니다.",
+      );
+    } finally {
+      setIsApprovingSnapshot(false);
     }
   }
 
@@ -489,6 +594,7 @@ export function AdminSiteObservationPanel({
 
       onDescriptionChange(result.description ?? trimmedDraft);
       onDescriptionErrorClear?.();
+      setIsSnapshotPublicApplied(true);
       setDescriptionPreviewPath(
         result.preview_path ?? (siteSlug ? `/sites/${siteSlug}` : null),
       );
@@ -498,6 +604,7 @@ export function AdminSiteObservationPanel({
         previewPath:
           result.preview_path ?? (siteSlug ? `/sites/${siteSlug}` : null),
       });
+      onSnapshotChanged?.();
       setMessage("관리자 승인 후 AI 설명을 사이트 설명에 반영했습니다.");
     } catch (error) {
       setErrorMessage(
@@ -519,6 +626,7 @@ export function AdminSiteObservationPanel({
       setAdminWarnings([]);
       setPendingDraft(null);
       setMessage("생성 초안을 반려했습니다.");
+      onSnapshotChanged?.();
       return;
     }
 
@@ -552,6 +660,8 @@ export function AdminSiteObservationPanel({
       }
 
       setMessage("관측 snapshot을 반려했습니다.");
+      setIsSnapshotPublicApplied(false);
+      onSnapshotChanged?.();
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -666,6 +776,16 @@ export function AdminSiteObservationPanel({
           className="h-10 rounded-md border border-line bg-surface px-4 text-sm font-semibold transition hover:bg-background disabled:opacity-50"
         >
           {isSavingSnapshot ? "저장 중..." : "관측 snapshot 저장"}
+        </button>
+        <button
+          type="button"
+          onClick={approveSnapshotForPublicDetail}
+          disabled={isApprovingSnapshot || !observation}
+          className="h-10 rounded-md border border-accent px-4 text-sm font-semibold text-accent transition hover:bg-accent-soft disabled:opacity-50"
+        >
+          {isApprovingSnapshot
+            ? "반영 중..."
+            : "관측 snapshot 저장·공개 반영"}
         </button>
         <button
           type="button"
@@ -880,6 +1000,7 @@ export function AdminSiteObservationPanel({
                 setAiDraft(event.target.value);
                 setSnapshotId(null);
                 setPendingDraft(null);
+                setIsSnapshotPublicApplied(false);
               }}
               className="min-h-48 rounded-md border border-line px-3 py-3 text-sm"
               placeholder="AI 상세 설명 생성 버튼을 누르면 초안이 표시됩니다."
