@@ -28,6 +28,13 @@ export function Footer() {
             ))}
           </nav>
         </div>
+        <div className="mt-6 border-t border-white/10 pt-4 text-xs leading-6 text-white/45">
+          <p>
+            본 사이트는 19세 이상 이용자를 대상으로 하며, 도박 참여를
+            권장하지 않습니다.
+          </p>
+          <p>도박 문제 상담: 한국도박문제관리센터 1336</p>
+        </div>
         <AdminFooterButton />
       </div>
     </footer>
