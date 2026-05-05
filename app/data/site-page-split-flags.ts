@@ -1,7 +1,7 @@
-const defaultPilotSlug = "youtoobet-morjcswx-p7k7";
+const defaultEnabledSlugs = "*";
 
 export function getSitePageSplitEnabledSlugs() {
-  return (process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS ?? defaultPilotSlug)
+  return (process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS ?? defaultEnabledSlugs)
     .split(",")
     .map((slug) => slug.trim())
     .filter(Boolean);

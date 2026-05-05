@@ -160,13 +160,13 @@ test("site detail split subpages index only pages with matching data", () => {
   );
 });
 
-test("site page split flag defaults to the pilot slug and supports wildcard", () => {
+test("site page split flag defaults to all sites and supports explicit slugs", () => {
   const originalValue = process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS;
 
   try {
     delete process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS;
     assert.equal(isSitePageSplitEnabled("youtoobet-morjcswx-p7k7"), true);
-    assert.equal(isSitePageSplitEnabled("other-site"), false);
+    assert.equal(isSitePageSplitEnabled("other-site"), true);
 
     process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS = "alpha, beta";
     assert.equal(isSitePageSplitEnabled("alpha"), true);

@@ -1645,18 +1645,18 @@ revalidateTag(`site-domains:${slug}`, "max");
 
 ### 결정 사항
 
-파일럿은 유튜벳 `youtoobet-morjcswx-p7k7` 하나로 시작한다. 피처 플래그는 서버 환경 변수로 제어한다.
+초기 파일럿은 유튜벳 `youtoobet-morjcswx-p7k7` 하나로 시작했고, 전체 적용 단계에서는 피처 플래그를 `*`로 둔다. 피처 플래그는 서버 환경 변수로 제어한다.
 
 권장 환경 변수:
 
 ```txt
-SITE_PAGE_SPLIT_ENABLED_SLUGS=youtoobet-morjcswx-p7k7
+SITE_PAGE_SPLIT_ENABLED_SLUGS=*
 ```
 
-전체 오픈 시에는 아래처럼 쓴다.
+특정 slug만 다시 제한해야 할 때는 아래처럼 쓴다.
 
 ```txt
-SITE_PAGE_SPLIT_ENABLED_SLUGS=*
+SITE_PAGE_SPLIT_ENABLED_SLUGS=youtoobet-morjcswx-p7k7
 ```
 
 파일럿 비활성 slug의 정책:
@@ -1671,10 +1671,10 @@ SITE_PAGE_SPLIT_ENABLED_SLUGS=*
 피처 플래그:
 
 ```ts
-const pilotSlug = "youtoobet-morjcswx-p7k7";
+const defaultEnabledSlugs = "*";
 
 export function getSitePageSplitEnabledSlugs() {
-  return (process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS ?? pilotSlug)
+  return (process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS ?? defaultEnabledSlugs)
     .split(",")
     .map((slug) => slug.trim())
     .filter(Boolean);
@@ -1754,11 +1754,11 @@ function DisabledSplitPage({ slug }: { slug: string }) {
 
 확인할 항목은 색인 생성 페이지 수, 제외된 noindex 페이지, 클릭/노출 변화, 중복 canonical 경고, 크롤링 빈도다. 특히 후기/제보 0건 페이지가 sitemap에 들어가지 않는지 확인한다.
 
-### Month 2+: 확대 기준
+### Month 2+: 전체 적용
 
-확대 기준은 다음 정도가 적당하다.
+전체 적용 후 확인 기준은 다음 정도가 적당하다.
 
-- 파일럿 사이트의 메인 페이지 색인에 악영향이 없다.
+- 기존 메인 페이지 색인에 악영향이 없다.
 - `/domains`가 정상 색인된다.
 - `/reviews`, `/scam-reports`는 데이터 1건 이상일 때만 색인된다.
 - Search Console에서 중복 페이지 또는 대체 canonical 경고가 늘지 않는다.
@@ -1766,6 +1766,6 @@ function DisabledSplitPage({ slug }: { slug: string }) {
 
 ### 의사결정 근거
 
-SEO용 URL 분리는 한 번에 전체 적용하면 문제 원인 추적이 어렵다. 파일럿 slug를 하나로 제한하면 Search Console에서 색인, canonical, noindex, sitemap 동작을 작은 범위에서 먼저 검증할 수 있다.
+SEO용 URL 분리는 한 번에 전체 적용하면 문제 원인 추적이 어렵다. 파일럿 slug로 먼저 검증한 뒤 전체 적용으로 전환하면 Search Console에서 색인, canonical, noindex, sitemap 동작을 단계적으로 확인할 수 있다.
 
 비활성 slug의 서브페이지는 안내 페이지보다 `308` 리다이렉트가 우선이다. 같은 URL 패턴에서 파일럿 사이트는 정상 콘텐츠를 보여주고 비활성 사이트는 얇은 안내 페이지만 보여주면 soft 404 또는 중복 얇은 페이지로 판단될 수 있다. 서버 리다이렉트는 검색엔진과 사용자 모두에게 메인 URL이 정식 목적지라는 신호를 더 명확하게 준다.
