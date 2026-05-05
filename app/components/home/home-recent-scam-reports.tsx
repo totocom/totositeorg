@@ -14,10 +14,14 @@ function formatDate(value: string) {
 
 function formatDamageAmount(report: PublicScamReportListItem) {
   if (report.damageAmountUnknown || report.damageAmount === null) {
-    return "피해 금액 미확인";
+    return "미확인";
   }
 
   return `${report.damageAmount.toLocaleString("ko-KR")}원`;
+}
+
+function getDamageSummary(report: PublicScamReportListItem) {
+  return report.damageTypes.join(", ") || report.mainCategory;
 }
 
 export function HomeRecentScamReports({
@@ -52,9 +56,11 @@ export function HomeRecentScamReports({
               >
                 {report.site.siteName}
               </Link>
-              <p className="mt-1 text-sm leading-6 text-muted">
-                {report.damageTypes.join(", ") || report.mainCategory} ·{" "}
-                {formatDamageAmount(report)}
+              <h3 className="mt-2 text-sm font-bold text-foreground">
+                {report.site.siteName} {getDamageSummary(report)}
+              </h3>
+              <p className="mt-1 text-sm font-semibold text-red-600 dark:text-red-400">
+                금액 {formatDamageAmount(report)}
               </p>
               <p className="mt-2 text-xs text-muted">
                 접수일 {formatDate(report.createdAt)} · 작성자{" "}
