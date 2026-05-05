@@ -29,7 +29,7 @@ export function HomeRecentReviews({ reviews }: HomeRecentReviewsProps) {
           href="/reviews"
           className="text-sm font-bold text-accent transition hover:text-foreground"
         >
-          전체 보기
+          이용자 후기 전체 보기
         </Link>
       </div>
 

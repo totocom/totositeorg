@@ -38,7 +38,7 @@ export function HomeRecentScamReports({
           href="/scam-reports"
           className="text-sm font-bold text-accent transition hover:text-foreground"
         >
-          전체 보기
+          먹튀 제보 전체 보기
         </Link>
       </div>
 
