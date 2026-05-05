@@ -19,7 +19,7 @@ import { siteDescription, siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 600;
 
-const homeTitle = `${siteName} - 안전한 토토사이트 순위 및 이용 후기`;
+const homeTitle = `${siteName} - 실제 후기·신뢰점수·도메인 이력 리포트`;
 
 export const metadata: Metadata = {
   title: {
@@ -116,9 +116,7 @@ export default async function Home() {
                   </span>
                 </div>
                 <h1 className="mt-4 text-4xl font-extrabold leading-tight text-white sm:text-5xl">
-                  안전한 토토사이트,
-                  <br />
-                  <span className="text-accent">실제 후기로 확인하세요</span>
+                  토토사이트 정보, 실제 후기와 신뢰점수로 확인하세요
                 </h1>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-white/60">
                   등록 사이트의 도메인 이력, 이용자 후기, 먹튀 피해 제보,
