@@ -9,6 +9,7 @@ import { HomeHeroStats } from "@/app/components/home/home-hero-stats";
 import { HomePopularSites } from "@/app/components/home/home-popular-sites";
 import { HomeRecentReviews } from "@/app/components/home/home-recent-reviews";
 import { HomeRecentScamReports } from "@/app/components/home/home-recent-scam-reports";
+import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import {
   buildFaqPageJsonLd,
   JsonLd,
@@ -211,6 +212,7 @@ export default async function Home() {
 
           <HomeAboutSection />
           <HomeFaqSection />
+          <ResponsibleUseNotice variant="card" />
         </div>
       </main>
     </>

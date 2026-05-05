@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { cache } from "react";
+import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary } from "@/app/components/review-summary";
 import { SiteEmptyState } from "@/app/components/site-detail/site-empty-state";
@@ -227,6 +228,7 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
           )}
 
           <SiteReviewFaq context={context} />
+          <ResponsibleUseNotice variant="card" />
         </div>
       </main>
     </>

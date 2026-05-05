@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { AdminFooterButton } from "@/app/components/admin-footer-button";
-import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { footerNavigationLinks } from "@/app/data/site-navigation";
 
 export function Footer() {
@@ -28,9 +27,6 @@ export function Footer() {
               </Link>
             ))}
           </nav>
-        </div>
-        <div className="mt-6 border-t border-white/10 pt-6">
-          <ResponsibleUseNotice />
         </div>
         <AdminFooterButton />
       </div>
