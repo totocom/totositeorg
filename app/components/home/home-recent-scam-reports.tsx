@@ -57,7 +57,7 @@ export function HomeRecentScamReports({
                 {report.site.siteName}
               </Link>
               <h3 className="mt-2 text-sm font-bold text-foreground">
-                {report.site.siteName} {getDamageSummary(report)}
+                {getDamageSummary(report)}
               </h3>
               <p className="mt-1 text-sm font-semibold text-red-600 dark:text-red-400">
                 금액 {formatDamageAmount(report)}
