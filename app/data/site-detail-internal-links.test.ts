@@ -143,7 +143,7 @@ test("site detail page uses the same two-column detail layout as blog posts", ()
   );
   assert.match(
     siteDetailPageSource,
-    /등록 도메인[\s\S]*?<DomainInfoTabs items=\{domainInfoTabs\} variant="embedded" \/>[\s\S]*?신뢰 점수 산정/,
+    /등록 도메인[\s\S]*?!splitEnabled && domainInfoTabs\.length > 0[\s\S]*?<DomainInfoTabs items=\{domainInfoTabs\} variant="embedded" \/>[\s\S]*?splitEnabled && domainTargets\.length > 0[\s\S]*?주소·도메인 \{domainTargets\.length\}개 보기[\s\S]*?신뢰 점수 산정/,
   );
   assert.match(
     siteDetailPageSource,
@@ -238,7 +238,7 @@ test("site detail review submission action is rendered in the review section hea
   assert.match(siteDetailPageSource, /\{site\.siteName\} 후기 남기기/);
   assert.match(
     siteDetailPageSource,
-    /<p className="text-xs font-semibold uppercase tracking-wider text-accent">커뮤니티 리뷰<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">최근 이용 경험<\/h2>[\s\S]*?primarySubmissionActionClassName/,
+    /<p className="text-xs font-semibold uppercase tracking-wider text-accent">커뮤니티 리뷰<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">[\s\S]*?splitEnabled \? "최근 이용 경험 요약" : "최근 이용 경험"[\s\S]*?<\/h2>[\s\S]*?primarySubmissionActionClassName/,
   );
 });
 
@@ -261,7 +261,7 @@ test("site detail scam report submission action is rendered in the scam reports 
   assert.match(siteDetailPageSource, /\{site\.siteName\} 먹튀 피해 제보하기/);
   assert.match(
     siteDetailPageSource,
-    /<p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">승인된 피해 제보<\/h2>[\s\S]*?primarySubmissionActionClassName/,
+    /<p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">[\s\S]*?splitEnabled \? "최근 승인된 피해 제보" : "승인된 피해 제보"[\s\S]*?<\/h2>[\s\S]*?primarySubmissionActionClassName/,
   );
   assert.match(feedbackSubmissionGuideSource, /guide\.actions\.map/);
   assert.match(feedbackSubmissionGuideSource, /href=\{action\.href\}/);

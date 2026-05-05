@@ -6,22 +6,22 @@ import {
   type ScamReport,
   type ReviewTarget,
   type SiteReview,
-} from "@/app/data/sites";
-import type { PublicDnsInfo } from "@/app/data/domain-dns";
-import { extractDomain, getBatchDomainCreationDates } from "@/app/data/domain-whois";
-import type { PublicSiteObservationSnapshot } from "@/app/data/public-site-observation-snapshot";
+} from "./sites";
+import type { PublicDnsInfo } from "./domain-dns";
+import { extractDomain, getBatchDomainCreationDates } from "./domain-whois";
+import type { PublicSiteObservationSnapshot } from "./public-site-observation-snapshot";
 import {
   normalizePublicSiteDescription,
   normalizePublicSiteDomains,
-} from "@/app/data/public-site-description";
+} from "./public-site-description";
 import {
   mapEligiblePublicSiteRelatedBlogReportRow,
   type PublicSiteRelatedBlogReport,
   type PublicSiteRelatedBlogReportRow,
-} from "@/app/data/related-blog-report";
-import type { SiteCrawlSnapshotSiteColumns } from "@/app/data/site-crawl-snapshots";
-import { getAllowedStoredImageUrl } from "@/app/data/storage-image-url";
-import { supabase } from "@/lib/supabase/client";
+} from "./related-blog-report";
+import type { SiteCrawlSnapshotSiteColumns } from "./site-crawl-snapshots";
+import { getAllowedStoredImageUrl } from "./storage-image-url";
+import { supabase } from "../../lib/supabase/client";
 import { unstable_cache } from "next/cache";
 
 const PUBLIC_SITE_SELECT =
@@ -53,7 +53,7 @@ export type PublicSiteDnsRecord = {
   dnsInfo: PublicDnsInfo;
 };
 
-type PublicDomainCreationDate = {
+export type PublicDomainCreationDate = {
   domain: string;
   creationDate: string;
 };
@@ -80,7 +80,7 @@ type PublicSitesResult = {
   source: "supabase" | "fallback";
 };
 
-type PublicSiteDetailResult = {
+export type PublicSiteDetailResult = {
   site: ReviewTarget | null;
   reviews: SiteReview[];
   scamReports: ScamReport[];

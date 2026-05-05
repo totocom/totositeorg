@@ -4,6 +4,9 @@ import {
   calculateSiteDetailIndexability,
   calculateSiteSummaryIndexability,
 } from "./site-detail-indexability";
+import { calculateSiteDetailSubpageIndexability } from "./site-detail-subpage-indexability";
+import { isSitePageSplitEnabled } from "./site-page-split-flags";
+import type { ReviewTarget } from "./sites";
 
 const baseSite = {
   siteName: "테스트",
@@ -17,6 +20,29 @@ const baseSite = {
   screenshotThumbUrl: null,
   dnsCheckedAt: null,
   oldestDomainCreationDate: null,
+};
+
+const subpageSite: ReviewTarget = {
+  id: "site-1",
+  slug: "site-1",
+  siteName: "테스트",
+  siteNameKo: "테스트",
+  siteNameEn: null,
+  siteUrl: "https://test.example",
+  domains: ["https://test.example"],
+  screenshotUrl: null,
+  screenshotThumbUrl: null,
+  faviconUrl: null,
+  logoUrl: null,
+  category: "기타 베팅",
+  availableStates: ["KR"],
+  licenseInfo: "관리자 등록 사이트",
+  status: "운영 중",
+  moderationStatus: "approved",
+  shortDescription: "기본 설명입니다.",
+  averageRating: 0,
+  reviewCount: 0,
+  scamReportCount: 0,
 };
 
 test("site detail indexability noindexes sparse pages", () => {
@@ -91,4 +117,69 @@ test("site detail indexability always noindexes fallback and missing sites", () 
     calculateSiteDetailIndexability({ site: null, source: "none" }).robots,
     "noindex,follow",
   );
+});
+
+test("site detail split subpages index only pages with matching data", () => {
+  assert.equal(
+    calculateSiteDetailSubpageIndexability({
+      site: subpageSite,
+      kind: "main",
+    }).robots,
+    "index,follow",
+  );
+  assert.equal(
+    calculateSiteDetailSubpageIndexability({
+      site: subpageSite,
+      kind: "domains",
+    }).robots,
+    "index,follow",
+  );
+  assert.equal(
+    calculateSiteDetailSubpageIndexability({
+      site: subpageSite,
+      kind: "reviews",
+      itemCount: 0,
+    }).robots,
+    "noindex,follow",
+  );
+  assert.equal(
+    calculateSiteDetailSubpageIndexability({
+      site: subpageSite,
+      kind: "reviews",
+      itemCount: 1,
+    }).robots,
+    "index,follow",
+  );
+  assert.equal(
+    calculateSiteDetailSubpageIndexability({
+      site: subpageSite,
+      kind: "scam-reports",
+      itemCount: 0,
+    }).robots,
+    "noindex,follow",
+  );
+});
+
+test("site page split flag defaults to the pilot slug and supports wildcard", () => {
+  const originalValue = process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS;
+
+  try {
+    delete process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS;
+    assert.equal(isSitePageSplitEnabled("youtoobet-morjcswx-p7k7"), true);
+    assert.equal(isSitePageSplitEnabled("other-site"), false);
+
+    process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS = "alpha, beta";
+    assert.equal(isSitePageSplitEnabled("alpha"), true);
+    assert.equal(isSitePageSplitEnabled("beta"), true);
+    assert.equal(isSitePageSplitEnabled("youtoobet-morjcswx-p7k7"), false);
+
+    process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS = "*";
+    assert.equal(isSitePageSplitEnabled("any-site"), true);
+  } finally {
+    if (originalValue === undefined) {
+      delete process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS;
+    } else {
+      process.env.SITE_PAGE_SPLIT_ENABLED_SLUGS = originalValue;
+    }
+  }
 });

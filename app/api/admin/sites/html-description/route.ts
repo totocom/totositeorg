@@ -3,13 +3,23 @@ import type { SiteHtmlObservation } from "@/app/data/site-html-observation";
 import { containsSiteObservationPromotionalTerm } from "@/app/data/site-html-promotional-flags";
 import { formatObservationDescriptionForPublic } from "@/app/data/public-site-description";
 import {
+  buildObservationDescriptionFallback,
   sanitizeObservationDescription,
   validateObservationDescriptionDraft,
+  type ObservationDescriptionAiOutput,
+  type ObservationDescriptionSite,
+  type ObservationDescriptionSnapshot,
 } from "@/app/data/site-observation-description";
 import {
   getAdminSession,
   getBearerToken,
 } from "@/app/api/admin/sites/_admin";
+import {
+  buildSiteObservationDescriptionPrompt,
+  SITE_OBSERVATION_DESCRIPTION_PROMPT_VERSION,
+  siteObservationDescriptionJsonSchema,
+  siteObservationDescriptionSystemPrompt,
+} from "@/prompts/site-observation-description-v1";
 
 export const runtime = "nodejs";
 
@@ -48,61 +58,63 @@ function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function safeBullets(values: string[], limit = 6) {
-  return values
-    .map((value) => value.replace(/\s+/g, " ").trim())
-    .filter(Boolean)
-    .filter((value) => !containsSiteObservationPromotionalTerm(value))
-    .slice(0, limit);
-}
-
 function buildLocalDescriptionDraft({
   siteName,
+  sourceUrl,
   observation,
 }: {
   siteName: string;
+  sourceUrl: string;
   observation: SiteHtmlObservation;
-}) {
-  const displayName =
-    safeBullets([observation.h1 || observation.page_title || siteName], 1)[0] ||
-    siteName;
-  const siteSubject = siteName.endsWith("사이트") ? siteName : `${siteName} 사이트`;
-  const accountItems = safeBullets(observation.observed_account_features);
-  const bettingItems = safeBullets(observation.observed_betting_features);
-  const paymentItems = safeBullets(observation.observed_payment_flags);
-  const displayNameSentence =
-    displayName && displayName !== siteName
-      ? `${siteSubject}는 공개 화면에서 "${displayName}"이라는 이름을 사용하는 사이트입니다.`
-      : `${siteSubject}는 사이트 식별명과 주요 화면 흐름을 함께 사용하는 사이트입니다.`;
-  const categorySentence =
-    bettingItems.length > 0
-      ? "전체 화면은 스포츠 경기 정보, 카지노 또는 슬롯 계열 콘텐츠, 라이브 콘텐츠로 보이는 영역을 함께 탐색하는 구조에 가깝습니다. 화면은 여러 기능을 한 페이지 안에서 구분해 보여주는 편입니다."
-      : "전체 화면은 사이트 식별 영역, 계정 관련 메뉴, 문의 또는 고객지원 요소를 중심으로 탐색하는 구조에 가깝습니다. 화면은 여러 기능을 한 페이지 안에서 구분해 보여주는 편입니다.";
-  const mainContentSentence =
-    bettingItems.length > 0
-      ? "본문에는 콘텐츠를 구분해 보여주는 카드형 영역과 카테고리 이동 요소가 함께 배치되어 있습니다. 이용자는 화면의 구획을 따라 스포츠, 라이브 콘텐츠, 게임성 콘텐츠를 나누어 살펴보는 흐름으로 이해할 수 있습니다."
-      : "본문에는 여러 안내 영역과 화면 전환 요소가 함께 배치되어 있습니다. 이용자는 상단 식별 영역과 본문 구획을 따라 주요 메뉴와 고객지원 흐름을 구분해 살펴보는 구조로 이해할 수 있습니다.";
-  const accountSentence =
-    accountItems.length > 0
-      ? "계정 접근, 문의, 이용 기록과 관련된 요소도 일부 확인됩니다. 다만 화면에 보이는 라벨만으로 실제 계정 생성 절차나 본인 확인 방식, 이용 조건이 어떻게 적용되는지는 판단하기 어렵습니다."
-      : "계정이나 문의 흐름과 관련된 세부 절차는 제공된 자료만으로 충분히 확인되지 않습니다. 실제 계정 생성 절차, 본인 확인 방식, 이용 조건은 별도 검토가 필요한 항목입니다.";
-  const categoryDetailSentence =
-    bettingItems.length > 0
-      ? "게임 또는 경기 관련 카테고리는 여러 성격의 콘텐츠를 묶어 보여주는 방식으로 구성되어 있습니다. 세부 메뉴명과 개별 게임명은 본문에서 길게 나열하지 않고, 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있도록 분리했습니다."
-      : "세부 메뉴는 계정, 문의, 화면 이동 항목을 중심으로 정리할 수 있습니다. 반복되는 메뉴명과 하단 문구는 본문에 길게 나열하지 않고, 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있도록 분리했습니다.";
-  const paymentRecordSentence =
-    paymentItems.length > 0 || accountItems.length > 0
-      ? "금전 처리나 이용 내역과 관련된 항목으로 해석될 수 있는 요소가 일부 포함되어 있습니다. 실제 결제 방식, 본인 확인 절차, 접근 제한 여부, 세부 이용 조건은 제공된 자료만으로 확인되지 않습니다."
-      : "실제 결제 방식, 본인 확인 절차, 접근 제한 여부, 세부 이용 조건은 제공된 자료만으로 확인되지 않습니다. 공지성 안내나 캠페인성 영역이 있더라도 적용 조건과 기간은 별도 자료 없이는 단정하기 어렵습니다.";
-  const paragraphs = [
-    `${displayNameSentence} ${categorySentence}`,
-    mainContentSentence,
-    accountSentence,
-    categoryDetailSentence,
-    `${paymentRecordSentence} 세부 관측값은 상세 설명 본문에 반복하지 않고 원본 사이트 관측 정보 섹션에 남겨, 관리자가 화면 구성과 저장된 원문 자료를 함께 검토할 수 있게 했습니다.`,
-  ];
+}): ObservationDescriptionAiOutput {
+  return buildObservationDescriptionFallback({
+    site: buildPromptSite(siteName, sourceUrl),
+    snapshot: buildPromptSnapshot({ sourceUrl, observation }),
+  });
+}
 
-  return paragraphs.join("\n\n");
+function buildPromptSite(
+  siteName: string,
+  sourceUrl: string,
+): ObservationDescriptionSite {
+  return {
+    id: "manual-html-observation",
+    name: siteName,
+    url: sourceUrl || null,
+  };
+}
+
+function buildPromptSnapshot({
+  sourceUrl,
+  observation,
+}: {
+  sourceUrl: string;
+  observation: SiteHtmlObservation;
+}): ObservationDescriptionSnapshot {
+  return {
+    id: "manual-html-observation",
+    site_id: "manual-html-observation",
+    source_url: sourceUrl || null,
+    final_url: sourceUrl || null,
+    collected_at: null,
+    page_title: observation.page_title,
+    meta_description: observation.meta_description,
+    h1: observation.h1,
+    observed_menu_labels: observation.observed_menu_labels,
+    observed_account_features: observation.observed_account_features,
+    observed_betting_features: observation.observed_betting_features,
+    observed_payment_flags: observation.observed_payment_flags,
+    observed_notice_items: observation.observed_notice_items,
+    observed_event_items: observation.observed_event_items,
+    observed_footer_text: observation.observed_footer_text,
+    observed_badges: observation.observed_badges,
+    image_candidates_json: observation.image_candidates_json,
+    promotional_flags_json: observation.promotional_flags_json,
+    excluded_terms_json: observation.excluded_terms_json,
+    html_sha256: observation.html_sha256,
+    visible_text_sha256: observation.visible_text_sha256,
+    snapshot_status: "extracted",
+  };
 }
 
 function buildObservationSummaryJson(observation: SiteHtmlObservation) {
@@ -141,54 +153,75 @@ function getObservationSourceTextChunks(observation: SiteHtmlObservation) {
 async function callOpenAiDescription({
   apiKey,
   model,
-  siteName,
-  sourceUrl,
-  observation,
+  site,
+  snapshot,
   rewriteDraft,
 }: {
   apiKey: string;
   model: string;
-  siteName: string;
-  sourceUrl: string;
-  observation: SiteHtmlObservation;
+  site: ObservationDescriptionSite;
+  snapshot: ObservationDescriptionSnapshot;
   rewriteDraft?: string;
-}) {
-  const observationInput = JSON.stringify({
-    siteName,
-    sourceUrl,
-    title: observation.page_title,
-    h1: observation.h1,
-    metaDescription: observation.meta_description,
-    publicSummary: observation.public_observation_summary,
-    menuLabels: asStringArray(observation.observed_menu_labels),
-    accountFeatures: asStringArray(observation.observed_account_features),
-    bettingFeatures: asStringArray(observation.observed_betting_features),
-    paymentFlags: asStringArray(observation.observed_payment_flags),
-    noticeItems: asStringArray(observation.observed_notice_items),
-    eventItems: asStringArray(observation.observed_event_items),
-    footerText: asStringArray(observation.observed_footer_text),
-    promotionalFlags: observation.promotional_flags_json,
-    excludedTerms: observation.excluded_terms_json,
-    hashes: {
-      html: observation.html_sha256,
-      visibleText: observation.visible_text_sha256,
+}): Promise<ObservationDescriptionAiOutput> {
+  const promptInput = buildSiteObservationDescriptionPrompt({
+    site: {
+      id: site.id,
+      name: site.name,
+      url: site.url,
+    },
+    snapshot: {
+      id: snapshot.id,
+      source_url: snapshot.source_url,
+      final_url: snapshot.final_url,
+      collected_at: snapshot.collected_at,
+      page_title: snapshot.page_title,
+      meta_description: snapshot.meta_description,
+      h1: snapshot.h1,
+      observed_menu_labels: asStringArray(snapshot.observed_menu_labels),
+      observed_account_features: asStringArray(
+        snapshot.observed_account_features,
+      ),
+      observed_betting_features: asStringArray(
+        snapshot.observed_betting_features,
+      ),
+      observed_payment_flags: asStringArray(snapshot.observed_payment_flags),
+      observed_notice_items: asStringArray(snapshot.observed_notice_items),
+      observed_event_items: asStringArray(snapshot.observed_event_items),
+      observed_footer_text: asStringArray(snapshot.observed_footer_text),
+      observed_badges: asStringArray(snapshot.observed_badges),
+      image_alt_texts: asStringArray(
+        isRecord(snapshot.image_candidates_json)
+          ? snapshot.image_candidates_json.image_alts
+          : [],
+      ),
+      promotional_flags_json: isRecord(snapshot.promotional_flags_json)
+        ? snapshot.promotional_flags_json
+        : {},
+      excluded_terms_json: asStringArray(snapshot.excluded_terms_json),
+      html_sha256: snapshot.html_sha256,
+      visible_text_sha256: snapshot.visible_text_sha256,
     },
   });
   const userPrompt = rewriteDraft
     ? [
-        "아래 설명문은 원본 HTML 문장을 그대로 복사한 것으로 의심되는 부분이 있습니다. 원본 문구를 그대로 사용하지 말고, sites.description에 저장할 자연스러운 사이트 설명문으로 다시 작성하세요. 가입, 입금, 프로모션, 보너스, 추천 문구는 강조하지 마세요.",
-        "4~6문단, 각 문단 2~3문장, 전체 700~1,100자 정도로 자연스럽게 작성하고 제목이나 bullet 목록은 사용하지 마세요.",
-        "세부 메뉴, 게임 분류, footer, 이미지 alt, 배지, 긴 URL은 설명 본문에 나열하지 마세요.",
-        "실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부는 확인되지 않았다고 짧게 언급하세요.",
-        "고지문은 별도 컴포넌트에서 출력하므로 공개 HTML, 조회 시점 기준, 스크린샷 표현은 본문에 반복하지 마세요.",
+        "아래 설명문은 원본 HTML 문장을 그대로 복사한 것으로 의심되는 부분이 있습니다. 원본 문구를 그대로 베끼지 말고, 사이트 화면을 보면서 실시간으로 메모하는 사람의 글처럼 다시 작성하세요.",
+        "보고서, 분석문, 검증 리포트 톤은 피하세요. 친구한테 카톡으로 설명하는 정도의 '~요' 톤을 유지하세요.",
+        "문장 끝은 '~네요', '~어요', '~이에요', '~죠?', '~습니다'를 골고루 섞되 같은 종결을 연속 두 문장에 쓰지 마세요. '~네요'는 전체 3회 이내입니다.",
+        "고지문은 별도 컴포넌트에서 출력하므로 본문에 넣지 말고, 데이터가 충분하면 5~8문단과 600~1100자 범위로 작성하세요.",
+        "page_title, meta_description, h1 같은 내부 필드명과 '문서 제목은', '메타 설명에는', '대표 제목 영역에는' 표현을 쓰지 마세요.",
+        "메뉴 이름이나 빠른 버튼 항목은 bullet이 아니라 한 문장 안에 쉼표로 이어 쓰세요. 다만 이용이나 금전거래를 유도하는 항목은 직접 강조하지 말고 계정/거래/이벤트성 버튼처럼 흐려 쓰세요.",
+        "사이트가 자기 자랑으로 써놓은 영역은 짧게 발췌할 수 있지만, 이용이나 금전거래를 유도하는 문구는 인용하지 마세요. 인용 뒤에는 사이트가 직접 쓴 문구라 그대로 믿긴 어렵다는 코멘트를 붙이세요.",
+        "권유성, 홍보성, 이용 유도, 금전거래 유도 문구는 강조하지 마세요.",
+        "실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부는 '이 화면에서는 안 보여요' 정도로 짧게 언급하세요.",
+        "공개 HTML, 조회 시점 기준, 스크린샷 표현은 Notice 컴포넌트에서 처리하므로 본문에 반복하지 마세요.",
+        "이미지 alt, 메타 태그, viewport 같은 기술 용어는 본문에 노출하지 마세요.",
         "",
         "기존 설명문:",
         rewriteDraft,
         "",
-        "관측 데이터:",
-        observationInput,
+        promptInput,
       ].join("\n")
-    : observationInput;
+    : promptInput;
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -204,23 +237,7 @@ async function callOpenAiDescription({
           content: [
             {
               type: "input_text",
-              text: [
-                "한국어 사이트 상세 설명 초안을 sites.description에 저장할 자연스러운 설명문으로 작성한다.",
-                "추천, 홍보, 가입 유도, 입금 유도, 이벤트 강조를 하지 않는다.",
-                "입력 자료에 표시된 정보를 상세페이지 본문으로 해석 중심 요약한다.",
-                "고지문은 별도 컴포넌트에서 출력하므로 본문에 넣지 않는다.",
-                "4~6문단, 각 문단 2~3문장, 전체 700~1,100자 정도로 작성한다.",
-                "제목, bullet 목록, 표, 키워드 나열은 사용하지 않는다.",
-                "page_title, meta_description, h1 같은 내부 필드명이나 '문서 제목은', '메타 설명에는', '대표 제목 영역에는' 표현을 쓰지 않는다.",
-                "세부 메뉴, 게임 분류, footer, 이미지 alt, 배지, 긴 URL은 설명 본문에 나열하지 않고 원본 사이트 관측 정보 섹션에서 다룰 값으로 남긴다.",
-                "메뉴 전체 목록, 게임명, 카테고리명, 언어명, footer 문구를 길게 나열하지 않는다.",
-                "'관측되었습니다'는 최대 2회까지만 사용하고, '공개 HTML', '조회 시점 기준', '스크린샷' 표현은 본문에 반복하지 않는다.",
-                "'구성 요소', '문구가 확인되었습니다', '배치된 형태로 보입니다'처럼 AI 리포트처럼 보이는 표현은 최소화한다.",
-                "대신 '확인됩니다', '표시됩니다', '사용되었습니다', '구성되어 있습니다', '함께 보입니다', '따로 정리했습니다'를 우선 사용한다.",
-                "실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부는 확인되지 않은 항목으로 짧게 언급한다.",
-                "promotional/excluded terms는 본문에서 강조하지 않는다.",
-                "마크다운으로 작성하되 외부 이미지 URL을 삽입하지 않는다.",
-              ].join("\n"),
+              text: siteObservationDescriptionSystemPrompt,
             },
           ],
         },
@@ -234,37 +251,31 @@ async function callOpenAiDescription({
           ],
         },
       ],
-      max_output_tokens: 2200,
+      max_output_tokens: 3000,
+      text: {
+        format: {
+          type: "json_schema",
+          name: "site_observation_description",
+          strict: true,
+          schema: siteObservationDescriptionJsonSchema,
+        },
+      },
     }),
   });
-  const payload = (await response.json().catch(() => null)) as
-    | {
-        output_text?: string;
-        output?: Array<{
-          content?: Array<{ text?: string }>;
-        }>;
-        error?: { message?: string };
-      }
-    | null;
+  const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error?.message ?? "OpenAI 설명 생성에 실패했습니다.");
+    throw new Error(getOpenAiErrorMessage(payload));
   }
 
-  const outputText =
-    payload?.output_text ??
-    payload?.output
-      ?.flatMap((item) => item.content ?? [])
-      .map((item) => item.text ?? "")
-      .join("\n")
-      .trim() ??
-    "";
+  const outputText = extractOpenAiOutputText(payload);
+  const jsonText = extractJsonObjectText(outputText);
 
-  if (!outputText) {
-    throw new Error("OpenAI 응답에서 설명 초안을 찾지 못했습니다.");
+  if (!jsonText) {
+    throw new Error("OpenAI 응답에서 관측 설명 JSON을 찾지 못했습니다.");
   }
 
-  return outputText;
+  return JSON.parse(jsonText);
 }
 
 export async function POST(request: Request) {
@@ -296,23 +307,33 @@ export async function POST(request: Request) {
 
   const openaiApiKey = process.env.OPENAI_API_KEY;
   const openaiModel =
+    process.env.OPENAI_SITE_OBSERVATION_DESCRIPTION_MODEL ||
     process.env.OPENAI_SITE_DESCRIPTION_MODEL ||
     process.env.OPENAI_BLOG_PLANNER_MODEL ||
     "";
+  const promptSite = buildPromptSite(siteName, sourceUrl);
+  const promptSnapshot = buildPromptSnapshot({ sourceUrl, observation });
+  const fallbackOutput = buildLocalDescriptionDraft({
+    siteName,
+    sourceUrl,
+    observation,
+  });
   const adminWarnings: string[] = [];
   let provider: DescriptionResponse["provider"] = "local";
-  let aiDetailDescriptionMd = "";
+  let model: string | null = null;
+  let promptVersion: string | null = SITE_OBSERVATION_DESCRIPTION_PROMPT_VERSION;
+  let aiOutput = fallbackOutput;
 
   if (openaiApiKey && openaiModel) {
     try {
-      aiDetailDescriptionMd = await callOpenAiDescription({
+      aiOutput = await callOpenAiDescription({
         apiKey: openaiApiKey,
         model: openaiModel,
-        siteName,
-        sourceUrl,
-        observation,
+        site: promptSite,
+        snapshot: promptSnapshot,
       });
       provider = "openai";
+      model = openaiModel;
     } catch (error) {
       adminWarnings.push(
         error instanceof Error
@@ -322,16 +343,12 @@ export async function POST(request: Request) {
     }
   } else {
     adminWarnings.push(
-      "OPENAI_API_KEY와 OPENAI_SITE_DESCRIPTION_MODEL이 없어 로컬 규칙 기반 초안을 생성했습니다.",
+      "OPENAI_API_KEY 또는 관측 설명 모델 환경변수가 없어 로컬 규칙 기반 초안을 생성했습니다.",
     );
   }
 
-  if (!aiDetailDescriptionMd) {
-    aiDetailDescriptionMd = buildLocalDescriptionDraft({
-      siteName,
-      observation,
-    });
-  }
+  adminWarnings.push(...aiOutput.admin_warnings);
+  let aiDetailDescriptionMd = aiOutput.detail_description_md;
 
   const formattedDescription = formatObservationDescriptionForPublic(
     aiDetailDescriptionMd,
@@ -355,14 +372,17 @@ export async function POST(request: Request) {
     openaiModel
   ) {
     try {
-      aiDetailDescriptionMd = await callOpenAiDescription({
+      aiOutput = await callOpenAiDescription({
         apiKey: openaiApiKey,
         model: openaiModel,
-        siteName,
-        sourceUrl,
-        observation,
+        site: promptSite,
+        snapshot: promptSnapshot,
         rewriteDraft: aiDetailDescriptionMd,
       });
+      provider = "openai";
+      model = openaiModel;
+      promptVersion = SITE_OBSERVATION_DESCRIPTION_PROMPT_VERSION;
+      aiDetailDescriptionMd = aiOutput.detail_description_md;
       const formattedRewriteDescription = formatObservationDescriptionForPublic(
         aiDetailDescriptionMd,
       );
@@ -394,19 +414,97 @@ export async function POST(request: Request) {
     );
   }
   adminWarnings.push(...validation.warnings);
+  const finalAdminWarnings = uniqueStrings(adminWarnings);
 
   return NextResponse.json({
     aiDetailDescriptionMd,
     aiObservationSummaryJson: {
       ...buildObservationSummaryJson(observation),
+      observation_summary: aiOutput.observation_summary,
+      content_quality: aiOutput.content_quality,
       validation_status: validation.status,
       validation_errors: validation.errors,
-      admin_warnings: validation.warnings,
+      admin_warnings: finalAdminWarnings,
       prohibited_phrase_check: validation.prohibited_phrase_check,
+      provider,
+      model,
+      prompt_version: promptVersion,
     },
-    adminWarnings,
+    adminWarnings: finalAdminWarnings,
     validationErrors: validation.errors,
     validationStatus: validation.status,
     provider,
   } satisfies DescriptionResponse);
+}
+
+function extractOpenAiOutputText(payload: unknown) {
+  if (!payload || typeof payload !== "object") return "";
+  const response = payload as Record<string, unknown>;
+
+  if (typeof response.output_text === "string") {
+    return response.output_text;
+  }
+
+  const output = response.output;
+  if (!Array.isArray(output)) return "";
+
+  return output
+    .flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const content = (item as Record<string, unknown>).content;
+      if (!Array.isArray(content)) return [];
+
+      return content.map((part) => {
+        if (!part || typeof part !== "object") return "";
+        const record = part as Record<string, unknown>;
+        return typeof record.text === "string" ? record.text : "";
+      });
+    })
+    .join("\n")
+    .trim();
+}
+
+function extractJsonObjectText(text: string) {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const candidate = fenced ? fenced[1].trim() : trimmed;
+
+  if (candidate.startsWith("{") && candidate.endsWith("}")) {
+    return candidate;
+  }
+
+  const firstBrace = candidate.indexOf("{");
+  const lastBrace = candidate.lastIndexOf("}");
+
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return candidate.slice(firstBrace, lastBrace + 1);
+  }
+
+  return "";
+}
+
+function getOpenAiErrorMessage(payload: unknown) {
+  const error = isRecord(payload) ? payload.error : null;
+
+  if (!error || typeof error !== "object") {
+    return "OpenAI API 요청에 실패했습니다.";
+  }
+
+  const errorRecord = error as Record<string, unknown>;
+  const code = typeof errorRecord.code === "string" ? errorRecord.code : "";
+  const type = typeof errorRecord.type === "string" ? errorRecord.type : "";
+  const message =
+    typeof errorRecord.message === "string" ? errorRecord.message : "";
+
+  if (code === "insufficient_quota" || type === "insufficient_quota") {
+    return "OpenAI API 할당량이 부족합니다.";
+  }
+
+  return message
+    ? `OpenAI API 요청에 실패했습니다: ${message}`
+    : "OpenAI API 요청에 실패했습니다.";
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map(normalizeText).filter(Boolean)));
 }

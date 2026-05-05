@@ -618,40 +618,41 @@ export function buildObservationDescriptionFallback({
     siteName,
   );
   const siteSubject = getSiteSubjectName(siteName);
+  const siteSubjectWithParticle = withTopicParticle(siteSubject);
   const displayNameSentence =
     displayName && displayName !== siteName
-      ? `${siteSubject}는 공개 화면에서 "${displayName}"이라는 이름을 사용하는 사이트입니다.`
-      : `${siteSubject}는 사이트 식별명과 주요 화면 흐름을 함께 사용하는 사이트입니다.`;
+      ? `${siteSubjectWithParticle} 화면 안에서 "${displayName}" 이름을 쓰고 있다.`
+      : `${siteSubjectWithParticle} 이름 영역과 주요 메뉴를 앞쪽에 두고 있다.`;
   const categorySentence =
     observationSummary.betting_feature_summary.length > 0
-      ? "전체 화면은 스포츠 경기 정보, 카지노 또는 슬롯 계열 콘텐츠, 라이브 콘텐츠로 보이는 영역을 함께 탐색하는 구조에 가깝습니다. 화면은 여러 기능을 한 페이지 안에서 구분해 보여주는 편입니다."
-      : "전체 화면은 사이트 식별 영역, 계정 관련 메뉴, 문의 또는 고객지원 요소를 중심으로 탐색하는 구조에 가깝습니다. 화면은 여러 기능을 한 페이지 안에서 구분해 보여주는 편입니다.";
+      ? "메인에는 스포츠, 카지노, 슬롯 계열로 보이는 영역이 나뉘어 있다. 화면 한쪽에는 라이브 콘텐츠처럼 보이는 구획도 붙어 있다."
+      : "메인에는 이름 영역, 계정 쪽 메뉴, 문의 흐름이 먼저 눈에 들어온다. 본문은 몇 개 구획으로 나뉘어 있다.";
   const mainContentSentence =
     observationSummary.betting_feature_summary.length > 0
-      ? "본문에는 콘텐츠를 구분해 보여주는 카드형 영역과 카테고리 이동 요소가 함께 배치되어 있습니다. 이용자는 화면의 구획을 따라 스포츠, 라이브 콘텐츠, 게임성 콘텐츠를 나누어 살펴보는 흐름으로 이해할 수 있습니다."
-      : "본문에는 여러 안내 영역과 화면 전환 요소가 함께 배치되어 있습니다. 이용자는 상단 식별 영역과 본문 구획을 따라 주요 메뉴와 고객지원 흐름을 구분해 살펴보는 구조로 이해할 수 있습니다.";
+      ? "본문을 보면 카드형 영역과 이동 버튼이 따로 잡혀 있다. 게임성 콘텐츠와 경기 쪽 화면을 같은 페이지에서 넘겨보게 만든 흐름이다. 상단 메뉴는 몇 갈래로 나뉘고, 버튼 간격은 촘촘한 편이다."
+      : "본문에는 안내 영역과 화면 이동 버튼이 따로 보인다. 상단에서 메뉴를 고르고 아래쪽에서 세부 내용을 따라가는 흐름이다. 버튼과 텍스트가 한 화면 안에 비교적 가까이 붙어 있다.";
   const accountSentence =
     observationSummary.account_feature_summary.length > 0
-      ? "계정 접근, 문의, 이용 기록과 관련된 요소도 일부 확인됩니다. 다만 화면에 보이는 라벨만으로 실제 계정 생성 절차나 본인 확인 방식, 이용 조건이 어떻게 적용되는지는 판단하기 어렵습니다."
-      : "계정이나 문의 흐름과 관련된 세부 절차는 제공된 자료만으로 충분히 확인되지 않습니다. 실제 계정 생성 절차, 본인 확인 방식, 이용 조건은 별도 검토가 필요한 항목입니다.";
+      ? "상단이나 한쪽에는 계정 접근, 문의, 이용 기록 쪽 요소가 걸려 있다. 문의 쪽 버튼은 계정 영역 가까이에 붙어 있다. 다만 실제 본인 확인 방식이나 이용 조건은 이 화면에서 못 찾는다."
+      : "계정이나 문의 흐름은 뚜렷하게 많이 잡히지 않는다. 본인 확인 방식과 이용 조건도 이 화면에서는 안 나와 있다. 연락 채널이나 운영 조건도 더 봐야 한다.";
   const categoryDetailSentence =
     observationSummary.betting_feature_summary.length > 0
-      ? "게임 또는 경기 관련 카테고리는 여러 성격의 콘텐츠를 묶어 보여주는 방식으로 구성되어 있습니다. 세부 메뉴명과 개별 게임명은 본문에서 길게 나열하지 않고, 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있도록 분리했습니다."
-      : "세부 메뉴는 계정, 문의, 화면 이동 항목을 중심으로 정리할 수 있습니다. 반복되는 메뉴명과 하단 문구는 본문에 길게 나열하지 않고, 아래 원본 사이트 관측 정보 섹션에서 확인할 수 있도록 분리했습니다.";
+      ? "세부 메뉴와 개별 게임명은 꽤 많아질 수 있다. 그래서 본문에서는 큰 갈래만 남기고, 긴 목록은 별도 관측값으로 넘기는 편이 낫다. 공지나 안내 항목은 아래쪽에 따로 몰려 있다."
+      : "세부 메뉴와 하단 문구는 길게 늘어놓기보다 따로 빼두는 편이 낫다. 본문에는 화면 흐름만 짧게 남긴다. 공지나 안내 항목은 아래쪽에 따로 몰려 있다.";
   const paymentRecordSentence =
     observationSummary.payment_feature_summary.length > 0
-      ? "금전 처리나 이용 내역과 관련된 항목으로 해석될 수 있는 요소가 일부 포함되어 있습니다. 실제 결제 방식, 본인 확인 절차, 접근 제한 여부, 세부 이용 조건은 제공된 자료만으로 확인되지 않습니다."
-      : "실제 결제 방식, 본인 확인 절차, 접근 제한 여부, 세부 이용 조건은 제공된 자료만으로 확인되지 않습니다. 공지성 안내나 캠페인성 영역이 있더라도 적용 조건과 기간은 별도 자료 없이는 단정하기 어렵습니다.";
+      ? "아래쪽에는 거래나 이용 내역처럼 보이는 영역도 일부 있다. 결제 처리 방식, 접근 제한, 세부 조건은 안 나와 있다. 하단에는 저작권 성격의 짧은 문구도 남아 있다."
+      : "결제 방식, 접근 제한, 세부 조건은 이 화면만으로는 안 나온다. 공지성 영역이 있어도 적용 조건까지 단정하기는 어렵다. 하단에는 저작권 성격의 짧은 문구도 남아 있다.";
   const shortFallbackParagraphs = [
-    `${displayNameSentence} 제공된 관측 항목이 많지 않아 화면 구성은 기본 정보 중심으로만 정리합니다.`,
-    "승인된 후기나 피해 제보와 연결해 판단할 수 있는 추가 자료는 별도 검토가 필요합니다. 확인되지 않은 항목은 추정하지 않았습니다.",
+    `${displayNameSentence} 잡힌 항목이 많지 않아 기본 화면만 짧게 남긴다.`,
+    "메뉴나 게임 목록은 뚜렷하게 많이 보이지 않는다. 결제 방식이나 운영 정보도 안 나와 있다.",
   ];
   const paragraphs = [
     `${displayNameSentence} ${categorySentence}`,
     mainContentSentence,
     accountSentence,
     categoryDetailSentence,
-    `${paymentRecordSentence} 세부 관측값은 상세 설명 본문에 반복하지 않고 원본 사이트 관측 정보 섹션에 남겨, 관리자가 화면 구성과 저장된 원문 자료를 함께 검토할 수 있게 했습니다.`,
+    paymentRecordSentence,
   ];
   const detailDescriptionMd =
     contentQuality.unique_fact_count < 5
@@ -963,6 +964,22 @@ function getObservationDisplayName(
 
 function getSiteSubjectName(siteName: string) {
   return siteName.endsWith("사이트") ? siteName : `${siteName} 사이트`;
+}
+
+function withTopicParticle(value: string) {
+  const chars = Array.from(value.trim());
+  const lastChar = chars[chars.length - 1];
+  if (!lastChar) return value;
+
+  const codePoint = lastChar.codePointAt(0) ?? 0;
+  const hangulStart = 0xac00;
+  const hangulEnd = 0xd7a3;
+
+  if (codePoint < hangulStart || codePoint > hangulEnd) {
+    return `${value}는`;
+  }
+
+  return (codePoint - hangulStart) % 28 === 0 ? `${value}는` : `${value}은`;
 }
 
 function normalizeRequestBody(value: unknown): ObservationDescriptionRequestBody {

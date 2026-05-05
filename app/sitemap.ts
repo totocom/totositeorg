@@ -14,6 +14,7 @@ import {
   calculateSiteDetailIndexability,
   type SiteDetailIndexabilityResult,
 } from "@/app/data/site-detail-indexability";
+import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
 import type { ReviewTarget } from "@/app/data/sites";
 import { siteUrl } from "@/lib/config";
 
@@ -62,13 +63,65 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         source: publicSitesForSitemapResult.source,
       }),
     }))
-    .filter(({ indexability }) => indexability.shouldIndex)
-    .map(({ site, indexability, lastModified }) => ({
-      url: `${siteUrl}/sites/${site.slug}`,
-      lastModified: lastModified ? new Date(lastModified) : new Date(),
-      changeFrequency: "weekly" as const,
-      priority: getSiteSitemapPriority(site, indexability),
-    }));
+    .flatMap(({
+      site,
+      indexability,
+      approvedReviewCount,
+      approvedScamReportCount,
+      latestReviewAt,
+      latestScamReportAt,
+      latestDomainSignalAt,
+      lastModified,
+    }) => {
+      const splitEnabled = isSitePageSplitEnabled(site.slug);
+
+      if (!splitEnabled && !indexability.shouldIndex) {
+        return [];
+      }
+
+      const baseUrl = `${siteUrl}/sites/${site.slug}`;
+      const pages: MetadataRoute.Sitemap = [
+        {
+          url: baseUrl,
+          lastModified: lastModified ? new Date(lastModified) : new Date(),
+          changeFrequency: "weekly" as const,
+          priority: splitEnabled
+            ? 0.75
+            : getSiteSitemapPriority(site, indexability),
+        },
+      ];
+
+      if (!splitEnabled) {
+        return pages;
+      }
+
+      if (approvedScamReportCount > 0) {
+        pages.push({
+          url: `${baseUrl}/scam-reports`,
+          lastModified: new Date(latestScamReportAt ?? lastModified ?? Date.now()),
+          changeFrequency: "weekly" as const,
+          priority: 0.7,
+        });
+      }
+
+      if (approvedReviewCount > 0) {
+        pages.push({
+          url: `${baseUrl}/reviews`,
+          lastModified: new Date(latestReviewAt ?? lastModified ?? Date.now()),
+          changeFrequency: "weekly" as const,
+          priority: 0.65,
+        });
+      }
+
+      pages.push({
+        url: `${baseUrl}/domains`,
+        lastModified: new Date(latestDomainSignalAt ?? lastModified ?? Date.now()),
+        changeFrequency: "monthly" as const,
+        priority: 0.6,
+      });
+
+      return pages;
+    });
   const blogEntries: MetadataRoute.Sitemap = [
     ...(isBlogIndexActive
       ? [

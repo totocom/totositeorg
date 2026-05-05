@@ -288,7 +288,7 @@ test("fallback draft does not emphasize promotional flags in public description"
     /^#{1,6}\s|^\s*[-*+]\s/m.test(fallback.detail_description_md),
     false,
   );
-  assert.equal(paragraphs.length >= 4 && paragraphs.length <= 6, true);
+  assert.equal(paragraphs.length >= 3 && paragraphs.length <= 5, true);
   assert.equal(
     paragraphs.every((paragraph) => {
       const sentenceCount = getSentences(paragraph).length;
@@ -296,8 +296,11 @@ test("fallback draft does not emphasize promotional flags in public description"
     }),
     true,
   );
-  assert.equal(getPlainLength(fallback.detail_description_md) >= 700, true);
-  assert.equal(getPlainLength(fallback.detail_description_md) <= 1100, true);
+  assert.equal(getPlainLength(fallback.detail_description_md) >= 450, true);
+  assert.equal(getPlainLength(fallback.detail_description_md) <= 900, true);
+  assert.equal(/구조로 이해|판단하기 어렵|확인됩니다|구성되어 있습니다/.test(
+    fallback.detail_description_md,
+  ), false);
   assert.equal(fallback.content_quality.public_index_recommendation, "index");
   assert.equal(fallback.detail_description_md.includes(site.url ?? ""), false);
   assert.equal(fallback.detail_description_md.includes("홈, 스포츠, 고객센터"), false);
@@ -670,19 +673,33 @@ test("site observation description prompt requires data-based bounded paragraphs
   });
   const combinedPrompt = `${siteObservationDescriptionSystemPrompt}\n${prompt}`;
 
-  assert.match(combinedPrompt, /3~5문단/);
-  assert.match(combinedPrompt, /150~350자/);
+  assert.match(combinedPrompt, /사이트 들어가서 화면 보면서 실시간으로 메모하는 사람/);
+  assert.match(combinedPrompt, /친구한테 카톡으로 사이트 설명/);
+  assert.match(combinedPrompt, /5~8문단/);
+  assert.match(combinedPrompt, /600~1100자/);
+  assert.match(combinedPrompt, /200~400자/);
   assert.match(combinedPrompt, /insufficient_unique_data/);
   assert.match(combinedPrompt, /content_quality/);
-  assert.match(combinedPrompt, /고지문은 별도/);
+  assert.match(combinedPrompt, /고지문.*SiteDescriptionNotice/);
   assert.match(combinedPrompt, /page_title, meta_description, h1/);
-  assert.match(combinedPrompt, /세부 메뉴, 게임명, footer, 이미지 alt, 배지/);
-  assert.match(combinedPrompt, /공개 HTML.*Notice/);
-  assert.match(combinedPrompt, /URL은 설명 본문에 직접 길게 쓰지 말고/);
-  assert.match(combinedPrompt, /실제 결제 방식, 본인 확인 절차, 이용 조건, 접근 제한 여부/);
-  assert.match(combinedPrompt, /원본 사이트 관측 정보/);
-  assert.match(combinedPrompt, /확인됩니다/);
-  assert.match(combinedPrompt, /본문 영역에서는 경기 일정/);
+  assert.match(combinedPrompt, /메뉴 이름이나 빠른 버튼 항목은 한 문장 안에 쉼표로 길게/);
+  assert.match(combinedPrompt, /공개 HTML.*사용 금지/);
+  assert.match(combinedPrompt, /본문에 URL 직접 노출 금지/);
+  assert.match(combinedPrompt, /원본 URL 노출 하지 않습니다/);
+  assert.match(combinedPrompt, /결제 방식, 본인 확인, 이용 조건/);
+  assert.match(combinedPrompt, /접속해보면/);
+  assert.match(combinedPrompt, /그 아래는/);
+  assert.match(combinedPrompt, /글쓴이의 즉흥적 판단/);
+  assert.match(combinedPrompt, /왜 이 정보를 다루는지/);
+  assert.match(combinedPrompt, /사이트가 자기 자랑으로 써놓은 영역/);
+  assert.match(combinedPrompt, /그대로 믿기는 어려워요/);
+  assert.match(combinedPrompt, /반말체와 존댓말체를 섞지/);
+  assert.match(combinedPrompt, /처음 정한 어조/);
+  assert.match(combinedPrompt, /"~네요"는 글 전체에서 3회 이내/);
+  assert.match(combinedPrompt, /같은 종결을 연속 두 문장에 쓰지 않는다/);
+  assert.match(combinedPrompt, /이미지 alt, 메타 태그, viewport/);
+  assert.match(combinedPrompt, /모든 문단을 비슷한 길이로 맞추지 않는다/);
+  assert.match(combinedPrompt, /좋은 예시/);
 });
 
 test("approveObservationDescription blocks forbidden final descriptions", async () => {

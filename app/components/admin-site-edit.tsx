@@ -761,6 +761,8 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   const [siteStatus, setSiteStatus] = useState<SiteRow["status"]>("pending");
   const [isLoadingSite, setIsLoadingSite] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingManualDescription, setIsSavingManualDescription] =
+    useState(false);
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
   const [metadata, setMetadata] = useState<SiteMetadata | null>(null);
   const [isFetchingWhois, setIsFetchingWhois] = useState(false);
@@ -939,6 +941,78 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
   async function getAdminToken() {
     const { data: sessionResult } = await supabase.auth.getSession();
     return sessionResult.session?.access_token ?? "";
+  }
+
+  async function saveManualDescription() {
+    const trimmedDescription = values.description.trim();
+    setMessage("");
+    setErrorMessage("");
+
+    if (trimmedDescription.length < 30) {
+      const descriptionError = "사이트 설명은 최소 30자 이상 입력해주세요.";
+      setErrors((current) => ({
+        ...current,
+        description: descriptionError,
+      }));
+      setErrorMessage(descriptionError);
+      return;
+    }
+
+    setErrors((current) => ({
+      ...current,
+      description: undefined,
+    }));
+    setIsSavingManualDescription(true);
+
+    try {
+      const token = await getAdminToken();
+
+      if (!token) {
+        setErrorMessage("관리자 로그인 세션을 확인하지 못했습니다.");
+        return;
+      }
+
+      const response = await fetch(
+        `/api/admin/sites/${encodeURIComponent(siteId)}/manual-description`,
+        {
+          method: "PATCH",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ description: trimmedDescription }),
+        },
+      );
+      const result = (await response.json().catch(() => null)) as {
+        description?: string;
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        setErrorMessage(
+          result?.error ?? "사이트 설명을 저장하지 못했습니다.",
+        );
+        return;
+      }
+
+      setValues((current) => ({
+        ...current,
+        description:
+          typeof result?.description === "string"
+            ? result.description
+            : trimmedDescription,
+      }));
+      setMessage("사이트 설명을 저장하고 공개 상세 캐시를 갱신했습니다.");
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "사이트 설명 저장 중 문제가 발생했습니다.",
+      );
+    } finally {
+      setIsSavingManualDescription(false);
+    }
   }
 
   async function deleteCrawlSnapshot(snapshotId: string) {
@@ -1703,6 +1777,9 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
                 description: undefined,
               }))
             }
+            onManualDescriptionSave={() => void saveManualDescription()}
+            isManualDescriptionSaving={isSavingManualDescription}
+            manualDescriptionSaveLabel="사이트 설명만 저장"
             onSnapshotApplied={({ snapshotId }) => {
               setMessage(`관측 snapshot ${snapshotId}의 설명을 반영했습니다.`);
             }}

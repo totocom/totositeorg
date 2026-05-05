@@ -8,6 +8,11 @@ import {
   getSiteDetailSocialImage,
   stripMarkdownForMeta,
 } from "./site-detail-metadata";
+import {
+  buildDomainsSiteTitle,
+  buildDomainsTitleSuffix,
+  buildReviewsTitleSuffix,
+} from "./site-detail-subpage-metadata";
 import type { ReviewTarget } from "./sites";
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://project.supabase.co";
@@ -60,6 +65,40 @@ function assertShortPlainMetaDescription(description: string | null | undefined)
   assert.equal((description?.length ?? 0) <= 160, true);
   assert.equal((description?.length ?? 0) <= 200, true);
 }
+
+test("reviews title suffix omits negative rating signals for empty reviews", () => {
+  assert.equal(buildReviewsTitleSuffix(0, 0), "이용자 후기");
+  assert.equal(buildReviewsTitleSuffix(0, 5), "이용자 후기");
+});
+
+test("reviews title suffix omits zero rating when reviews exist", () => {
+  assert.equal(buildReviewsTitleSuffix(5, 0), "후기 5건");
+});
+
+test("reviews title suffix includes rating only when reviews and positive rating exist", () => {
+  assert.equal(buildReviewsTitleSuffix(5, 4.2), "후기 5건·평점 4.2점");
+});
+
+test("domains title suffix uses operating history when present", () => {
+  assert.equal(
+    buildDomainsTitleSuffix(3, "1년 11개월"),
+    "도메인 3개·운영 이력 1년 11개월",
+  );
+});
+
+test("domains site title keeps parenthesized site name within hard limit", () => {
+  assert.equal(
+    buildDomainsSiteTitle(
+      "유튜벳 (YOUTOOBET)",
+      "도메인 3개·운영 이력 1년 11개월",
+    ),
+    "유튜벳 (YOUTOOBET) 도메인 3개·운영 이력 1년 11개월",
+  );
+});
+
+test("domains title suffix falls back to address domain wording without history", () => {
+  assert.equal(buildDomainsTitleSuffix(3, null), "주소·도메인 3개");
+});
 
 test("site detail meta description does not use full markdown description", () => {
   const description = buildSiteDetailMetaDescription(createSite());

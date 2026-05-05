@@ -33,6 +33,9 @@ type AdminSiteObservationPanelProps = {
   description: string;
   onDescriptionChange: (description: string) => void;
   onDescriptionErrorClear?: () => void;
+  onManualDescriptionSave?: () => void;
+  isManualDescriptionSaving?: boolean;
+  manualDescriptionSaveLabel?: string;
   onPendingSnapshotChange?: (draft: AdminSiteObservationDraft | null) => void;
   onSnapshotApplied?: (payload: {
     snapshotId: string;
@@ -150,6 +153,9 @@ export function AdminSiteObservationPanel({
   description,
   onDescriptionChange,
   onDescriptionErrorClear,
+  onManualDescriptionSave,
+  isManualDescriptionSaving = false,
+  manualDescriptionSaveLabel = "사이트 설명만 저장",
   onPendingSnapshotChange,
   onSnapshotApplied,
   onSnapshotChanged,
@@ -1076,6 +1082,29 @@ export function AdminSiteObservationPanel({
             <span className="text-xs text-red-700">{descriptionError}</span>
           ) : null}
         </label>
+        {onManualDescriptionSave ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onManualDescriptionSave}
+              disabled={
+                isManualDescriptionSaving || description.trim().length < 30
+              }
+              className="h-9 rounded-md bg-accent px-3 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              {isManualDescriptionSaving
+                ? "저장 중..."
+                : manualDescriptionSaveLabel}
+            </button>
+            <span className="text-xs text-muted">
+              현재 사이트 설명만 저장하고 공개 상세 캐시를 갱신합니다.
+            </span>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-muted">
+            수정 후 등록 버튼을 눌러야 사이트 레코드에 반영됩니다.
+          </p>
+        )}
       </details>
     </section>
   );

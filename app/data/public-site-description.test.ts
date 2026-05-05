@@ -76,18 +76,22 @@ test("formatObservationDescriptionForPublic separates long notice from descripti
   );
 
   assert.equal(formatted.description.includes(siteSpecificNoticeText), false);
-  assert.equal(formatted.description.includes("가입 또는 이용을 권장"), false);
+  assert.equal(formatted.description.includes("가입하거나 이용하라고"), false);
   assert.match(formatted.description, /테스트 사이트는/);
 });
 
 test("buildSiteDescriptionNoticeText renders site-specific non-promo disclosure", () => {
   assert.equal(
     buildSiteDescriptionNoticeText("벳톡"),
-    "본 설명은 벳톡 토토사이트가 공개한 HTML 자료와 스크린샷을 기준으로 작성된 요약본이며, 해당 사이트의 가입 또는 이용을 권장하거나 유도하는 내용이 아닙니다.",
+    "벳톡 사이트에 직접 접속해서 확인한 스크린샷과 HTML 내용을 정리해 올립니다. 가입하거나 이용하라고 쓴 글은 아니고, 화면이 어떻게 생겼는지 보여드리려고 정리한 겁니다.",
   );
   assert.equal(
     buildSiteDescriptionNoticeText("벳톡 토토사이트"),
-    "본 설명은 벳톡 토토사이트가 공개한 HTML 자료와 스크린샷을 기준으로 작성된 요약본이며, 해당 사이트의 가입 또는 이용을 권장하거나 유도하는 내용이 아닙니다.",
+    "벳톡 토토사이트에 직접 접속해서 확인한 스크린샷과 HTML 내용을 정리해 올립니다. 가입하거나 이용하라고 쓴 글은 아니고, 화면이 어떻게 생겼는지 보여드리려고 정리한 겁니다.",
+  );
+  assert.equal(
+    buildSiteDescriptionNoticeText("장강 (JANGKANG)"),
+    "장강(JANGKANG) 사이트에 직접 접속해서 확인한 스크린샷과 HTML 내용을 정리해 올립니다. 가입하거나 이용하라고 쓴 글은 아니고, 화면이 어떻게 생겼는지 보여드리려고 정리한 겁니다.",
   );
 });
 

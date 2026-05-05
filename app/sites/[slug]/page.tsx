@@ -6,10 +6,17 @@ import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actio
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { RelatedBlogReportCard } from "@/app/components/related-blog-report-card";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
-import { ReviewSummary, getReviewSeoSummary } from "@/app/components/review-summary";
+import { ReviewSummary } from "@/app/components/review-summary";
 import { SafeMarkdown } from "@/app/components/safe-markdown";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteDescriptionNotice } from "@/app/components/site-description-notice";
+import { SiteDetailTabs } from "@/app/components/site-detail/site-detail-tabs";
+import {
+  buildAggregateRatingJsonLd,
+  buildSiteBreadcrumbJsonLd,
+  buildSiteWebPageJsonLd,
+  JsonLd,
+} from "@/app/components/site-detail/site-json-ld";
 import { SiteFeedbackSubmissionGuide } from "@/app/components/site-feedback-submission-guide";
 import { SiteObservationSnapshotCard } from "@/app/components/site-observation-snapshot-card";
 import { SiteShareActions } from "@/app/components/site-share-actions";
@@ -18,6 +25,7 @@ import { formatKstDate } from "@/app/data/date-format";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
 import { extractDomain } from "@/app/data/domain-whois";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
+import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
 import { getSiteOverviewMarkdownBlocks } from "@/app/data/public-site-description";
 import { calculateSiteDetailIndexability } from "@/app/data/site-detail-indexability";
 import {
@@ -162,6 +170,7 @@ export async function generateMetadata({
 }: SiteDetailPageProps): Promise<Metadata> {
   const { slug: rawSlug } = await params;
   const slug = rawSlug.trim();
+  const splitEnabled = isSitePageSplitEnabled(slug);
   const detail = await getCachedPublicSiteDetail(slug);
   const {
     site,
@@ -188,7 +197,7 @@ export async function generateMetadata({
   });
 
   return buildSiteDetailMetadata(site, slug, {
-    shouldIndex: indexability.shouldIndex,
+    shouldIndex: splitEnabled ? true : indexability.shouldIndex,
     indexability,
     observationSnapshot,
     relatedBlogReport,
@@ -198,6 +207,7 @@ export async function generateMetadata({
 export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const { slug: rawSlug } = await params;
   const slug = rawSlug.trim();
+  const splitEnabled = isSitePageSplitEnabled(slug);
 
   const {
     site,
@@ -267,32 +277,13 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     siteDetailMetadataOptions,
   );
   const shareUrl = `${siteUrl.replace(/\/$/, "")}/sites/${encodeURIComponent(slug)}`;
-  const itemListJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Review",
-    itemReviewed: {
-      "@type": "WebSite",
-      name: site.siteName,
-      url: site.siteUrl,
-    },
-    reviewRating: {
-      "@type": "AggregateRating",
-      ratingValue: Math.round(site.averageRating * 20),
-      reviewCount: site.reviewCount,
-      bestRating: 100,
-      worstRating: 20,
-    },
-    name: `${site.siteName} 토토사이트 정보`,
-    description: reviews[0]
-      ? getReviewSeoSummary(site.siteName, reviews[0].experience)
-      : siteDetailMetaDescription,
-  };
+  const aggregateRatingJsonLd = buildAggregateRatingJsonLd(site);
   const domainTargets = Array.from(
     new Set([site.siteUrl, ...site.domains].filter(Boolean)),
   ).slice(0, 6);
   const siteDetailInternalLinks = buildSiteDetailInternalLinks({
     siteName: site.siteName,
-    includeDomainLinks: domainTargets.length > 0,
+    includeDomainLinks: !splitEnabled && domainTargets.length > 0,
   });
   const domainCreationDateMap = new Map(
     domainCreationDates.map(({ domain, creationDate }) => [
@@ -343,15 +334,29 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     (domain) => formatDisplayDomain(domain) !== representativeDisplayDomain,
   );
   const overviewBlocks = getSiteOverviewMarkdownBlocks(site.shortDescription);
+  const visibleScamReports = splitEnabled ? scamReports.slice(0, 3) : scamReports;
+  const visibleReviews = splitEnabled ? reviews.slice(0, 3) : reviews;
 
   return (
     <>
-      {site.reviewCount > 0 && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
-        />
-      )}
+      <JsonLd
+        value={buildSiteWebPageJsonLd({
+          site,
+          canonical: shareUrl,
+          title: shareTitle,
+          description: siteDetailMetaDescription,
+        })}
+      />
+      <JsonLd
+        value={buildSiteBreadcrumbJsonLd({
+          items: [
+            { name: "홈", url: siteUrl },
+            { name: "사이트 목록", url: new URL("/sites", siteUrl).toString() },
+            { name: site.siteName, url: shareUrl },
+          ],
+        })}
+      />
+      {aggregateRatingJsonLd ? <JsonLd value={aggregateRatingJsonLd} /> : null}
       <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_320px] lg:px-8">
         <div className="min-w-0">
           {/* 메인 정보 카드 */}
@@ -469,6 +474,18 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 />
               </div>
             </div>
+
+            {splitEnabled ? (
+              <SiteDetailTabs
+                slug={site.slug}
+                activeTab="main"
+                counts={{
+                  scamReports: scamReports.length,
+                  reviews: reviews.length,
+                  domains: domainTargets.length,
+                }}
+              />
+            ) : null}
           </div>
 
           {/* 등록 도메인 */}
@@ -497,9 +514,26 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           ) : null}
 
           {/* 도메인 & DNS */}
-          {domainInfoTabs.length > 0 ? (
+          {!splitEnabled && domainInfoTabs.length > 0 ? (
             <div className="border-t border-line px-5 py-4">
               <DomainInfoTabs items={domainInfoTabs} variant="embedded" />
+            </div>
+          ) : null}
+
+          {splitEnabled && domainTargets.length > 0 ? (
+            <div className="border-t border-line px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                도메인 상세
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                WHOIS와 DNS 조회 항목은 주소·도메인 전용 페이지에서 확인할 수 있습니다.
+              </p>
+              <Link
+                href={`/sites/${encodeURIComponent(site.slug)}/domains`}
+                className="mt-3 inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
+              >
+                주소·도메인 {domainTargets.length}개 보기
+              </Link>
             </div>
           ) : null}
 
@@ -549,7 +583,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           {/* 사이트 개요 */}
           {overviewBlocks.length > 0 ? (
             <div className="px-5 pb-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">사이트 개요</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                사이트 메인 화면 내용
+              </p>
               <SiteDescriptionNotice siteName={site.siteName} />
               <SafeMarkdown
                 value={site.shortDescription}
@@ -607,7 +643,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           <div className="flex flex-col gap-3 border-b border-line px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력</p>
-              <h2 className="mt-1 text-base font-bold">승인된 피해 제보</h2>
+              <h2 className="mt-1 text-base font-bold">
+                {splitEnabled ? "최근 승인된 피해 제보" : "승인된 피해 제보"}
+              </h2>
             </div>
             <div className="w-full sm:w-auto sm:shrink-0">
               <Link
@@ -618,9 +656,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </Link>
             </div>
           </div>
-          {scamReports.length > 0 ? (
+          {visibleScamReports.length > 0 ? (
             <div className="grid gap-3 p-4">
-              {scamReports.map((report) => (
+              {visibleScamReports.map((report) => (
                 <article
                   key={report.id}
                   className="rounded-lg border border-line bg-background p-4"
@@ -644,6 +682,14 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   <ScamReportDetails report={report} siteName={site.siteName} />
                 </article>
               ))}
+              {splitEnabled ? (
+                <Link
+                  href={`/sites/${encodeURIComponent(site.slug)}/scam-reports`}
+                  className="inline-flex min-h-10 items-center justify-center rounded-md border border-line bg-surface px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
+                >
+                  먹튀 제보 전체 {scamReports.length}건 보기
+                </Link>
+              ) : null}
             </div>
           ) : (
             <div className="px-5 py-4">
@@ -667,7 +713,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           <div className="flex flex-col gap-3 border-b border-line px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-accent">커뮤니티 리뷰</p>
-              <h2 className="mt-1 text-base font-bold">최근 이용 경험</h2>
+              <h2 className="mt-1 text-base font-bold">
+                {splitEnabled ? "최근 이용 경험 요약" : "최근 이용 경험"}
+              </h2>
             </div>
             <div className="w-full sm:w-auto sm:shrink-0">
               <Link
@@ -678,9 +726,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </Link>
             </div>
           </div>
-          {reviews.length > 0 ? (
+          {visibleReviews.length > 0 ? (
             <div className="grid gap-3 p-4">
-              {reviews.map((review) => (
+              {visibleReviews.map((review) => (
                 <article
                   key={review.id}
                   className="rounded-lg border border-line bg-background p-4 transition hover:border-accent/40"
@@ -708,6 +756,14 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   />
                 </article>
               ))}
+              {splitEnabled ? (
+                <Link
+                  href={`/sites/${encodeURIComponent(site.slug)}/reviews`}
+                  className="inline-flex min-h-10 items-center justify-center rounded-md border border-line bg-surface px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
+                >
+                  후기 전체 {reviews.length}건 보기
+                </Link>
+              ) : null}
             </div>
           ) : (
             <div className="px-5 py-4">
