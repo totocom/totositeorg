@@ -52,6 +52,19 @@ export function ResponsibleUseNotice({
           <li key={notice}>{notice}</li>
         ))}
       </ul>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {responsibleUseExternalLinks.map((link) => (
+          <a
+            key={link.href}
+            href={link.href}
+            rel="noopener noreferrer"
+            target="_blank"
+            className="text-xs font-semibold text-white/40 transition hover:text-white"
+          >
+            {link.label}
+          </a>
+        ))}
+      </div>
     </section>
   );
 }
