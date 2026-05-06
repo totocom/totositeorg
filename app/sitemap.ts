@@ -178,6 +178,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.7,
     },
+    {
+      url: `${siteUrl}/domains`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.65,
+    },
     ...blogEntries,
     {
       url: `${siteUrl}/site-registration`,
