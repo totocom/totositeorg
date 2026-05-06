@@ -6,10 +6,11 @@ export type SiteNavigationLink = {
 export const primaryNavigationLinks: SiteNavigationLink[] = [
   { href: "/", label: "홈" },
   { href: "/sites", label: "사이트 목록" },
-  { href: "/blog", label: "블로그" },
-  { href: "/reviews", label: "만족도 평가" },
+  { href: "/reviews", label: "이용 후기" },
   { href: "/scam-reports", label: "먹튀 제보" },
+  { href: "/blog/category/domain-dns", label: "도메인 정보" },
   { href: "/site-registration", label: "사이트 등록" },
+  { href: "/blog", label: "블로그" },
 ];
 
 export const footerNavigationLinks: SiteNavigationLink[] = [

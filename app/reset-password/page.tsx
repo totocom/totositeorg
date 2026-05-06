@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
 import { ResetPasswordForm } from "@/app/components/reset-password-form";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: true,
+  },
+};
 
 export default function ResetPasswordPage() {
   return (

@@ -166,25 +166,26 @@ export function buildSiteDetailHeading(
   options: SiteDetailMetadataOptions = {},
 ) {
   const displayName = normalizeHeadingSiteName(site.siteName);
+  const keywordName = `${displayName} 토토사이트`;
   const domainCount = getSiteDomainCount(site);
   const scamReportCount = site.scamReportCount ?? 0;
   const context = getSiteDetailMetaContext(site, options);
-  let heading = `${displayName} 기본 정보 및 확인 필요 항목`;
+  let heading = `${keywordName} 기본 정보 및 확인 필요 항목`;
 
   if (scamReportCount > 0 || site.reviewCount > 0) {
-    heading = `${displayName} 후기·제보 현황 리포트`;
+    heading = `${keywordName} 후기·제보 현황 리포트`;
   } else if (!context.shouldIndex) {
-    heading = `${displayName} 기본 정보 및 확인 필요 항목`;
+    heading = `${keywordName} 기본 정보 및 확인 필요 항목`;
   } else if (context.hasRelatedBlogReport) {
-    heading = `${displayName} 관련 리포트와 화면 관측 정보`;
+    heading = `${keywordName} 관련 리포트와 화면 관측 정보`;
   } else if (context.dominantObservation && context.observationFactCount >= 5) {
-    heading = `${displayName} ${context.dominantObservation.headingLabel} 관측 정보`;
+    heading = `${keywordName} ${context.dominantObservation.headingLabel} 관측 정보`;
   } else if (context.observationFactCount >= 5) {
-    heading = `${displayName} 화면 관측 및 도메인 리포트`;
+    heading = `${keywordName} 화면 관측 및 도메인 리포트`;
   } else if (context.hasScreenshot) {
-    heading = `${displayName} 스크린샷 기반 기본 정보`;
+    heading = `${keywordName} 스크린샷 기반 기본 정보`;
   } else if (domainCount >= 2 || site.dnsCheckedAt || site.oldestDomainCreationDate) {
-    heading = `${displayName} 주소·도메인 관측 리포트`;
+    heading = `${keywordName} 주소·도메인 관측 리포트`;
   }
 
   return removeForbiddenHeadingTerms(heading).replace(/\s+/g, " ").trim();

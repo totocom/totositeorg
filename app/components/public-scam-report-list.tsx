@@ -186,7 +186,7 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <Link
-                    href={`/sites/${report.site.slug}#reports`}
+                    href={`/sites/${report.site.slug}/scam-reports`}
                     className="text-sm font-semibold text-accent transition hover:text-foreground"
                   >
                     {report.site.siteName}
@@ -226,7 +226,7 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
               <ScamReportDetails report={report} siteName={report.site.siteName} />
               <div className="mt-4">
                 <Link
-                  href={`/sites/${report.site.slug}#reports`}
+                  href={`/sites/${report.site.slug}/scam-reports`}
                   className="text-sm font-semibold text-accent transition hover:text-foreground"
                 >
                   해당 게시물 보기

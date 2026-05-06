@@ -159,7 +159,7 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
             >
               <div className="min-w-0">
                 <Link
-                  href={`/sites/${review.site.slug}#reviews`}
+                  href={`/sites/${review.site.slug}/reviews`}
                   className="text-xs font-bold uppercase tracking-wide text-accent transition hover:text-accent/80"
                 >
                   {review.site.siteName}
@@ -187,7 +187,7 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
               />
               <div className="mt-4">
                 <Link
-                  href={`/sites/${review.site.slug}#reviews`}
+                  href={`/sites/${review.site.slug}/reviews`}
                   className="text-sm font-semibold text-accent transition hover:text-accent/80"
                 >
                   해당 게시물 보기 →

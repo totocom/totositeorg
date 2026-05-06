@@ -170,8 +170,24 @@ test("site detail H1 uses descriptive site report wording", () => {
 
   assert.equal(heading.endsWith(site.siteName), false);
   assert.equal(heading.includes(site.siteName), true);
+  assert.equal(heading.includes(`${site.siteName} 토토사이트`), true);
   assert.match(heading, /기본 정보|주소·도메인|후기·제보/);
   assert.equal(heading.length >= 15, true);
+});
+
+test("site detail H1 includes 토토사이트 before report wording", () => {
+  const heading = buildSiteDetailHeading(
+    createSite({
+      siteName: "유튜벳 (YOUTOOBET)",
+      reviewCount: 3,
+      scamReportCount: 1,
+    }),
+  );
+
+  assert.equal(
+    heading,
+    "유튜벳 (YOUTOOBET) 토토사이트 후기·제보 현황 리포트",
+  );
 });
 
 test("site detail H1 removes prohibited promotional terms", () => {

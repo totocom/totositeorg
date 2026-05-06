@@ -22,10 +22,21 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
 }
 
 function getHeading(activeTab: SiteDetailTab, siteName: string) {
-  if (activeTab === "scam-reports") return `${siteName} 먹튀 제보`;
-  if (activeTab === "reviews") return `${siteName} 후기`;
-  if (activeTab === "domains") return `${siteName} 주소·도메인`;
-  return `${siteName} 토토사이트`;
+  const keywordName = getSiteKeywordName(siteName);
+
+  if (activeTab === "scam-reports") return `${keywordName} 먹튀 제보`;
+  if (activeTab === "reviews") return `${keywordName} 후기`;
+  if (activeTab === "domains") return `${keywordName} 주소·도메인`;
+  return keywordName;
+}
+
+function getSiteKeywordName(siteName: string) {
+  const normalizedSiteName = siteName.replace(/\s+/g, " ").trim();
+
+  if (!normalizedSiteName) return "토토사이트";
+  if (normalizedSiteName.includes("토토사이트")) return normalizedSiteName;
+
+  return `${normalizedSiteName} 토토사이트`;
 }
 
 export function SiteHeaderCommon({
