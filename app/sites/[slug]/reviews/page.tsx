@@ -19,13 +19,16 @@ import {
   getReviewFaqItems,
   SiteReviewFaq,
 } from "@/app/components/site-detail/site-review-faq";
-import { formatKstDate } from "@/app/data/date-format";
+import {
+  formatKoreanDate,
+  maskPublicAuthorName,
+} from "@/app/data/public-display";
 import { getSiteReviewsDetail } from "@/app/data/public-site-detail";
 import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
 import {
-  buildOptimalSiteTitle,
-  buildReviewsTitleSuffix,
+  buildSiteReviewsDescription,
   buildSiteReviewsMetadata,
+  buildSiteReviewsTitle,
 } from "@/app/data/site-detail-subpage-metadata";
 import { formatRatingScore, issueTypeLabels } from "@/app/data/sites";
 import { siteUrl } from "@/lib/config";
@@ -43,18 +46,42 @@ function redirectDisabledSplitPage(slug: string): never {
   permanentRedirect(`/sites/${encodeURIComponent(slug)}`);
 }
 
-function Stars({ rating }: { rating: number }) {
-  const filled = Math.round(Math.max(1, Math.min(5, rating)));
+function getReviewScoreLabel(rating: number) {
+  const score = Math.round(Math.max(1, Math.min(5, rating)) * 20);
+
+  if (score >= 80) return "긍정 평가";
+  if (score >= 60) return "보통 평가";
+  if (score >= 40) return "불만족 평가";
+
+  return "낮은 만족도";
+}
+
+function ReviewScoreBadge({ rating }: { rating: number }) {
+  const score = formatRatingScore(rating);
+  const label = getReviewScoreLabel(rating);
 
   return (
-    <span aria-label={`${filled}점`} className="text-base leading-none">
-      {Array.from({ length: 5 }, (_, index) => (
-        <span key={index} className={index < filled ? "text-accent" : "text-line"}>
-          ★
-        </span>
-      ))}
+    <span
+      className="rounded-md bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent"
+      aria-label={`만족도 ${score.replace("/100", "점")}, ${label}`}
+    >
+      만족도 점수: {score} · {label}
     </span>
   );
+}
+
+function buildReviewInterpretationNotice(siteName: string, reviewCount: number) {
+  if (reviewCount <= 0) {
+    return `현재 공개된 ${siteName} 관련 승인 후기는 0건입니다. 빈 후기 페이지는 사이트 전체의 상태를 판단하는 자료가 아니며, 도메인 정보와 먹튀 제보 여부를 함께 확인하는 것이 좋습니다.`;
+  }
+
+  const base = `현재 공개된 ${siteName} 관련 승인 후기는 ${reviewCount}건입니다. 단일 후기나 소수의 후기는 전체 이용자 의견을 대표한다고 보기 어려우며, 작성 시점, 이용 기간, 환전 경험, 고객센터 응답, 먹튀 제보 여부, 도메인 정보와 함께 참고하는 것이 좋습니다.`;
+
+  if (reviewCount === 1) {
+    return `${base} 후기 수가 적을 때는 평균 만족도 점수가 쉽게 변동될 수 있습니다.`;
+  }
+
+  return `${base} 후기는 참고 자료이며 사이트 이용을 권장하는 의미가 아닙니다.`;
 }
 
 export async function generateMetadata({
@@ -106,14 +133,8 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
     `/sites/${encodeURIComponent(slug)}/reviews`,
     siteUrl,
   ).toString();
-  const title = buildOptimalSiteTitle(
-    site.siteName,
-    buildReviewsTitleSuffix(reviews.length, site.averageRating),
-  );
-  const description =
-    reviews.length > 0
-      ? `${site.siteName} 토토사이트의 승인된 후기 ${reviews.length}건과 평점, 이용 경험을 정리했습니다.`
-      : `${site.siteName} 토토사이트에 대해 승인된 후기는 아직 없습니다. 후기 작성 방법과 확인 기준을 안내합니다.`;
+  const title = buildSiteReviewsTitle(site.siteName);
+  const description = buildSiteReviewsDescription(site);
   const aggregateRatingJsonLd = buildAggregateRatingJsonLd(site);
 
   return (
@@ -124,6 +145,7 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
           canonical,
           title,
           description,
+          pageType: "CollectionPage",
         })}
       />
       <JsonLd
@@ -149,10 +171,35 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
                   이용 경험
                 </p>
                 <h2 className="mt-1 text-lg font-bold">
-                  {site.siteName} 토토사이트 후기 {reviews.length}건
+                  승인된 이용자 후기와 만족도 평가
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-muted">
                   승인된 이용 경험만 공개하며, 평점은 공개 승인 후기에만 반영됩니다.
+                </p>
+                <dl className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <div className="rounded-md bg-background px-3 py-2">
+                    <dt className="font-semibold text-muted">승인 후기</dt>
+                    <dd className="mt-1 font-bold text-foreground">
+                      {reviews.length}건
+                    </dd>
+                  </div>
+                  <div className="rounded-md bg-background px-3 py-2">
+                    <dt className="font-semibold text-muted">평균 만족도</dt>
+                    <dd className="mt-1 font-bold text-foreground">
+                      {reviews.length > 0
+                        ? formatRatingScore(site.averageRating)
+                        : "집계 전"}
+                    </dd>
+                  </div>
+                </dl>
+                <p
+                  className={
+                    reviews.length <= 1
+                      ? "mt-3 rounded-md border border-line bg-background px-3 py-2 text-sm leading-6 text-foreground"
+                      : "mt-3 rounded-md bg-background px-3 py-2 text-sm leading-6 text-muted"
+                  }
+                >
+                  {buildReviewInterpretationNotice(site.siteName, reviews.length)}
                 </p>
               </div>
               <Link
@@ -174,10 +221,7 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Stars rating={review.rating} />
-                        <span className="text-xs font-semibold text-accent">
-                          {formatRatingScore(review.rating)}
-                        </span>
+                        <ReviewScoreBadge rating={review.rating} />
                         <span className="text-xs text-muted">
                           {issueTypeLabels[review.issueType]}
                         </span>
@@ -187,8 +231,8 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
                       </h3>
                     </div>
                     <p className="text-xs text-muted">
-                      {review.authorNickname ?? "익명"} ·{" "}
-                      {formatKstDate(review.createdAt)}
+                      {maskPublicAuthorName(review.authorNickname)} ·{" "}
+                      {formatKoreanDate(review.createdAt)}
                     </p>
                   </div>
                   <ReviewSummary
@@ -217,7 +261,7 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
                   후기 작성 전 확인할 항목
                 </h2>
                 <p className="mt-3 text-sm leading-7 text-muted">
-                  {site.siteName} 후기는 대표 주소 {context.representativeDomain},
+                  {site.siteName} 후기는 대표 도메인 {context.representativeDomain},
                   도메인 {context.domainCount}개, 운영 이력{" "}
                   {context.operatingPeriod} 같은 공개 정보와 함께 검토됩니다.
                   경험 내용에는 입출금, 계정 확인, 고객지원, 이용 카테고리처럼

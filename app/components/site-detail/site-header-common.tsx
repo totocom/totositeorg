@@ -1,4 +1,5 @@
-import { formatDisplayUrl } from "@/app/data/domain-display";
+import { formatDisplayDomain } from "@/app/data/domain-display";
+import { sanitizePublicSiteName } from "@/app/data/public-display";
 import type { SiteCommonHeaderResult } from "@/app/data/public-site-detail";
 import { formatTrustScore } from "@/app/data/sites";
 import {
@@ -24,14 +25,20 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
 function getHeading(activeTab: SiteDetailTab, siteName: string) {
   const keywordName = getSiteKeywordName(siteName);
 
-  if (activeTab === "scam-reports") return `${keywordName} 먹튀 제보`;
-  if (activeTab === "reviews") return `${keywordName} 후기`;
-  if (activeTab === "domains") return `${keywordName} 주소·도메인`;
+  if (activeTab === "scam-reports") {
+    return `${sanitizePublicSiteName(siteName)} 먹튀 제보 및 피해 사례`;
+  }
+  if (activeTab === "reviews") {
+    return `${keywordName} 후기 및 이용자 만족도 평가`;
+  }
+  if (activeTab === "domains") {
+    return `${sanitizePublicSiteName(siteName)} 주소·도메인 정보 및 변경 이력`;
+  }
   return keywordName;
 }
 
 function getSiteKeywordName(siteName: string) {
-  const normalizedSiteName = siteName.replace(/\s+/g, " ").trim();
+  const normalizedSiteName = sanitizePublicSiteName(siteName);
 
   if (!normalizedSiteName) return "토토사이트";
   if (normalizedSiteName.includes("토토사이트")) return normalizedSiteName;
@@ -62,7 +69,8 @@ export function SiteHeaderCommon({
         {getHeading(activeTab, site.siteName)}
       </h1>
       <p className="mt-2 break-all text-sm text-muted">
-        대표 주소: {formatDisplayUrl(site.siteUrl)}
+        <span className="font-semibold text-foreground">대표 도메인: </span>
+        {formatDisplayDomain(site.siteUrl)}
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-4">

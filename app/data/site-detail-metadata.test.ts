@@ -12,6 +12,10 @@ import {
   buildDomainsSiteTitle,
   buildDomainsTitleSuffix,
   buildReviewsTitleSuffix,
+  buildSiteDomainsDescription,
+  buildSiteDomainsTitle,
+  buildSiteScamReportsDescription,
+  buildSiteScamReportsTitle,
 } from "./site-detail-subpage-metadata";
 import type { ReviewTarget } from "./sites";
 
@@ -66,17 +70,57 @@ function assertShortPlainMetaDescription(description: string | null | undefined)
   assert.equal((description?.length ?? 0) <= 200, true);
 }
 
-test("reviews title suffix omits negative rating signals for empty reviews", () => {
-  assert.equal(buildReviewsTitleSuffix(0, 0), "이용자 후기");
-  assert.equal(buildReviewsTitleSuffix(0, 5), "이용자 후기");
+test("reviews title suffix avoids volatile count and rating signals", () => {
+  assert.equal(
+    buildReviewsTitleSuffix(0, 0),
+    "후기와 이용자 만족도 평가",
+  );
+  assert.equal(
+    buildReviewsTitleSuffix(0, 5),
+    "후기와 이용자 만족도 평가",
+  );
 });
 
-test("reviews title suffix omits zero rating when reviews exist", () => {
-  assert.equal(buildReviewsTitleSuffix(5, 0), "후기 5건");
+test("reviews title suffix stays stable when reviews exist without rating", () => {
+  assert.equal(
+    buildReviewsTitleSuffix(5, 0),
+    "후기와 이용자 만족도 평가",
+  );
 });
 
-test("reviews title suffix includes rating only when reviews and positive rating exist", () => {
-  assert.equal(buildReviewsTitleSuffix(5, 4.2), "후기 5건·평점 4.2점");
+test("reviews title suffix omits positive rating from metadata title", () => {
+  assert.equal(
+    buildReviewsTitleSuffix(5, 4.2),
+    "후기와 이용자 만족도 평가",
+  );
+});
+
+test("scam reports title avoids volatile counts and confirmation wording", () => {
+  const title = buildSiteScamReportsTitle("유튜벳 (YOUTOOBET)");
+
+  assert.equal(
+    title,
+    "유튜벳(YOUTOOBET) 먹튀 제보와 피해 사례 확인 | 토토사이트 정보",
+  );
+  assert.equal(title.includes("1건"), false);
+  assert.equal(title.includes("먹튀 확정"), false);
+  assert.equal(title.includes("위험 사이트"), false);
+});
+
+test("scam reports description uses submitted damage types without count emphasis", () => {
+  const description = buildSiteScamReportsDescription(
+    createSite({ siteName: "유튜벳 (YOUTOOBET)" }),
+    [
+      { damageTypes: ["출금 거부", "계정 차단"] },
+      { damageTypes: ["출금 거부", "고객센터 차단"] },
+    ],
+  );
+
+  assert.match(description, /^유튜벳 \(YOUTOOBET\)의 승인된 먹튀 제보/);
+  assert.match(description, /출금 거부, 계정 차단, 고객센터 차단 등/);
+  assert.match(description, /단일 제보만으로 사이트 전체를 단정하지 않는 것/);
+  assert.equal(description.includes("1건"), false);
+  assert.equal(description.includes("먹튀 확정"), false);
 });
 
 test("domains title suffix uses operating history when present", () => {
@@ -100,6 +144,30 @@ test("domains title suffix falls back to address domain wording without history"
   assert.equal(buildDomainsTitleSuffix(3, null), "주소·도메인 3개");
 });
 
+test("domains metadata title avoids count and access wording", () => {
+  const title = buildSiteDomainsTitle("유튜벳 (YOUTOOBET)");
+
+  assert.equal(
+    title,
+    "유튜벳(YOUTOOBET) 주소와 도메인 변경 이력 확인 | 토토사이트 정보",
+  );
+  assert.equal(title.includes("3개"), false);
+  assert.equal(title.includes("우회"), false);
+  assert.equal(title.includes("접속"), false);
+});
+
+test("domains metadata description frames DNS WHOIS as reference data", () => {
+  const description = buildSiteDomainsDescription(
+    createSite({ siteName: "유튜벳 (YOUTOOBET)" }),
+  );
+
+  assert.match(description, /^유튜벳 \(YOUTOOBET\)의 대표 도메인/);
+  assert.match(description, /DNS·WHOIS 참고 정보/);
+  assert.match(description, /보장하지 않습니다/);
+  assert.equal(description.includes("우회"), false);
+  assert.equal(description.includes("접속"), false);
+});
+
 test("site detail meta description does not use full markdown description", () => {
   const description = buildSiteDetailMetaDescription(createSite());
 
@@ -109,7 +177,8 @@ test("site detail meta description does not use full markdown description", () =
   assert.equal(description.includes("<script"), false);
   assert.equal(description.length >= 80, true);
   assert.match(description, /^벳톡의 대표 도메인 bettok\.example/);
-  assert.match(description, /승인 후기와 피해 제보가 부족/);
+  assert.match(description, /사이트 이용을 권장하지 않습니다/);
+  assert.match(description, /사실로 단정하지 않습니다/);
 });
 
 test("stripMarkdownForMeta removes markdown html newlines lists and long urls", () => {
@@ -159,9 +228,9 @@ test("site detail title avoids duplicated 토토사이트 정보 suffix", () => 
 
   assert.equal(
     title,
-    "벳톡 주소·기본 정보",
+    "벳톡 도메인 정보 | 토토사이트 정보",
   );
-  assert.equal(countOccurrences(title, "토토사이트 정보"), 0);
+  assert.equal(countOccurrences(title, "토토사이트 정보"), 1);
 });
 
 test("site detail H1 uses descriptive site report wording", () => {
@@ -170,12 +239,12 @@ test("site detail H1 uses descriptive site report wording", () => {
 
   assert.equal(heading.endsWith(site.siteName), false);
   assert.equal(heading.includes(site.siteName), true);
-  assert.equal(heading.includes(`${site.siteName} 토토사이트`), true);
-  assert.match(heading, /기본 정보|주소·도메인|후기·제보/);
-  assert.equal(heading.length >= 15, true);
+  assert.equal(heading.includes(`${site.siteName} 토토사이트`), false);
+  assert.match(heading, /도메인 정보|먹튀 제보|후기/);
+  assert.equal(heading.length >= 8, true);
 });
 
-test("site detail H1 includes 토토사이트 before report wording", () => {
+test("site detail H1 uses report review and domain data axes", () => {
   const heading = buildSiteDetailHeading(
     createSite({
       siteName: "유튜벳 (YOUTOOBET)",
@@ -186,7 +255,7 @@ test("site detail H1 includes 토토사이트 before report wording", () => {
 
   assert.equal(
     heading,
-    "유튜벳 (YOUTOOBET) 토토사이트 후기·제보 현황 리포트",
+    "유튜벳 (YOUTOOBET) 먹튀 제보·후기·도메인 정보",
   );
 });
 
@@ -200,7 +269,7 @@ test("site detail H1 removes prohibited promotional terms", () => {
     forbiddenTerms.some((term) => heading.includes(term)),
     false,
   );
-  assert.equal(heading.includes("기본 정보"), true);
+  assert.equal(heading.includes("도메인 정보"), true);
 });
 
 test("twitter title is generated from the site detail title", () => {
@@ -209,18 +278,18 @@ test("twitter title is generated from the site detail title", () => {
 
   assert.equal(
     twitter.title,
-    "벳톡 주소·기본 정보",
+    "벳톡 도메인 정보 | 토토사이트 정보",
   );
 });
 
 test("site detail title reflects approved reports reviews and domains", () => {
   assert.equal(
     buildSiteDetailTitle(createSite({ scamReportCount: 2, reviewCount: 1 })),
-    "벳톡 피해 제보 2건·도메인 현황",
+    "벳톡 먹튀 제보·후기·도메인 정보 | 토토사이트 정보",
   );
   assert.equal(
     buildSiteDetailTitle(createSite({ reviewCount: 3 })),
-    "벳톡 후기 3건·관측 정보",
+    "벳톡 후기·도메인 정보 | 토토사이트 정보",
   );
   assert.equal(
     buildSiteDetailTitle(
@@ -229,7 +298,7 @@ test("site detail title reflects approved reports reviews and domains", () => {
         domains: ["https://bettok.example", "https://bettok.kr"],
       }),
     ),
-    "벳톡 도메인 2개·확인 항목",
+    "벳톡 도메인 정보 | 토토사이트 정보",
   );
   assert.equal(
     buildSiteDetailTitle(createSite(), {
@@ -239,7 +308,7 @@ test("site detail title reflects approved reports reviews and domains", () => {
         ),
       },
     }),
-    "벳톡 화면 관측 55개·도메인 정보",
+    "벳톡 도메인 정보 | 토토사이트 정보",
   );
 });
 

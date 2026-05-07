@@ -1057,10 +1057,31 @@ export function validateSlugQuality(
   };
 }
 
+export const absenceOnlyFactPatterns = [
+  /0\s*(?:건|개|명|회)/,
+  /없음/,
+  /미확인/,
+  /확인되지\s*않음/,
+  /저장된\s*레코드\s*없음/,
+  /공개된\s*제보\s*없음/,
+  /승인된\s*후기\s*없음/,
+  /데이터\s*없음/,
+  /정보\s*없음/,
+];
+
+export function isAbsenceOnlyFactText(value: string) {
+  const normalized = normalizeWhitespace(value);
+
+  if (!normalized) return true;
+
+  return absenceOnlyFactPatterns.some((pattern) => pattern.test(normalized));
+}
+
 export function calculateUniqueFactScore(facts: unknown) {
   const factTexts = flattenFacts(facts)
     .map((fact) => normalizeWhitespace(fact))
-    .filter((fact) => fact.length >= 3);
+    .filter((fact) => fact.length >= 3)
+    .filter((fact) => !isAbsenceOnlyFactText(fact));
 
   return new Set(factTexts.map((fact) => fact.toLowerCase())).size;
 }

@@ -100,6 +100,27 @@ test("public observation text does not expose direct promotional phrases", () =>
   assert.equal(publicText.includes("입금 안내"), false);
 });
 
+test("promotional page title and h1 are summarized instead of quoted", () => {
+  const model = buildSiteObservationSnapshotViewModel({
+    snapshot: {
+      ...baseSnapshot,
+      page_title: "안전하고 빠른 최고 토토사이트",
+      h1: "전문적으로 즐길 수 있습니다",
+    },
+    assets: baseAssets,
+  });
+
+  assert.equal(model.hasSnapshot, true);
+  if (!model.hasSnapshot) throw new Error("expected snapshot model");
+
+  assert.equal(model.pageTitle, "홍보성 문구가 관측됨");
+  assert.equal(model.h1, "홍보성 문구가 관측됨");
+  assert.equal(
+    getSiteObservationPublicTextSegments(model).join(" ").includes("최고"),
+    false,
+  );
+});
+
 test("site screenshot takes priority over snapshot screenshot", () => {
   const model = buildSiteObservationSnapshotViewModel({
     snapshot: baseSnapshot,

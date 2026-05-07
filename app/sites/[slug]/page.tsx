@@ -22,7 +22,8 @@ import { SiteObservationSnapshotCard } from "@/app/components/site-observation-s
 import { SiteShareActions } from "@/app/components/site-share-actions";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
 import { formatKstDate } from "@/app/data/date-format";
-import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
+import { formatDisplayDomain } from "@/app/data/domain-display";
+import { maskPublicAuthorName } from "@/app/data/public-display";
 import { extractDomain } from "@/app/data/domain-whois";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
 import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
@@ -47,13 +48,26 @@ import {
 } from "@/app/data/sites";
 import { siteUrl } from "@/lib/config";
 
-function Stars({ rating }: { rating: number }) {
-  const filled = Math.round(Math.max(1, Math.min(5, rating)));
+function getReviewScoreLabel(rating: number) {
+  const score = Math.round(Math.max(1, Math.min(5, rating)) * 20);
+
+  if (score >= 80) return "긍정 평가";
+  if (score >= 60) return "보통 평가";
+  if (score >= 40) return "불만족 평가";
+
+  return "낮은 만족도";
+}
+
+function ReviewScoreBadge({ rating }: { rating: number }) {
+  const score = formatRatingScore(rating);
+  const label = getReviewScoreLabel(rating);
+
   return (
-    <span aria-label={`${filled}점`} className="text-xl leading-none">
-      {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} className={i < filled ? "text-accent" : "text-line"}>★</span>
-      ))}
+    <span
+      className="rounded-md bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent"
+      aria-label={`만족도 ${score.replace("/100", "점")}, ${label}`}
+    >
+      만족도 점수: {score} · {label}
     </span>
   );
 }
@@ -333,6 +347,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const additionalDomains = domainTargets.filter(
     (domain) => formatDisplayDomain(domain) !== representativeDisplayDomain,
   );
+  const publicEvidenceNotice = `현재 공개된 ${site.siteName} 관련 먹튀 피해 제보는 ${scamReportCount}건, 이용자 후기는 ${reviews.length}건입니다. 단일 제보나 단일 후기는 사이트 전체의 상태를 확정하는 자료가 아니며, 피해 유형, 작성 시점, 도메인 정보, 추가 후기와 함께 참고해야 합니다.`;
   const overviewBlocks = getSiteOverviewMarkdownBlocks(site.shortDescription);
   const visibleScamReports = splitEnabled ? scamReports.slice(0, 3) : scamReports;
   const visibleReviews = splitEnabled ? reviews.slice(0, 3) : reviews;
@@ -434,7 +449,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   {siteDetailHeading}
                 </h1>
                 <p className="mt-1 break-all text-sm text-muted">
-                  {formatDisplayUrl(site.siteUrl)}
+                  <span className="font-semibold text-foreground">대표 도메인: </span>
+                  {representativeDisplayDomain || formatDisplayDomain(site.siteUrl)}
                 </p>
               </div>
             </div>
@@ -498,7 +514,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 <div className="rounded-md bg-background px-3 py-2">
                   <span className="font-semibold text-foreground">대표 도메인: </span>
                   <span className="break-all">
-                    {representativeDisplayDomain || formatDisplayUrl(representativeDomain)}
+                    {representativeDisplayDomain || formatDisplayDomain(representativeDomain)}
                   </span>
                 </div>
                 {additionalDomains.length > 0 ? (
@@ -532,7 +548,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 href={`/sites/${encodeURIComponent(site.slug)}/domains`}
                 className="mt-3 inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
               >
-                주소·도메인 {domainTargets.length}개 보기
+                {site.siteName} 주소·도메인 정보 {domainTargets.length}개 보기
               </Link>
             </div>
           ) : null}
@@ -579,6 +595,15 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               ))}
             </div>
           </nav>
+
+          <div className="border-t border-line px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+              제보·후기 해석 기준
+            </p>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              {publicEvidenceNotice}
+            </p>
+          </div>
 
           {/* 사이트 개요 */}
           {overviewBlocks.length > 0 ? (
@@ -637,15 +662,18 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
           }}
         />
 
-        {/* 먹튀 피해 이력 */}
+        {/* 먹튀 제보 현황 */}
         <section id="reports" className="mt-5 scroll-mt-24 rounded-xl border border-line bg-surface shadow-sm">
           <span id="scam-reports" className="sr-only" aria-hidden="true" />
           <div className="flex flex-col gap-3 border-b border-line px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 제보 현황</p>
               <h2 className="mt-1 text-base font-bold">
                 {splitEnabled ? "최근 승인된 피해 제보" : "승인된 피해 제보"}
               </h2>
+              <p className="mt-1 text-sm leading-6 text-muted">
+                승인된 공개 제보 기준으로 요약하며, 제보 내용은 참고 자료입니다.
+              </p>
             </div>
             <div className="w-full sm:w-auto sm:shrink-0">
               <Link
@@ -687,7 +715,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   href={`/sites/${encodeURIComponent(site.slug)}/scam-reports`}
                   className="inline-flex min-h-10 items-center justify-center rounded-md border border-line bg-surface px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
                 >
-                  먹튀 제보 전체 {scamReports.length}건 보기
+                  {site.siteName} 먹튀 제보 현황 {scamReports.length}건 보기
                 </Link>
               ) : null}
             </div>
@@ -735,17 +763,15 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Stars rating={review.rating} />
-                        <span className="text-xs font-semibold text-accent">
-                          {formatRatingScore(review.rating)}
-                        </span>
-                      </div>
-                      <h3 className="mt-1.5 font-bold text-foreground">{review.title}</h3>
+                      <h3 className="font-bold text-foreground">{review.title}</h3>
                     </div>
                     <p className="shrink-0 text-xs text-muted">
-                      {review.authorNickname ?? "익명"} · {formatKstDate(review.createdAt)}
+                      {maskPublicAuthorName(review.authorNickname)} ·{" "}
+                      {formatKstDate(review.createdAt)}
                     </p>
+                  </div>
+                  <div className="mt-1.5">
+                    <ReviewScoreBadge rating={review.rating} />
                   </div>
                   <ReviewSummary siteName={site.siteName} experience={review.experience} />
                   <ReviewHelpfulnessVote
@@ -761,7 +787,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   href={`/sites/${encodeURIComponent(site.slug)}/reviews`}
                   className="inline-flex min-h-10 items-center justify-center rounded-md border border-line bg-surface px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
                 >
-                  후기 전체 {reviews.length}건 보기
+                  {site.siteName} 후기 데이터 {reviews.length}건 보기
                 </Link>
               ) : null}
             </div>

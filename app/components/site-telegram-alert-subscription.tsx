@@ -187,9 +187,10 @@ export function SiteTelegramAlertSubscription({
 
         <div className="grid gap-2">
           {isLoading ? (
-            <span className="inline-flex h-10 w-full items-center justify-center rounded-md border border-line px-4 text-sm font-semibold text-muted">
-              확인 중
-            </span>
+            <span
+              className="inline-flex h-10 w-full rounded-md border border-line bg-line/50"
+              aria-hidden="true"
+            />
           ) : !user ? (
             <Link
               href={loginHref}

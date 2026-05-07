@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/app/components/auth-provider";
+import { sanitizePublicSiteName } from "@/app/data/public-display";
 import { supabase } from "@/lib/supabase/client";
 
 type SiteDomainSubmissionFormProps = {
@@ -28,7 +29,7 @@ function isValidUrl(value: string) {
 }
 
 function normalizeSiteName(siteName: string) {
-  return siteName.replace(/\s+/g, " ").trim() || "해당 사이트";
+  return sanitizePublicSiteName(siteName);
 }
 
 export function SiteDomainSubmissionForm({
@@ -140,7 +141,7 @@ export function SiteDomainSubmissionForm({
               key={site.id}
               href={site.publicUrl}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800 transition hover:border-red-300 hover:bg-red-100"
             >
               {site.name} 게시물 보기

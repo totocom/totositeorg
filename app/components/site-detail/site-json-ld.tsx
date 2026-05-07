@@ -1,4 +1,5 @@
 import type { ReviewTarget } from "@/app/data/sites";
+import { sanitizePublicSiteName } from "@/app/data/public-display";
 
 export type SiteFaqItem = {
   question: string;
@@ -19,28 +20,29 @@ export function buildSiteWebPageJsonLd({
   canonical,
   title,
   description,
+  pageType = "WebPage",
 }: {
   site: ReviewTarget;
   canonical: string;
   title: string;
   description: string;
+  pageType?: "WebPage" | "CollectionPage";
 }) {
   return {
     "@context": "https://schema.org",
-    "@type": "WebPage",
+    "@type": pageType,
     name: title,
     url: canonical,
     description,
     about: {
-      "@type": "WebSite",
-      name: site.siteName,
-      url: site.siteUrl,
+      "@type": "Thing",
+      name: sanitizePublicSiteName(site.siteName),
     },
   };
 }
 
 export function buildAggregateRatingJsonLd(site: ReviewTarget) {
-  if (site.reviewCount <= 0 || site.averageRating <= 0) return null;
+  if (site.reviewCount < 2 || site.averageRating <= 0) return null;
 
   return {
     "@context": "https://schema.org",
@@ -48,7 +50,6 @@ export function buildAggregateRatingJsonLd(site: ReviewTarget) {
     itemReviewed: {
       "@type": "WebSite",
       name: site.siteName,
-      url: site.siteUrl,
     },
     ratingValue: site.averageRating.toFixed(1),
     reviewCount: site.reviewCount,

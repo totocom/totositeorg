@@ -9,7 +9,9 @@ export function Footer() {
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2 text-lg font-bold text-white">
-              <span className="text-accent">★</span>
+              <span aria-hidden="true" className="text-accent">
+                ★
+              </span>
               토토사이트 정보
             </div>
             <p className="mt-2 max-w-xs text-sm leading-6 text-white/50">
@@ -33,7 +35,7 @@ export function Footer() {
             본 사이트는 19세 이상 이용자를 대상으로 하며, 도박 참여를
             권장하지 않습니다.
           </p>
-          <p>도박 문제 상담: 한국도박문제관리센터 1336</p>
+          <p>도박 문제 상담: 한국도박문제예방치유원 1336</p>
         </div>
         <AdminFooterButton />
       </div>

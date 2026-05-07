@@ -10,6 +10,7 @@ import {
   type PublicBlogPost,
 } from "@/app/data/public-blog-posts";
 import { getPublicSitesForSitemap } from "@/app/data/public-sites-sitemap";
+import { formatDisplayDomain } from "@/app/data/domain-display";
 import {
   calculateSiteDetailIndexability,
   type SiteDetailIndexabilityResult,
@@ -74,6 +75,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified,
     }) => {
       const splitEnabled = isSitePageSplitEnabled(site.slug);
+      const approvedDomainCount = getApprovedDomainCount(site);
 
       if (!splitEnabled && !indexability.shouldIndex) {
         return [];
@@ -113,12 +115,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         });
       }
 
-      pages.push({
-        url: `${baseUrl}/domains`,
-        lastModified: new Date(latestDomainSignalAt ?? lastModified ?? Date.now()),
-        changeFrequency: "monthly" as const,
-        priority: 0.6,
-      });
+      if (approvedDomainCount > 0) {
+        pages.push({
+          url: `${baseUrl}/domains`,
+          lastModified: new Date(latestDomainSignalAt ?? lastModified ?? Date.now()),
+          changeFrequency: "monthly" as const,
+          priority: 0.6,
+        });
+      }
 
       return pages;
     });
@@ -204,4 +208,13 @@ function getSiteSitemapPriority(
   if (indexability.uniqueFactScore >= 5) return 0.65;
 
   return 0.55;
+}
+
+function getApprovedDomainCount(site: ReviewTarget) {
+  return new Set(
+    [site.siteUrl, ...site.domains]
+      .map(formatDisplayDomain)
+      .map((domain) => domain.trim().toLowerCase())
+      .filter(Boolean),
+  ).size;
 }

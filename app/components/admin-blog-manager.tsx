@@ -514,6 +514,11 @@ function getSnapshotRecord(post: BlogPostRow | null) {
   return isRecord(snapshot) ? snapshot : null;
 }
 
+function getStoredSourceSnapshotRecord(post: BlogPostRow | null) {
+  if (!post || !isRecord(post.source_snapshot)) return null;
+  return post.source_snapshot;
+}
+
 function getSourceSnapshotValue(post: BlogPostRow | null, key: string) {
   const snapshot = getSnapshotRecord(post);
 
@@ -524,6 +529,43 @@ function getSourceSnapshotValue(post: BlogPostRow | null, key: string) {
 function getSnapshotObject(post: BlogPostRow | null, key: string) {
   const value = getSourceSnapshotValue(post, key);
   return isRecord(value) ? value : null;
+}
+
+function getStoredSnapshotObject(post: BlogPostRow | null, key: string) {
+  const sourceSnapshot = getStoredSourceSnapshotRecord(post);
+  const directValue = sourceSnapshot?.[key];
+  if (isRecord(directValue)) return directValue;
+
+  return getSnapshotObject(post, key);
+}
+
+function getStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function getBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : false;
+}
+
+function getMinimumPublishCheck(post: BlogPostRow | null) {
+  return getStoredSnapshotObject(post, "minimumPublishCheck") ??
+    getSnapshotObject(post, "minimum_publish_check");
+}
+
+function getPublishSafetyReview(post: BlogPostRow | null) {
+  return getStoredSnapshotObject(post, "publishSafetyReview");
+}
+
+function isFallbackDraft(post: BlogPostRow | null) {
+  const sourceSnapshot = getStoredSourceSnapshotRecord(post);
+  const publishSafetyReview = getPublishSafetyReview(post);
+
+  return (
+    getBoolean(sourceSnapshot?.isFallbackDraft) ||
+    getBoolean(publishSafetyReview?.is_fallback_draft)
+  );
 }
 
 function getDerivedFacts(post: BlogPostRow | null) {
@@ -722,12 +764,93 @@ function getCategoryIndexInfo(
   };
 }
 
+function getSameSitePublishedPostCount(
+  posts: BlogPostRow[],
+  post: BlogPostRow | null,
+) {
+  const siteId = post?.site_id ?? post?.source_site_id;
+
+  if (!siteId || !post) return 0;
+
+  return posts.filter(
+    (candidate) =>
+      candidate.id !== post.id &&
+      candidate.status === "published" &&
+      (candidate.site_id === siteId || candidate.source_site_id === siteId),
+  ).length;
+}
+
+function getSourceSnapshotPublishBlockingReasons(
+  post: BlogPostRow | null,
+  posts: BlogPostRow[],
+) {
+  const reasons: string[] = [];
+  const minimumPublishCheck = getMinimumPublishCheck(post);
+  const publishSafetyReview = getPublishSafetyReview(post);
+  const sourceSnapshot = getStoredSourceSnapshotRecord(post);
+
+  if (minimumPublishCheck) {
+    if (getBoolean(minimumPublishCheck.automatic_publish_blocked)) {
+      reasons.push("minimum_publish_check.automatic_publish_blocked=true 입니다.");
+    }
+
+    reasons.push(
+      ...getStringArray(minimumPublishCheck.publish_blocking_reasons),
+    );
+  }
+
+  if (publishSafetyReview) {
+    if (getBoolean(publishSafetyReview.automatic_publish_blocked)) {
+      reasons.push("발행 안전성 검수에서 published 차단 판정이 있습니다.");
+    }
+
+    reasons.push(
+      ...getStringArray(publishSafetyReview.publish_blocking_reasons),
+    );
+
+    if (getBoolean(publishSafetyReview.absence_heavy_body)) {
+      reasons.push("본문의 부재 정보 비중이 높습니다.");
+    }
+
+    if (getBoolean(publishSafetyReview.h2_pattern_publish_blocked)) {
+      reasons.push("H2 패턴 반복 위험이 medium 이상입니다.");
+    }
+  }
+
+  if (isFallbackDraft(post)) {
+    reasons.push("AI fallback 초안이므로 재생성 또는 수동 보강 필요");
+  }
+
+  const allowAdditionalPostForSameSite =
+    getBoolean(sourceSnapshot?.allowAdditionalPostForSameSite);
+  const sameSitePublishedPostCount = getSameSitePublishedPostCount(posts, post);
+
+  if (sameSitePublishedPostCount > 0 && !allowAdditionalPostForSameSite) {
+    reasons.push(
+      "기본 정책상 사이트당 published 블로그 글은 1개로 제한됩니다. 기존 글 업데이트 초안을 사용하세요.",
+    );
+  }
+
+  return Array.from(new Set(reasons.filter(Boolean)));
+}
+
+const publishReviewChecklist = [
+  "실제 데이터가 충분한가?",
+  "후기나 먹튀 제보를 AI가 창작한 문장처럼 보이지 않는가?",
+  "안전, 추천, 검증 완료, 먹튀 확정 같은 단정 표현이 없는가?",
+  "사이트명만 바뀐 기존 글과 너무 비슷하지 않은가?",
+  "도메인/DNS/WHOIS/후기/제보 중 최소 2개 이상의 실제 데이터 축이 포함되어 있는가?",
+  "데이터 부족 글이면 noindex 또는 발행 보류했는가?",
+];
+
 function getPublishBlockingReasons({
   post,
   payload,
+  posts,
 }: {
   post: BlogPostRow | null;
   payload: BlogPostPayload;
+  posts: BlogPostRow[];
 }) {
   const reasons: string[] = [];
 
@@ -759,6 +882,8 @@ function getPublishBlockingReasons({
     reasons.push("unique_fact_score가 5 미만입니다.");
   }
 
+  reasons.push(...getSourceSnapshotPublishBlockingReasons(post, posts));
+
   reasons.push(...getProhibitedPhraseCheckBlockingReasons(post));
 
   if (!payload.title.trim()) {
@@ -789,7 +914,7 @@ function getPublishBlockingReasons({
     reasons.push("source snapshot ID가 없습니다.");
   }
 
-  return reasons;
+  return Array.from(new Set(reasons));
 }
 
 function rowToFormValues(row: BlogPostRow): BlogPostFormValues {
@@ -977,6 +1102,22 @@ export function AdminBlogManager({
     () => getSnapshotSummary(selectedPost),
     [selectedPost],
   );
+  const selectedPublishSafetyReview = useMemo(
+    () => getPublishSafetyReview(selectedPost),
+    [selectedPost],
+  );
+  const selectedMinimumPublishCheck = useMemo(
+    () => getMinimumPublishCheck(selectedPost),
+    [selectedPost],
+  );
+  const selectedIsFallbackDraft = useMemo(
+    () => isFallbackDraft(selectedPost),
+    [selectedPost],
+  );
+  const selectedSameSitePublishedPostCount = useMemo(
+    () => getSameSitePublishedPostCount(posts, selectedPost),
+    [posts, selectedPost],
+  );
   const prohibitedPhraseCheck = useMemo(
     () => getProhibitedPhraseCheck(selectedPost),
     [selectedPost],
@@ -1019,13 +1160,14 @@ export function AdminBlogManager({
       return getPublishBlockingReasons({
         post: selectedPost,
         payload: formValuesToPayload(formValues),
+        posts,
       });
     } catch (error) {
       return [
         error instanceof Error ? error.message : "입력값을 확인해주세요.",
       ];
     }
-  }, [formValues, selectedPost]);
+  }, [formValues, posts, selectedPost]);
 
   async function loadPosts() {
     setIsLoading(true);
@@ -1144,6 +1286,7 @@ async function savePost() {
       const blockingReasons = getPublishBlockingReasons({
         post: selectedPost,
         payload,
+        posts,
       });
 
       if (blockingReasons.length > 0) {
@@ -1258,6 +1401,7 @@ async function savePost() {
     const blockingReasons = getPublishBlockingReasons({
       post: selectedPost,
       payload,
+      posts,
     });
 
     if (blockingReasons.length > 0) {
@@ -1734,6 +1878,35 @@ async function savePost() {
                 />
               </div>
 
+              {selectedIsFallbackDraft ||
+              getBoolean(selectedMinimumPublishCheck?.automatic_publish_blocked) ||
+              getBoolean(selectedPublishSafetyReview?.h2_pattern_publish_blocked) ? (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-800">
+                  {selectedIsFallbackDraft ? (
+                    <p className="font-bold">
+                      AI fallback 초안이므로 재생성 또는 수동 보강 필요
+                    </p>
+                  ) : null}
+                  {getBoolean(
+                    selectedMinimumPublishCheck?.automatic_publish_blocked,
+                  ) ? (
+                    <p className="mt-1">
+                      minimum_publish_check.automatic_publish_blocked=true
+                      상태라 published 전환이 차단됩니다.
+                    </p>
+                  ) : null}
+                  {getBoolean(
+                    selectedPublishSafetyReview?.h2_pattern_publish_blocked,
+                  ) ? (
+                    <p className="mt-1">
+                      H2 패턴 반복 위험이 medium 이상입니다. 같은 구조가
+                      반복되는 글은 발행 전에 구조와 고유 사실을 보강해야
+                      합니다.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="rounded-md border border-line bg-surface p-3">
                 <h4 className="text-sm font-bold">published 전환 조건</h4>
                 {publishBlockingReasons.length > 0 ? (
@@ -1749,6 +1922,24 @@ async function savePost() {
                     published 전환 조건을 모두 통과했습니다.
                   </p>
                 )}
+              </div>
+
+              <div className="rounded-md border border-line bg-surface p-3">
+                <h4 className="text-sm font-bold">발행 전 관리자 체크리스트</h4>
+                <ul className="mt-3 grid gap-2 text-xs leading-5 text-muted">
+                  {publishReviewChecklist.map((item) => (
+                    <li key={item} className="flex gap-2">
+                      <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-line bg-background text-[10px] font-bold">
+                        ✓
+                      </span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs font-semibold text-muted">
+                  현재 동일 사이트의 다른 published 글:{" "}
+                  {selectedSameSitePublishedPostCount}개
+                </p>
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">

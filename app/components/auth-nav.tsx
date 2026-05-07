@@ -16,7 +16,18 @@ export function AuthNav() {
   }
 
   if (isLoading) {
-    return <span className="px-3 py-2 text-sm text-muted">확인 중</span>;
+    return (
+      <span
+        aria-live="polite"
+        className="inline-flex h-9 w-16 items-center justify-center px-3 py-2"
+      >
+        <span
+          aria-hidden="true"
+          className="h-4 w-12 rounded bg-muted/20 motion-safe:animate-pulse"
+        />
+        <span className="sr-only">계정 상태를 불러오는 중입니다.</span>
+      </span>
+    );
   }
 
   if (!user) {

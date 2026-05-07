@@ -87,8 +87,8 @@ export function buildSiteObservationSnapshotViewModel({
     id: snapshot.id,
     collectedAt: snapshot.collected_at,
     sourceTypeLabel: getSiteObservationSourceTypeLabel(snapshot.source_type),
-    pageTitle: normalizePublicObservationText(snapshot.page_title),
-    h1: normalizePublicObservationText(snapshot.h1),
+    pageTitle: summarizePublicObservationText(snapshot.page_title),
+    h1: summarizePublicObservationText(snapshot.h1),
     menuLabels: normalizePublicObservationArray(snapshot.observed_menu_labels, 10),
     accountFeatures: normalizePublicObservationArray(
       snapshot.observed_account_features,
@@ -174,6 +174,16 @@ export function normalizePublicObservationText(value: unknown) {
 
   return normalizedValue.length > 120
     ? `${normalizedValue.slice(0, 117)}...`
+    : normalizedValue;
+}
+
+function summarizePublicObservationText(value: unknown) {
+  const normalizedValue = normalizePublicObservationText(value);
+
+  if (!normalizedValue) return null;
+
+  return isForbiddenPublicObservationText(normalizedValue)
+    ? "홍보성 문구가 관측됨"
     : normalizedValue;
 }
 

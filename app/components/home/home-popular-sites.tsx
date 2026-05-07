@@ -23,12 +23,12 @@ export function HomePopularSites({ sites }: HomePopularSitesProps) {
             사이트 비교
           </p>
           <h2 className="mt-1 text-2xl font-bold text-foreground">
-            공개 데이터가 많은 토토사이트
+            토토사이트 공개 정보 비교
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            신뢰점수, 후기, 먹튀 제보, 도메인 이력을 함께 계산해 정렬한
-            사이트입니다. 각 카드에서 상세 정보와 도메인 기록으로 바로 이동할
-            수 있습니다.
+            등록된 토토사이트의 신뢰점수, 후기, 먹튀 제보, 도메인 이력을
+            함께 비교할 수 있습니다. 각 카드에서 사이트 상세 정보와 도메인
+            기록을 확인할 수 있습니다.
           </p>
         </div>
         <Link
@@ -47,6 +47,7 @@ export function HomePopularSites({ sites }: HomePopularSitesProps) {
           >
             <Link
               href={`/sites/${encodeURIComponent(site.slug)}`}
+              aria-label={`${site.siteName} 종합 정보 보기`}
               className="block transition hover:text-accent"
             >
               <h3 className="break-keep text-lg font-bold text-foreground">
@@ -54,7 +55,7 @@ export function HomePopularSites({ sites }: HomePopularSitesProps) {
               </h3>
             </Link>
             <p className="mt-2 break-all text-xs text-muted">
-              대표 주소: {formatDisplayDomain(site.siteUrl)}
+              대표 도메인: {formatDisplayDomain(site.siteUrl)}
             </p>
 
             <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
@@ -81,12 +82,14 @@ export function HomePopularSites({ sites }: HomePopularSitesProps) {
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 href={`/sites/${encodeURIComponent(site.slug)}`}
+                aria-label={`${site.siteName} 종합 정보 보기`}
                 className="rounded-md border border-line bg-background px-3 py-2 text-xs font-bold text-foreground transition hover:border-accent hover:text-accent"
               >
                 종합
               </Link>
               <Link
                 href={`/sites/${encodeURIComponent(site.slug)}/domains`}
+                aria-label={`${site.siteName} 도메인 정보 보기`}
                 className="rounded-md border border-line bg-background px-3 py-2 text-xs font-bold text-foreground transition hover:border-accent hover:text-accent"
               >
                 도메인
@@ -94,6 +97,7 @@ export function HomePopularSites({ sites }: HomePopularSitesProps) {
               {site.reviewCount > 0 ? (
                 <Link
                   href={`/sites/${encodeURIComponent(site.slug)}/reviews`}
+                  aria-label={`${site.siteName} 이용자 후기 보기`}
                   className="rounded-md border border-line bg-background px-3 py-2 text-xs font-bold text-foreground transition hover:border-accent hover:text-accent"
                 >
                   후기
@@ -102,6 +106,7 @@ export function HomePopularSites({ sites }: HomePopularSitesProps) {
               {(site.scamReportCount ?? 0) > 0 ? (
                 <Link
                   href={`/sites/${encodeURIComponent(site.slug)}/scam-reports`}
+                  aria-label={`${site.siteName} 먹튀 제보 보기`}
                   className="rounded-md border border-line bg-background px-3 py-2 text-xs font-bold text-foreground transition hover:border-accent hover:text-accent"
                 >
                   제보

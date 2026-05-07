@@ -6,16 +6,30 @@ import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote"
 import { ReviewSummary } from "@/app/components/review-summary";
 import { formatKstDate } from "@/app/data/date-format";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
+import { maskPublicAuthorName } from "@/app/data/public-display";
 import type { PublicReviewListItem } from "@/app/data/public-sites";
-import { issueTypeLabels } from "@/app/data/sites";
+import { formatRatingScore, issueTypeLabels } from "@/app/data/sites";
 
-function Stars({ rating }: { rating: number }) {
-  const filled = Math.round(Math.max(1, Math.min(5, rating)));
+function getReviewScoreLabel(rating: number) {
+  const score = Math.round(Math.max(1, Math.min(5, rating)) * 20);
+
+  if (score >= 80) return "긍정 평가";
+  if (score >= 60) return "보통 평가";
+  if (score >= 40) return "불만족 평가";
+
+  return "낮은 만족도";
+}
+
+function ReviewScoreBadge({ rating }: { rating: number }) {
+  const score = formatRatingScore(rating);
+  const label = getReviewScoreLabel(rating);
+
   return (
-    <span aria-label={`${filled}점`} className="text-base leading-none">
-      {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} className={i < filled ? "text-accent" : "text-line"}>★</span>
-      ))}
+    <span
+      className="rounded-md bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent"
+      aria-label={`만족도 ${score.replace("/100", "점")}, ${label}`}
+    >
+      만족도 점수: {score} · {label}
     </span>
   );
 }
@@ -167,11 +181,12 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
                 <h2 className="mt-1 text-lg font-bold text-foreground">
                   {review.title}
                 </h2>
-                <div className="mt-2 flex items-center gap-3">
-                  <Stars rating={review.rating} />
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <ReviewScoreBadge rating={review.rating} />
                   <span className="text-xs text-muted">
                     {issueTypeLabels[review.issueType]} ·{" "}
-                    {review.authorNickname ?? "익명"} · {formatKstDate(review.createdAt)}
+                    {maskPublicAuthorName(review.authorNickname)} ·{" "}
+                    {formatKstDate(review.createdAt)}
                   </span>
                 </div>
               </div>

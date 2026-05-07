@@ -30,7 +30,7 @@ test("site detail body anchors use the allowed unique text set", () => {
 
   assert.deepEqual(labels, [
     "벳톡 상세 정보",
-    "벳톡 주소·도메인 기록",
+    "벳톡 주소·도메인 정보",
     "벳톡 DNS 조회 결과",
     "벳톡 먹튀 제보 현황",
     "벳톡 후기 데이터",
@@ -139,11 +139,11 @@ test("site detail page uses the same two-column detail layout as blog posts", ()
   );
   assert.match(
     siteDetailPageSource,
-    /<nav\s+className="border-t border-line px-5 py-4"\s+aria-label=\{`\$\{site\.siteName\} 상세 페이지 내부 링크`\}[\s\S]*?상세 페이지 탐색[\s\S]*?<\/nav>\s*\{\/\* 사이트 개요 \*\/\}/,
+    /<nav\s+className="border-t border-line px-5 py-4"\s+aria-label=\{`\$\{site\.siteName\} 상세 페이지 내부 링크`\}[\s\S]*?상세 페이지 탐색[\s\S]*?<\/nav>[\s\S]*?제보·후기 해석 기준[\s\S]*?\{\/\* 사이트 개요 \*\/\}/,
   );
   assert.match(
     siteDetailPageSource,
-    /등록 도메인[\s\S]*?!splitEnabled && domainInfoTabs\.length > 0[\s\S]*?<DomainInfoTabs items=\{domainInfoTabs\} variant="embedded" \/>[\s\S]*?splitEnabled && domainTargets\.length > 0[\s\S]*?주소·도메인 \{domainTargets\.length\}개 보기[\s\S]*?신뢰 점수 산정/,
+    /등록 도메인[\s\S]*?!splitEnabled && domainInfoTabs\.length > 0[\s\S]*?<DomainInfoTabs items=\{domainInfoTabs\} variant="embedded" \/>[\s\S]*?splitEnabled && domainTargets\.length > 0[\s\S]*?\{site\.siteName\} 주소·도메인 정보 \{domainTargets\.length\}개 보기[\s\S]*?신뢰 점수 산정/,
   );
   assert.match(
     siteDetailPageSource,
@@ -261,7 +261,7 @@ test("site detail scam report submission action is rendered in the scam reports 
   assert.match(siteDetailPageSource, /\{site\.siteName\} 먹튀 피해 제보하기/);
   assert.match(
     siteDetailPageSource,
-    /<p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 피해 이력<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">[\s\S]*?splitEnabled \? "최근 승인된 피해 제보" : "승인된 피해 제보"[\s\S]*?<\/h2>[\s\S]*?primarySubmissionActionClassName/,
+    /<p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 제보 현황<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">[\s\S]*?splitEnabled \? "최근 승인된 피해 제보" : "승인된 피해 제보"[\s\S]*?<\/h2>[\s\S]*?primarySubmissionActionClassName/,
   );
   assert.match(feedbackSubmissionGuideSource, /guide\.actions\.map/);
   assert.match(feedbackSubmissionGuideSource, /href=\{action\.href\}/);

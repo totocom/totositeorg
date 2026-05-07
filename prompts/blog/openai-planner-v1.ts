@@ -108,10 +108,14 @@ ${requiredH2Structure}
 - section_plan의 주요 H2는 "공개 제보", "공개 피해", "공개 데이터", "공개 먹튀 제보"를 쓰지 않고 주소, 도메인, 먹튀 제보, 후기, DNS, WHOIS처럼 실제 검색 표현과 데이터 항목을 중심으로 작성한다.
 - confirmed_facts, inferences, unknowns를 분리한다.
 - claim_map.source는 sites, dns, whois, reviews, scam_reports, domain_submissions, crawl_snapshot 중 하나만 사용한다.
+- 이용자 후기와 먹튀 제보는 반드시 승인된 데이터 기준 요약으로만 다룬다.
+- 실제 이용자 후기처럼 보이는 문장, 실제 먹튀 제보처럼 보이는 문장, 원문처럼 보이는 직접 인용문을 만들지 않는다.
+- 피해 금액, 발생일, 이용 기간, 고객센터 응답 여부는 Source Snapshot의 승인된 DB 데이터에 있을 때만 쓰고 없으면 "확인되지 않음"으로만 처리한다.
 - search_intent, confirmed_facts, inferences, unknowns, claim_map, writing_brief_for_claude, primary_keyword, secondary_keywords, prohibited_phrase_check는 내부 JSON 또는 관리자 검토용 항목이며 공개 본문에 그대로 노출하지 않도록 계획한다.
 - section_plan과 writing_brief_for_claude는 공개 본문이 자연스러운 제목, 요약, 본문, 표 형식 설명, FAQ, 체크리스트, 고지문으로만 구성되도록 지시한다.
 - writing_brief_for_claude에는 공개 body_md 안에 primary_keyword, secondary_keywords, search_intent, claim_map, confirmed_facts, inferences, unknowns, writing_brief 같은 내부 필드명이 절대 나오지 않도록 지시한다.
 - writing_brief_for_claude에는 키워드 목록, 검색어 목록, 키워드 나열 섹션을 만들지 말고 문맥 속 자연스러운 표현만 쓰라고 지시한다.
+- writing_brief_for_claude에는 승인된 후기/제보가 없거나 세부값이 없을 때 AI가 사례, 피해 금액, 날짜, 이용 기간, 고객센터 응답 여부를 보강하지 말라고 지시한다.
 - confidence는 근거가 직접 있으면 high, 집계/간접 관측이면 medium, 조회 실패/부재/불명확하면 low를 사용한다.
 - 모든 글에는 Source Snapshot의 site_specific_verification 값을 고유 데이터로 반영한다.
 - Source Snapshot의 site.description, site.description_source_snapshot_id, site.description_generated_at, site.screenshot_url, site.screenshot_thumb_url, site.favicon_url, site.logo_url이 있으면 사이트 식별과 화면 기록 확인 목적의 근거로 반영한다.

@@ -29,7 +29,7 @@ export function getSiteDetailAllowedAnchorText(
 
   switch (key) {
     case "domainHistory":
-      return `${normalizedSiteName} 주소·도메인 기록`;
+      return `${normalizedSiteName} 주소·도메인 정보`;
     case "dns":
       return `${normalizedSiteName} DNS 조회 결과`;
     case "reports":

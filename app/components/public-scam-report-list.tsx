@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
+import {
+  formatKoreanDate,
+  maskPublicAuthorName,
+} from "@/app/data/public-display";
 import type { PublicScamReportListItem } from "@/app/data/public-sites";
 
 type ScamReportSortOption =
@@ -36,15 +40,8 @@ const damageTypeFilters: { value: DamageTypeFilter; label: string }[] = [
   { value: "기타", label: "기타" },
 ];
 
-function formatDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("ko-KR");
-}
-
 function formatDamageAmount(amount: number | null, isUnknown: boolean) {
-  if (isUnknown || amount === null) return "피해 금액 미확인";
+  if (isUnknown || amount === null) return "금액 미상";
   return `${amount.toLocaleString("ko-KR")}원`;
 }
 
@@ -79,7 +76,7 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
             formatDisplayUrl(report.site.siteUrl),
             ...report.site.domains,
             ...report.site.domains.map(formatDisplayDomain),
-            report.authorNickname ?? "",
+            maskPublicAuthorName(report.authorNickname, "승인된 제보자"),
           ]
             .join(" ")
             .toLowerCase()
@@ -195,12 +192,16 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
                     {report.damageTypes.join(", ") || report.mainCategory}
                   </h2>
                   <p className="mt-1 text-xs text-muted">
-                    발생일 {formatDate(report.incidentDate)} · 접수일{" "}
-                    {formatDate(report.createdAt)} · 작성자{" "}
-                    {report.authorNickname ?? "익명"}
+                    발생일 {formatKoreanDate(report.incidentDate)} · 접수일{" "}
+                    {formatKoreanDate(report.createdAt)} · 작성자{" "}
+                    {maskPublicAuthorName(
+                      report.authorNickname,
+                      "승인된 제보자",
+                    )}
                   </p>
                 </div>
                 <p className="w-fit rounded-md bg-red-50 px-3 py-1 text-sm font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-400">
+                  피해 금액:{" "}
                   {formatDamageAmount(
                     report.damageAmount,
                     report.damageAmountUnknown,

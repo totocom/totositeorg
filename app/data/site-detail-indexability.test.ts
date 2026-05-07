@@ -131,6 +131,15 @@ test("site detail split subpages index only pages with matching data", () => {
     calculateSiteDetailSubpageIndexability({
       site: subpageSite,
       kind: "domains",
+      itemCount: 0,
+    }).robots,
+    "noindex,follow",
+  );
+  assert.equal(
+    calculateSiteDetailSubpageIndexability({
+      site: subpageSite,
+      kind: "domains",
+      itemCount: 1,
     }).robots,
     "index,follow",
   );
@@ -157,6 +166,14 @@ test("site detail split subpages index only pages with matching data", () => {
       itemCount: 0,
     }).robots,
     "noindex,follow",
+  );
+  assert.equal(
+    calculateSiteDetailSubpageIndexability({
+      site: subpageSite,
+      kind: "scam-reports",
+      itemCount: 1,
+    }).robots,
+    "index,follow",
   );
 });
 

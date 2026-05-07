@@ -58,6 +58,9 @@ export function buildClaudeWriterPrompt({
 - Cloudflare 사용, WHOIS 비공개, 동일 IP 관측만으로 위험하다고 단정하지 않습니다.
 - 피해 제보가 0건인 경우에도 "먹튀 없음"이라고 쓰지 말고, "조회 시점 기준 승인된 피해 제보는 확인되지 않음"이라고 표현합니다.
 - writing_brief_for_claude와 section_plan을 우선 따르되, Source Snapshot에 없는 사실은 추가하지 마세요.
+- 실제 이용자 후기처럼 보이는 문장, 실제 먹튀 제보처럼 보이는 문장, 원문처럼 보이는 직접 인용문을 창작하지 마세요.
+- 피해 금액, 발생일, 이용 기간, 고객센터 응답 여부는 Source Snapshot의 승인된 DB 데이터에 있을 때만 사용하고, 없으면 "확인되지 않음"으로만 표현합니다.
+- 후기와 제보는 반드시 "승인된 데이터 기준 요약"이라고 표현하고, 승인된 데이터에 없는 세부 사례를 보강하지 마세요.
 - 이 글은 DNS/WHOIS 중심 단일 리포트가 아니라 사이트 관측 정보, 주소·도메인, DNS·WHOIS, 먹튀 제보, 후기 현황을 함께 정리하는 종합 정보 리포트입니다.
 - Source Snapshot의 site.description, site.description_source_snapshot_id, site.description_generated_at, site.screenshot_url, site.screenshot_thumb_url, site.favicon_url, site.logo_url을 사이트 식별과 화면 기록 확인 근거로 자연스럽게 반영합니다.
 - crawl_snapshot 또는 manual_html_snapshot은 원본 페이지의 공개 HTML에서 조회 시점 기준 관측된 정보입니다. 이 정보를 사이트 이용 권유, 가입 유도, 보너스/이벤트 소개, 최신 주소 안내로 사용하지 마세요. 관측 정보는 사이트 식별과 화면 기록 확인 목적의 설명에만 사용하세요.

@@ -14,6 +14,7 @@ import {
   buildFaqPageJsonLd,
   JsonLd,
 } from "@/app/components/site-detail/site-json-ld";
+import { sanitizePublicSiteName } from "@/app/data/public-display";
 import { getHomePageData } from "@/app/data/public-home";
 import { siteName, siteUrl } from "@/lib/config";
 
@@ -69,10 +70,29 @@ const organizationJsonLd = {
   description: homeDescription,
 };
 
+function buildHomeSiteItemListJsonLd(
+  sites: Awaited<ReturnType<typeof getHomePageData>>["popularSites"],
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "등록된 토토사이트 주요 정보",
+    itemListElement: sites.map((site, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": "WebPage",
+        name: `${sanitizePublicSiteName(site.siteName)} 정보`,
+        url: `${siteUrl}/sites/${encodeURIComponent(site.slug)}`,
+      },
+    })),
+  };
+}
+
 const selectionCriteria = [
   {
     title: "사이트 정보",
-    desc: "대표 주소, 추가 도메인, 운영 이력, 라이선스 표기 등 공개 사이트 정보를 모아 확인합니다.",
+    desc: "대표 도메인, 추가 도메인, 운영 이력, 라이선스 표기 등 공개 사이트 정보를 모아 확인합니다.",
   },
   {
     title: "먹튀 제보",
@@ -95,7 +115,7 @@ const firstVisitSteps = [
     label: "토토사이트 목록",
   },
   {
-    title: "도메인 정보에서 대표 주소와 변경 이력을 확인합니다.",
+    title: "도메인 정보에서 대표 도메인과 변경 이력을 확인합니다.",
     href: "/domains",
     label: "도메인 정보",
   },
@@ -120,6 +140,9 @@ export default async function Home() {
       <JsonLd value={websiteJsonLd} />
       <JsonLd value={organizationJsonLd} />
       <JsonLd value={buildFaqPageJsonLd(homeFaqItems)} />
+      {homeData.popularSites.length > 0 ? (
+        <JsonLd value={buildHomeSiteItemListJsonLd(homeData.popularSites)} />
+      ) : null}
       <main className="flex w-full flex-col">
         <section className="bg-[#111111] px-4 py-14 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
@@ -250,7 +273,7 @@ export default async function Home() {
               <h2 className="mt-1 text-2xl font-bold text-foreground">
                 처음 방문했다면 이렇게 확인하세요
               </h2>
-              <ol className="mt-5 grid gap-3">
+              <ol className="mt-5 grid list-none gap-3 pl-0">
                 {firstVisitSteps.map((step, index) => (
                   <li
                     key={step.title}

@@ -526,6 +526,19 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
           <section className="border-b border-line py-6">
             <h2 className="text-xl font-bold text-foreground">
+              작성 기준 및 고지
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-muted">
+              이 글은 등록된 사이트 정보, 승인된 이용자 후기, 공개된 먹튀
+              제보, 도메인 DNS·WHOIS 조회 결과, 원본 사이트 관측 스냅샷을
+              바탕으로 작성된 정보형 리포트입니다. AI는 해당 데이터를
+              정리하는 데 사용되었으며, 확인되지 않은 내용은 사실로
+              단정하지 않습니다.
+            </p>
+          </section>
+
+          <section className="border-b border-line py-6">
+            <h2 className="text-xl font-bold text-foreground">
               요약
             </h2>
             <p className="mt-3 text-sm leading-7 text-muted">

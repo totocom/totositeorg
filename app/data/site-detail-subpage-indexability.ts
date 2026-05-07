@@ -32,6 +32,13 @@ export function calculateSiteDetailSubpageIndexability({
     );
   }
 
+  if (kind === "domains") {
+    return buildResult(
+      itemCount > 0,
+      itemCount > 0 ? "domains_present" : "domains_empty",
+    );
+  }
+
   return buildResult(true, `${kind}_site_present`);
 }
 

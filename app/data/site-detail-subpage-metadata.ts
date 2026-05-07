@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
-import { formatDisplayDomain } from "./domain-display";
+import {
+  sanitizePublicGeneratedText,
+  sanitizePublicSiteName,
+} from "./public-display";
 import {
   buildSiteDetailRobots,
   getSiteDetailSocialImage,
@@ -23,7 +26,9 @@ type SiteScamReportsDetailResult = {
   common: {
     site: ReviewTarget | null;
   };
-  scamReports: unknown[];
+  scamReports: Array<{
+    damageTypes?: string[];
+  }>;
 };
 
 type SiteReviewsDetailResult = {
@@ -92,19 +97,11 @@ export function buildSiteScamReportsMetadata(
   return buildSubpageMetadata({
     site,
     path: `/sites/${encodeURIComponent(slug)}/scam-reports`,
-    shouldIndex: calculateSiteDetailSubpageIndexability({
-      site,
-      kind: "scam-reports",
-      itemCount: reportCount,
-    }).shouldIndex,
+    shouldIndex: shouldIndexSiteScamReportsPage(site, reportCount),
     title: site
-      ? buildOptimalSiteTitle(site.siteName, `먹튀 제보 ${reportCount}건`)
+      ? buildSiteScamReportsTitle(site.siteName)
       : "사이트 정보를 찾을 수 없습니다",
-    description: site
-      ? reportCount > 0
-        ? `${site.siteName} 토토사이트 관련 승인된 먹튀 제보 ${reportCount}건의 피해 유형, 접수 시점, 공개 신고 내용을 정리했습니다.`
-        : `${site.siteName} 토토사이트 관련 승인된 먹튀 제보는 아직 없습니다. 제보 방법과 확인 기준을 안내합니다.`
-      : "",
+    description: site ? buildSiteScamReportsDescription(site, detail.scamReports) : "",
     imageAlt: site ? `${site.siteName} 토토사이트 먹튀 제보` : undefined,
   });
 }
@@ -115,25 +112,15 @@ export function buildSiteReviewsMetadata(
 ): Metadata {
   const site = detail.common.site;
   const reviewCount = detail.reviews.length;
-  const averageRating = site?.averageRating ?? 0;
-  const titleSuffix = buildReviewsTitleSuffix(reviewCount, averageRating);
 
   return buildSubpageMetadata({
     site,
     path: `/sites/${encodeURIComponent(slug)}/reviews`,
-    shouldIndex: calculateSiteDetailSubpageIndexability({
-      site,
-      kind: "reviews",
-      itemCount: reviewCount,
-    }).shouldIndex,
+    shouldIndex: shouldIndexSiteReviewsPage(site, reviewCount),
     title: site
-      ? buildOptimalSiteTitle(site.siteName, titleSuffix)
+      ? buildSiteReviewsTitle(site.siteName)
       : "사이트 정보를 찾을 수 없습니다",
-    description: site
-      ? reviewCount > 0
-        ? `${site.siteName} 토토사이트의 승인된 후기 ${reviewCount}건과 평점, 이용 경험을 모아 정리했습니다.`
-        : `${site.siteName} 토토사이트에 대해 승인된 후기는 아직 없습니다. 후기 작성 방법과 확인 기준을 안내합니다.`
-      : "",
+    description: site ? buildSiteReviewsDescription(site) : "",
     imageAlt: site ? `${site.siteName} 토토사이트 후기` : undefined,
   });
 }
@@ -144,26 +131,16 @@ export function buildSiteDomainsMetadata(
 ): Metadata {
   const site = detail.common.site;
   const domainCount = detail.domains.length;
-  const oldestDomainAge =
-    site?.oldestDomainCreationDate
-      ? getDomainAge(site.oldestDomainCreationDate)
-      : null;
-  const titleSuffix = buildDomainsTitleSuffix(domainCount, oldestDomainAge);
-  const representativeDomain = site ? formatDisplayDomain(site.siteUrl) : "";
-  const additionalDomainCount = Math.max(0, domainCount - 1);
 
   return buildSubpageMetadata({
     site,
     path: `/sites/${encodeURIComponent(slug)}/domains`,
-    shouldIndex: calculateSiteDetailSubpageIndexability({
-      site,
-      kind: "domains",
-    }).shouldIndex,
+    shouldIndex: shouldIndexSiteDomainsPage(site, domainCount),
     title: site
-      ? buildDomainsSiteTitle(site.siteName, titleSuffix)
+      ? buildSiteDomainsTitle(site.siteName)
       : "사이트 정보를 찾을 수 없습니다",
     description: site
-      ? `${site.siteName} 토토사이트의 대표 주소(${representativeDomain})와 추가 도메인 ${additionalDomainCount}개, DNS와 WHOIS 조회 정보를 정리했습니다.`
+      ? buildSiteDomainsDescription(site)
       : "",
     imageAlt: site ? `${site.siteName} 토토사이트 주소·도메인` : undefined,
   });
@@ -173,12 +150,46 @@ export function buildReviewsTitleSuffix(
   reviewCount: number,
   averageRating: number,
 ) {
-  if (reviewCount <= 0) return "이용자 후기";
-  if (!Number.isFinite(averageRating) || averageRating <= 0) {
-    return `후기 ${reviewCount}건`;
-  }
+  void reviewCount;
+  void averageRating;
 
-  return `후기 ${reviewCount}건·평점 ${averageRating.toFixed(1)}점`;
+  return "후기와 이용자 만족도 평가";
+}
+
+export function buildSiteReviewsTitle(siteDisplayName: string) {
+  const normalizedSiteName = normalizeReviewTitleSiteName(siteDisplayName);
+
+  return `${normalizedSiteName} 후기와 이용자 만족도 평가 | 토토사이트 정보`;
+}
+
+export function buildSiteReviewsDescription(
+  site: Pick<ReviewTarget, "siteName">,
+) {
+  const normalizedSiteName = site.siteName.replace(/\s+/g, " ").trim();
+  const displayName = sanitizePublicSiteName(normalizedSiteName);
+
+  return `${displayName}의 승인된 이용자 후기와 만족도 평가를 확인하세요. 환전, 고객센터, 이벤트, 모바일 사용성, 안전성 체감 등 세부 응답을 참고하되, 단일 후기로 사이트 전체를 단정하지 않는 것이 좋습니다.`;
+}
+
+export function buildSiteScamReportsTitle(siteDisplayName: string) {
+  const normalizedSiteName = normalizeReviewTitleSiteName(siteDisplayName);
+
+  return sanitizePublicGeneratedText(
+    `${normalizedSiteName} 먹튀 제보와 피해 사례 확인 | 토토사이트 정보`,
+  );
+}
+
+export function buildSiteScamReportsDescription(
+  site: Pick<ReviewTarget, "siteName">,
+  scamReports: Array<{ damageTypes?: string[] }> = [],
+) {
+  const normalizedSiteName = site.siteName.replace(/\s+/g, " ").trim();
+  const displayName = sanitizePublicSiteName(normalizedSiteName);
+  const damageTypeText = getScamReportDamageTypeText(scamReports);
+
+  return sanitizePublicGeneratedText(
+    `${displayName}의 승인된 먹튀 제보와 피해 사례를 확인하세요. ${damageTypeText} 공개 제보를 참고하되, 단일 제보만으로 사이트 전체를 단정하지 않는 것이 좋습니다.`,
+  );
 }
 
 export function buildDomainsTitleSuffix(
@@ -192,6 +203,24 @@ export function buildDomainsTitleSuffix(
   }
 
   return `주소·도메인 ${domainCount}개`;
+}
+
+export function buildSiteDomainsTitle(siteDisplayName: string) {
+  const normalizedSiteName = normalizeReviewTitleSiteName(siteDisplayName);
+
+  return sanitizePublicGeneratedText(
+    `${normalizedSiteName} 주소와 도메인 변경 이력 확인 | 토토사이트 정보`,
+  );
+}
+
+export function buildSiteDomainsDescription(
+  site: Pick<ReviewTarget, "siteName">,
+) {
+  const displayName = sanitizePublicSiteName(site.siteName);
+
+  return sanitizePublicGeneratedText(
+    `${displayName}의 대표 도메인, 추가 도메인, 최초 등록일, 운영 이력, DNS·WHOIS 참고 정보를 확인하세요. 도메인 정보는 참고 자료이며 사이트 안전성이나 이용 가능성을 보장하지 않습니다.`,
+  );
 }
 
 export function buildDomainsSiteTitle(siteDisplayName: string, suffix: string) {
@@ -269,24 +298,67 @@ function stripParenthesizedEnglish(siteDisplayName: string) {
     .trim();
 }
 
-function getDomainAge(value: string) {
-  const createdAt = new Date(value);
-  const now = new Date();
-  const monthDiff =
-    (now.getFullYear() - createdAt.getFullYear()) * 12 +
-    now.getMonth() -
-    createdAt.getMonth();
+function normalizeReviewTitleSiteName(siteDisplayName: string) {
+  const normalizedSiteName = sanitizePublicSiteName(siteDisplayName)
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\s+\(/g, "(");
 
-  if (!Number.isFinite(monthDiff) || monthDiff < 0) return null;
+  return normalizedSiteName || "해당 사이트";
+}
 
-  const years = Math.floor(monthDiff / 12);
-  const months = monthDiff % 12;
+function getScamReportDamageTypeText(
+  scamReports: Array<{ damageTypes?: string[] }>,
+) {
+  const damageTypes = Array.from(
+    new Set(
+      scamReports.flatMap((report) =>
+        Array.isArray(report.damageTypes) ? report.damageTypes : [],
+      ),
+    ),
+  )
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 3);
 
-  if (years <= 0) return `${months}개월`;
-  if (months === 0) return `${years}년`;
-  return `${years}년 ${months}개월`;
+  if (damageTypes.length > 0) return `${damageTypes.join(", ")} 등`;
+
+  return "출금 거부, 출금 지연, 계정 차단, 고객센터 차단 등";
 }
 
 function toAbsoluteSiteUrl(path: string) {
   return new URL(path, siteUrl).toString();
+}
+
+function shouldIndexSiteReviewsPage(
+  site: ReviewTarget | null,
+  approvedReviewCount: number,
+) {
+  return calculateSiteDetailSubpageIndexability({
+    site,
+    kind: "reviews",
+    itemCount: approvedReviewCount,
+  }).shouldIndex;
+}
+
+function shouldIndexSiteScamReportsPage(
+  site: ReviewTarget | null,
+  approvedScamReportCount: number,
+) {
+  return calculateSiteDetailSubpageIndexability({
+    site,
+    kind: "scam-reports",
+    itemCount: approvedScamReportCount,
+  }).shouldIndex;
+}
+
+function shouldIndexSiteDomainsPage(
+  site: ReviewTarget | null,
+  approvedDomainCount: number,
+) {
+  return calculateSiteDetailSubpageIndexability({
+    site,
+    kind: "domains",
+    itemCount: approvedDomainCount,
+  }).shouldIndex;
 }

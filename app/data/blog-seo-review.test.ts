@@ -211,6 +211,22 @@ test("calculateUniqueFactScore counts distinct non-empty facts", () => {
   );
 });
 
+test("calculateUniqueFactScore excludes absence-only facts", () => {
+  assert.equal(
+    calculateUniqueFactScore([
+      "승인된 후기 없음",
+      "공개된 제보 없음",
+      "저장된 레코드 없음",
+      "DNS 정보 없음",
+      "먹튀 제보 0건",
+      "대표 도메인 example.com",
+      "WHOIS 등록일 2024-01-02",
+      "A 레코드 203.0.113.10",
+    ]),
+    3,
+  );
+});
+
 test("calculateAverageWordsPerSentence returns a one-decimal average", () => {
   assert.equal(
     calculateAverageWordsPerSentence("민속촌 토토사이트는 도메인 기록을 확인합니다. 승인 리뷰와 제보를 함께 봅니다."),

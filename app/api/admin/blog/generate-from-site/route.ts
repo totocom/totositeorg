@@ -46,6 +46,7 @@ import {
 import {
   getPlacementInternalAnchorText,
   normalizeInternalLinkAnchorTexts,
+  calculateUniqueFactScore,
   reviewBlogDuplicateRisk,
   validateBlogSeoDraft,
   type BlogRenderedInternalAnchorInput,
@@ -403,10 +404,35 @@ type MinimumPublishCheck = {
   automatic_publish_blocked: boolean;
   warning: string | null;
   reasons: string[];
+  publish_blocking_reasons: string[];
   reviews_count: number;
   scam_reports_count: number;
   dns_records_count: number;
   has_whois_created_date: boolean;
+  has_domain_info: boolean;
+  has_dns_records: boolean;
+  has_dns_whois_data: boolean;
+  has_crawl_snapshot: boolean;
+  real_data_axes: string[];
+  real_data_axis_count: number;
+};
+
+type PublishSafetyReview = {
+  automatic_publish_blocked: boolean;
+  publish_blocking_reasons: string[];
+  real_data_axes: string[];
+  real_data_axis_count: number;
+  unique_fact_score: number;
+  unique_fact_score_blocked: boolean;
+  absence_signal_count: number;
+  absence_signal_ratio: number;
+  absence_heavy_body: boolean;
+  is_fallback_draft: boolean;
+  fallback_blocked: boolean;
+  h2_pattern_repeat_count: number;
+  h2_pattern_publish_blocked: boolean;
+  same_site_published_post_count: number;
+  same_site_publish_blocked: boolean;
 };
 
 type SeoTitleSignals = {
@@ -774,9 +800,19 @@ const duplicateComparisonBlogSelect = [
 
 const piiRedactionVersion = "v1";
 const insufficientSourceDataWarning =
-  "현재 승인 리뷰, 피해 제보, DNS/WHOIS 정보가 충분하지 않아 본문이 얇아질 수 있습니다. 관리자 검토 후 발행 여부를 결정하세요.";
+  "현재 승인 리뷰, 피해 제보, 도메인/DNS/WHOIS, 원본 사이트 관측 데이터가 충분하지 않아 published 전환이 차단됩니다.";
 const insufficientSeoTitleDataWarning =
   "현재 사이트 고유 데이터가 부족해 제목과 본문이 템플릿성 콘텐츠로 보일 수 있습니다. 추가 리뷰, 제보, DNS/WHOIS 데이터 확보 후 발행을 권장합니다.";
+const fallbackDraftPublishBlockedWarning =
+  "AI fallback 초안이므로 재생성 또는 수동 보강 필요";
+const h2PatternRepeatPublishBlockedWarning =
+  "H2 구조 반복 위험이 높아 같은 템플릿 콘텐츠로 보일 수 있습니다.";
+const absenceHeavyBodyPublishBlockedWarning =
+  "본문에 미확인, 없음, 0건 같은 부재 정보 비중이 높아 published 전환이 차단됩니다.";
+const sameSitePublishedLimitWarning =
+  "기본 정책상 사이트당 published 블로그 글은 1개로 제한됩니다. 기존 글 업데이트 초안을 우선 사용하세요.";
+const minimumRealDataAxisCount = 2;
+const minimumUniqueFactScoreForPublish = 5;
 
 const categoryStrategySchema = {
   type: "object",
@@ -1117,14 +1153,24 @@ const finalReviewSchema = {
 
 const prohibitedPhrases = [
   "추천",
+  "추천 사이트",
   "강력 추천",
   "안전놀이터",
+  "안전한 사이트",
+  "안전 보장",
   "검증 완료",
+  "100% 검증",
   "먹튀 없음",
   "먹튀 없는",
+  "먹튀 확정",
+  "먹튀 사이트로 확정",
+  "위험 사이트",
   "100% 안전",
+  "무조건 안전",
   "가입하세요",
   "가입하기",
+  "가입 추천",
+  "바로 가입",
   "지금 가입",
   "첫충",
   "매충",
@@ -1133,18 +1179,33 @@ const prohibitedPhrases = [
   "쿠폰",
   "꽁머니",
   "우회주소",
+  "우회 주소",
   "최신 접속주소",
+  "최신 우회 주소",
+  "보장된 환전",
+  "제보 없음 = 안전",
   "가입코드",
   "총판",
   "파트너 코드",
 ] as const;
 
 const riskyPatterns = [
+  /먹튀\s*확정/i,
+  /먹튀\s*사이트로\s*확정/i,
   /먹튀\s*없/i,
+  /위험\s*사이트/i,
+  /안전한\s*사이트/i,
+  /안전\s*보장/i,
   /안전.*사이트/i,
   /검증.*완료/i,
+  /100%\s*검증/i,
+  /무조건\s*안전/i,
+  /추천\s*사이트/i,
   /가입.*추천/i,
+  /바로\s*가입/i,
   /이용.*추천/i,
+  /보장된\s*환전/i,
+  /제보\s*없음\s*=\s*안전/i,
   /보너스.*제공/i,
   /첫충.*혜택/i,
   /우회.*주소/i,
@@ -1156,8 +1217,10 @@ const blockedExternalLinkTargetPattern =
 
 const requiredBlogNoticeLines = [
   "이 글은 특정 사이트의 가입, 이용, 충전, 베팅을 권유하기 위한 글이 아닙니다.",
+  "이 글은 등록된 사이트 정보, 승인된 이용자 후기, 공개된 먹튀 제보, 도메인 DNS·WHOIS 조회 결과, 원본 사이트 관측 스냅샷을 바탕으로 작성된 정보형 리포트입니다.",
   "승인된 리뷰, 피해 제보, DNS 및 WHOIS 조회 데이터를 기준으로 작성된 정보 정리입니다.",
   "DNS, WHOIS, IP 정보는 조회 시점에 따라 달라질 수 있으며, 특정 기술 정보만으로 운영 주체나 안전성을 단정할 수 없습니다.",
+  "AI는 해당 데이터를 정리하는 데 사용되었으며, 확인되지 않은 내용은 사실로 단정하지 않습니다.",
   "이 글은 수집된 확인 데이터와 내부 승인 데이터를 바탕으로 AI 초안을 생성한 뒤 관리자가 검토하는 방식으로 작성됩니다.",
 ] as const;
 
@@ -1169,6 +1232,9 @@ const blogGenerationImplementationPrinciples = [
   "AI에게 원본 개인정보를 전달하지 않는다.",
   "추천, 홍보, 가입 유도, 보너스, 우회주소 표현을 금지한다.",
   "먹튀 없음 대신 조회 시점 기준 승인된 먹튀 피해 제보는 확인되지 않음으로 표현한다.",
+  "실제 이용자 후기처럼 보이는 문장, 실제 먹튀 제보처럼 보이는 문장, 원문처럼 보이는 직접 인용문을 AI가 창작하지 않는다.",
+  "피해 금액, 발생일, 이용 기간, 고객센터 응답 여부는 승인된 DB 데이터에 있을 때만 사용하고, 없으면 확인되지 않음으로만 표현한다.",
+  "후기와 제보는 반드시 승인된 데이터 기준 요약이라고 표현한다.",
   "Cloudflare, WHOIS 비공개, 동일 IP만으로 위험하다고 단정하지 않는다.",
   "AI 결과는 published가 아니라 draft로 저장한다.",
   "관리자가 검토한 뒤에만 published로 변경한다.",
@@ -1210,6 +1276,21 @@ const forbiddenPatterns: Array<{ pattern: RegExp; label: string; reason: string 
     pattern: /(?:검증\s*완료|검증된\s*사이트|신뢰할\s*수\s*있는\s*사이트)/g,
     label: "검증 완료",
     reason: "검증 완료 또는 신뢰를 보장하는 표현입니다.",
+  },
+  {
+    pattern: /(?:먹튀\s*확정|먹튀\s*사이트로\s*확정|위험\s*사이트)/g,
+    label: "위험 단정",
+    reason: "공개 데이터만으로 먹튀 또는 위험 사이트라고 단정하는 표현입니다.",
+  },
+  {
+    pattern: /(?:100%\s*검증|무조건\s*안전|추천\s*사이트|가입\s*추천|바로\s*가입)/g,
+    label: "추천/검증 단정",
+    reason: "검색용 정보 리포트를 추천 또는 검증 보장 글처럼 보이게 하는 표현입니다.",
+  },
+  {
+    pattern: /(?:우회\s*주소|최신\s*우회\s*주소|보장된\s*환전|제보\s*없음\s*=\s*안전)/g,
+    label: "접속/안전 오도",
+    reason: "접속을 돕거나 제보 부재를 안전으로 오도할 수 있는 표현입니다.",
   },
   {
     pattern: /(?:수익\s*보장|고수익|확실한\s*수익|당첨\s*보장)/g,
@@ -3164,12 +3245,14 @@ function buildDerivedFacts({
 
 function buildMinimumPublishCheck({
   site,
+  crawlSnapshot,
   reviewsSummary,
   scamReportsSummary,
   dnsRecords,
   derivedFacts,
 }: {
   site: SnapshotSite;
+  crawlSnapshot: BlogSourceCrawlSnapshot | null;
   reviewsSummary: ReviewsSummary;
   scamReportsSummary: ScamReportsSummary;
   dnsRecords: SnapshotDnsRecord[];
@@ -3179,17 +3262,32 @@ function buildMinimumPublishCheck({
   const scamReportsCount =
     scamReportsSummary.approved_public_report_count;
   const dnsRecordsCount = dnsRecords.length;
+  const hasDomainInfo = Boolean(site.domain.trim() || derivedFacts.primary_domain);
+  const hasDnsRecords = dnsRecordsCount > 0;
   const hasWhoisCreatedDate = Boolean(derivedFacts.domain_created_date);
+  const hasDnsWhoisData = hasDnsRecords && hasWhoisCreatedDate;
+  const hasCrawlSnapshot = Boolean(crawlSnapshot);
+  const realDataAxes = [
+    hasDomainInfo ? "domain" : "",
+    hasDnsRecords ? "dns" : "",
+    hasWhoisCreatedDate ? "whois" : "",
+    reviewsCount > 0 ? "approved_reviews" : "",
+    scamReportsCount > 0 ? "approved_scam_reports" : "",
+    hasCrawlSnapshot ? "crawl_snapshot" : "",
+  ].filter(Boolean);
   const canGenerateDraft = Boolean(
     site.name.trim() &&
       site.domain.trim() &&
       derivedFacts.dns_last_checked_at,
   );
   const needsMoreData =
-    reviewsCount === 0 &&
-    scamReportsCount === 0 &&
-    dnsRecordsCount === 0 &&
-    !hasWhoisCreatedDate;
+    reviewsCount === 0 ||
+    scamReportsCount === 0 ||
+    !hasDomainInfo ||
+    !hasDnsRecords ||
+    !hasWhoisCreatedDate ||
+    !hasCrawlSnapshot ||
+    realDataAxes.length < minimumRealDataAxisCount;
   const reasons = [
     !site.name.trim() ? "사이트명이 확인되지 않았습니다." : "",
     !site.domain.trim() ? "대표 도메인이 확인되지 않았습니다." : "",
@@ -3200,8 +3298,24 @@ function buildMinimumPublishCheck({
     scamReportsCount === 0 ? "승인 피해 제보가 없습니다." : "",
     dnsRecordsCount === 0 ? "DNS 레코드가 없습니다." : "",
     !hasWhoisCreatedDate ? "WHOIS 생성일이 확인되지 않았습니다." : "",
+    !hasCrawlSnapshot ? "원본 사이트 관측 스냅샷이 없습니다." : "",
+    realDataAxes.length < minimumRealDataAxisCount
+      ? "도메인/DNS/WHOIS/후기/제보/관측 중 실제 데이터 축이 2개 미만입니다."
+      : "",
   ].filter(Boolean);
-  const automaticPublishBlocked = !canGenerateDraft || needsMoreData;
+  const publishBlockingReasons = reasons.filter((reason) =>
+    [
+      "승인 리뷰가 없습니다.",
+      "승인 피해 제보가 없습니다.",
+      "대표 도메인이 확인되지 않았습니다.",
+      "DNS 레코드가 없습니다.",
+      "WHOIS 생성일이 확인되지 않았습니다.",
+      "원본 사이트 관측 스냅샷이 없습니다.",
+      "도메인/DNS/WHOIS/후기/제보/관측 중 실제 데이터 축이 2개 미만입니다.",
+    ].includes(reason),
+  );
+  const automaticPublishBlocked =
+    !canGenerateDraft || needsMoreData || publishBlockingReasons.length > 0;
 
   return {
     can_generate_draft: canGenerateDraft,
@@ -3209,10 +3323,17 @@ function buildMinimumPublishCheck({
     automatic_publish_blocked: automaticPublishBlocked,
     warning: automaticPublishBlocked ? insufficientSourceDataWarning : null,
     reasons,
+    publish_blocking_reasons: publishBlockingReasons,
     reviews_count: reviewsCount,
     scam_reports_count: scamReportsCount,
     dns_records_count: dnsRecordsCount,
     has_whois_created_date: hasWhoisCreatedDate,
+    has_domain_info: hasDomainInfo,
+    has_dns_records: hasDnsRecords,
+    has_dns_whois_data: hasDnsWhoisData,
+    has_crawl_snapshot: hasCrawlSnapshot,
+    real_data_axes: realDataAxes,
+    real_data_axis_count: realDataAxes.length,
   };
 }
 
@@ -3492,6 +3613,7 @@ async function createSourceSnapshot({
   const crawlSnapshot = toBlogSourceCrawlSnapshot(crawlSnapshotResult.data ?? null);
   const minimumPublishCheck = buildMinimumPublishCheck({
     site: snapshotSite,
+    crawlSnapshot,
     reviewsSummary,
     scamReportsSummary,
     dnsRecords,
@@ -4545,6 +4667,150 @@ async function getDuplicateComparisonPosts({
   return Array.from(byId.values()).map((row) =>
     mapDuplicateComparisonBlogRow(row, fallbackSiteName),
   );
+}
+
+async function countPublishedBlogsForSite({
+  supabase,
+  siteId,
+  excludePostId,
+}: {
+  supabase: SupabaseClient;
+  siteId: string;
+  excludePostId?: string | null;
+}) {
+  const result = await supabase
+    .from("blog_posts")
+    .select("id, site_id, source_site_id")
+    .eq("status", "published")
+    .limit(1000);
+
+  if (result.error) {
+    throw new Error(
+      `사이트별 published 글 수를 확인하지 못했습니다: ${result.error.message}`,
+    );
+  }
+
+  return ((result.data ?? []) as Array<{
+    id: string;
+    site_id: string | null;
+    source_site_id: string | null;
+  }>).filter(
+    (post) =>
+      post.id !== excludePostId &&
+      (post.site_id === siteId || post.source_site_id === siteId),
+  ).length;
+}
+
+const absenceBodySignalPatterns = [
+  /0\s*(?:건|개|명|회)/g,
+  /없음/g,
+  /미확인/g,
+  /확인되지\s*않음/g,
+  /저장된\s*레코드\s*없음/g,
+  /공개된\s*제보\s*없음/g,
+  /승인된\s*후기\s*없음/g,
+  /데이터\s*없음/g,
+  /정보\s*없음/g,
+] as const;
+
+function reviewAbsenceHeavyBody(markdown: string) {
+  const lines = markdown
+    .replace(/```[\s\S]*?```/g, "")
+    .split(/\n+/)
+    .map((line) => line.replace(/^#{1,6}\s+/, "").trim())
+    .filter((line) => line.length >= 8);
+  let absenceSignalCount = 0;
+  let absenceLineCount = 0;
+
+  for (const line of lines) {
+    let lineHasSignal = false;
+
+    for (const pattern of absenceBodySignalPatterns) {
+      const matches = line.match(pattern);
+
+      if (matches?.length) {
+        absenceSignalCount += matches.length;
+        lineHasSignal = true;
+      }
+    }
+
+    if (lineHasSignal) absenceLineCount += 1;
+  }
+
+  const absenceSignalRatio =
+    lines.length === 0 ? 0 : Math.round((absenceLineCount / lines.length) * 100) / 100;
+  const absenceHeavyBody =
+    lines.length >= 6 &&
+    (absenceSignalRatio >= 0.35 ||
+      (absenceSignalCount >= 8 && absenceSignalRatio >= 0.25));
+
+  return {
+    absence_signal_count: absenceSignalCount,
+    absence_signal_ratio: absenceSignalRatio,
+    absence_heavy_body: absenceHeavyBody,
+  };
+}
+
+function buildPublishSafetyReview({
+  snapshot,
+  finalBodyMarkdown,
+  uniqueFactScore,
+  duplicateReview,
+  isFallbackDraft,
+  sameSitePublishedPostCount,
+  allowAdditionalPostForSameSite,
+}: {
+  snapshot: SourceSnapshot;
+  finalBodyMarkdown: string;
+  uniqueFactScore: number;
+  duplicateReview: BlogDuplicateRiskReview;
+  isFallbackDraft: boolean;
+  sameSitePublishedPostCount: number;
+  allowAdditionalPostForSameSite: boolean;
+}): PublishSafetyReview {
+  const minimumCheck = snapshot.minimum_publish_check;
+  const absenceReview = reviewAbsenceHeavyBody(finalBodyMarkdown);
+  const uniqueFactScoreBlocked =
+    uniqueFactScore < minimumUniqueFactScoreForPublish;
+  const fallbackBlocked = isFallbackDraft;
+  const h2PatternPublishBlocked = duplicateReview.h2PatternCount >= 3;
+  const sameSitePublishBlocked =
+    sameSitePublishedPostCount > 0 && !allowAdditionalPostForSameSite;
+  const minimumPublishBlockingReasons =
+    minimumCheck?.publish_blocking_reasons?.length
+      ? minimumCheck.publish_blocking_reasons
+      : minimumCheck?.automatic_publish_blocked
+        ? minimumCheck.reasons
+        : [];
+  const publishBlockingReasons = uniqueStrings([
+    ...minimumPublishBlockingReasons,
+    minimumCheck?.automatic_publish_blocked
+      ? "minimum_publish_check.automatic_publish_blocked=true 입니다."
+      : "",
+    uniqueFactScoreBlocked
+      ? `본문 고유 사실 수가 기준 미달입니다. (${uniqueFactScore}/${minimumUniqueFactScoreForPublish})`
+      : "",
+    absenceReview.absence_heavy_body ? absenceHeavyBodyPublishBlockedWarning : "",
+    fallbackBlocked ? fallbackDraftPublishBlockedWarning : "",
+    h2PatternPublishBlocked ? h2PatternRepeatPublishBlockedWarning : "",
+    sameSitePublishBlocked ? sameSitePublishedLimitWarning : "",
+  ].filter(Boolean));
+
+  return {
+    automatic_publish_blocked: publishBlockingReasons.length > 0,
+    publish_blocking_reasons: publishBlockingReasons,
+    real_data_axes: minimumCheck?.real_data_axes ?? [],
+    real_data_axis_count: minimumCheck?.real_data_axis_count ?? 0,
+    unique_fact_score: uniqueFactScore,
+    unique_fact_score_blocked: uniqueFactScoreBlocked,
+    ...absenceReview,
+    is_fallback_draft: isFallbackDraft,
+    fallback_blocked: fallbackBlocked,
+    h2_pattern_repeat_count: duplicateReview.h2PatternCount,
+    h2_pattern_publish_blocked: h2PatternPublishBlocked,
+    same_site_published_post_count: sameSitePublishedPostCount,
+    same_site_publish_blocked: sameSitePublishBlocked,
+  };
 }
 
 function createSha256Hash(value: string) {
@@ -5852,7 +6118,7 @@ function buildDeterministicGeneratedDraft({
   const checklistJson = buildDeterministicChecklist(snapshot);
   const confirmedFacts = getDeterministicFactLines(snapshot);
   const unknowns = getDeterministicUnknownLines(snapshot);
-  const uniqueFactScore = Math.max(5, Math.min(10, confirmedFacts.length));
+  const uniqueFactScore = Math.min(10, calculateUniqueFactScore(confirmedFacts));
   const claudeDraft = normalizeClaudeDraft(
     {
       draft_markdown: bodyMd,
@@ -5882,7 +6148,7 @@ function buildDeterministicGeneratedDraft({
         intro_too_similar: false,
         faq_too_similar: false,
         unique_fact_score: uniqueFactScore,
-        estimated_duplicate_risk: "medium",
+        estimated_duplicate_risk: "high",
         reason:
           "AI provider timeout으로 서버 수집 데이터 기반 fallback 구조를 사용했으므로 관리자 중복 검토가 필요합니다.",
       },
@@ -5899,6 +6165,7 @@ function buildDeterministicGeneratedDraft({
       },
       admin_warnings: [
         `AI provider timeout fallback 사용: ${reason}`,
+        fallbackDraftPublishBlockedWarning,
         "AI provider 응답 지연으로 서버 수집 데이터 기반 검토용 초안을 저장했습니다.",
         "발행 전 본문 자연스러움, 중복성, 금지 표현을 관리자가 확인해야 합니다.",
       ],
@@ -5935,6 +6202,7 @@ function buildDeterministicGeneratedDraft({
     finalReview,
     finalDraft,
     safetyViolations,
+    isFallbackDraft: true,
   };
 }
 
@@ -6072,6 +6340,7 @@ async function generateDraft({
       finalReview,
       finalDraft,
       safetyViolations,
+      isFallbackDraft: false,
     };
   } catch (error) {
     if (isAiProviderTimeoutError(error)) {
@@ -6449,12 +6718,18 @@ export async function POST(request: Request) {
       facts: generated.finalReview.summary.confirmed_facts,
       comparisonPosts: duplicateComparisonPosts,
     });
+    const sameSitePublishedPostCount = await countPublishedBlogsForSite({
+      supabase,
+      siteId: site.id,
+      excludePostId: targetBlog?.id,
+    });
     const duplicateRisk = maxDuplicateRisk(
       getDuplicateRiskFromFinalReview({
         finalReview: generated.finalReview,
         titleQualityReview,
       }),
       duplicateReview.duplicateRisk,
+      generated.isFallbackDraft ? "high" : "low",
     );
     const uniqueFactScore = Math.min(
       getUniqueFactScoreFromFinalReview(
@@ -6469,6 +6744,20 @@ export async function POST(request: Request) {
       legalReviewStatus = "needs_review";
     }
 
+    const publishSafetyReview = buildPublishSafetyReview({
+      snapshot: persistedSnapshot,
+      finalBodyMarkdown,
+      uniqueFactScore,
+      duplicateReview,
+      isFallbackDraft: generated.isFallbackDraft,
+      sameSitePublishedPostCount,
+      allowAdditionalPostForSameSite,
+    });
+
+    if (publishSafetyReview.automatic_publish_blocked) {
+      legalReviewStatus = "needs_review";
+    }
+
     const adminWarnings = uniqueStrings([
       ...buildAdminWarnings({
         finalReview: generated.finalReview,
@@ -6480,6 +6769,7 @@ export async function POST(request: Request) {
       }),
       ...seoDraftValidation.adminWarnings,
       ...duplicateReview.adminWarnings,
+      ...publishSafetyReview.publish_blocking_reasons,
     ]);
     const blogPayload = {
       site_id: site.id,
@@ -6559,11 +6849,15 @@ export async function POST(request: Request) {
         titleQualityReview,
         seoDraftValidation,
         duplicateRiskReview: duplicateReview,
+        publishSafetyReview,
         blogVisualImages,
         duplicateRisk,
         uniqueFactScore,
         allowAdditionalPostForSameSite,
         isAdditionalPost,
+        isFallbackDraft: generated.isFallbackDraft,
+        fallbackBlocked: publishSafetyReview.fallback_blocked,
+        sameSitePublishedPostCount,
         internalLinks: generated.finalDraft.internal_links,
         categoryStructure: {
           primaryCategoryId,
@@ -6677,6 +6971,9 @@ export async function POST(request: Request) {
         duplicateRiskReview: duplicateReview,
         duplicateRisk,
         uniqueFactScore,
+        publishSafetyReview,
+        isFallbackDraft: generated.isFallbackDraft,
+        sameSitePublishedPostCount,
         isAdditionalPost,
         sameIpSites: persistedSnapshot.sameIpSites.length,
       },

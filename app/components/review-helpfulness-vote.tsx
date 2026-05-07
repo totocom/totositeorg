@@ -104,12 +104,13 @@ export function ReviewHelpfulnessVote({
   const helpfulSelected = currentVote === 1;
   const notHelpfulSelected = currentVote === -1;
   const isVoteDisabled = isLoading || isSaving;
-  const statusMessage =
-    message ||
-    (isLoading ? "투표 상태를 확인하는 중입니다." : "");
+  const statusMessage = message;
 
   return (
-    <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">
+    <div
+      className="mt-4 flex flex-col gap-2 border-t border-line pt-3"
+      aria-busy={isLoading || isSaving}
+    >
       <p className="text-xs font-semibold text-muted">
         이 리뷰가 도움이 됐나요?
       </p>
@@ -117,6 +118,11 @@ export function ReviewHelpfulnessVote({
         <p className="min-h-4 text-xs font-semibold text-muted" aria-live="polite">
           {statusMessage}
         </p>
+      ) : isLoading ? (
+        <span
+          className="min-h-4 w-24 rounded bg-line/70"
+          aria-hidden="true"
+        />
       ) : (
         <p className="min-h-4 text-xs font-semibold text-muted" aria-hidden="true" />
       )}

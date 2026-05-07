@@ -52,23 +52,16 @@ export function SiteDetailTabs({
           const className =
             "shrink-0 rounded-md border px-3 py-2 text-sm font-bold transition";
 
-          if (isActive) {
-            return (
-              <span
-                key={tab.id}
-                aria-current="page"
-                className={`${className} border-accent bg-accent-soft text-accent`}
-              >
-                {tab.label}
-              </span>
-            );
-          }
-
           return (
             <Link
               key={tab.id}
               href={tab.href}
-              className={`${className} border-line bg-background text-foreground hover:border-accent hover:text-accent`}
+              aria-current={isActive ? "page" : undefined}
+              className={
+                isActive
+                  ? `${className} border-accent bg-accent-soft text-accent`
+                  : `${className} border-line bg-background text-foreground hover:border-accent hover:text-accent`
+              }
             >
               {tab.label}
             </Link>
