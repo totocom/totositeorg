@@ -1,8 +1,5 @@
 import Link from "next/link";
-import {
-  formatKoreanDate,
-  maskPublicAuthorName,
-} from "@/app/data/public-display";
+import { formatKoreanDate } from "@/app/data/public-display";
 import type { PublicReviewListItem } from "@/app/data/public-sites";
 import { formatRatingScore, issueTypeLabels } from "@/app/data/sites";
 
@@ -54,8 +51,7 @@ export function HomeRecentReviews({ reviews }: HomeRecentReviewsProps) {
                 {review.title}
               </h3>
               <p className="mt-2 text-xs text-muted">
-                작성일 {formatKoreanDate(review.createdAt)} · 작성자{" "}
-                {maskPublicAuthorName(review.authorNickname)}
+                작성일 {formatKoreanDate(review.createdAt)}
               </p>
             </article>
           ))}

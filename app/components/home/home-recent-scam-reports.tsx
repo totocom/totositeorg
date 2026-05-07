@@ -1,8 +1,5 @@
 import Link from "next/link";
-import {
-  formatKoreanDate,
-  maskPublicAuthorName,
-} from "@/app/data/public-display";
+import { formatKoreanDate } from "@/app/data/public-display";
 import type { PublicScamReportListItem } from "@/app/data/public-sites";
 
 type HomeRecentScamReportsProps = {
@@ -65,12 +62,8 @@ export function HomeRecentScamReports({
               <p className="mt-1 text-sm font-semibold text-red-600 dark:text-red-400">
                 피해 금액: {formatDamageAmount(report)}
               </p>
-              <p className="mt-1 text-xs text-muted">
-                표시 기준: 승인된 제보자 제출 정보 기준
-              </p>
               <p className="mt-2 text-xs text-muted">
-                접수일 {formatKoreanDate(report.createdAt)} · 작성자{" "}
-                {maskPublicAuthorName(report.authorNickname, "승인된 제보자")}
+                접수일 {formatKoreanDate(report.createdAt)}
               </p>
             </article>
           ))}
