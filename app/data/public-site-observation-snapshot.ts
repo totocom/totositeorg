@@ -172,9 +172,21 @@ export function normalizePublicObservationText(value: unknown) {
 
   if (!normalizedValue) return null;
 
-  return normalizedValue.length > 120
-    ? `${normalizedValue.slice(0, 117)}...`
-    : normalizedValue;
+  const neutralizedValue = neutralizePublicObservationLabel(normalizedValue);
+
+  return neutralizedValue.length > 120
+    ? `${neutralizedValue.slice(0, 117)}...`
+    : neutralizedValue;
+}
+
+function neutralizePublicObservationLabel(value: string) {
+  return value
+    .replace(/회원\s*가입|가입하기|가입/g, "계정 등록 메뉴")
+    .replace(/입금|출금|충전|환전/g, "금전 처리 메뉴")
+    .replace(/이벤트|보너스|쿠폰|프로모션/g, "공지성 영역")
+    .replace(/추천\s*경기|추천/g, "콘텐츠 노출 영역")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function summarizePublicObservationText(value: unknown) {

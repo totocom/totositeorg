@@ -56,6 +56,10 @@ export async function generateMetadata({
   return {
     title: `${tag.label} 태그 글 | 블로그`,
     description: `${tag.label} 태그로 묶인 발행 블로그 글 목록입니다.`,
+    robots: {
+      index: false,
+      follow: true,
+    },
     alternates: { canonical: canonicalUrl },
     openGraph: {
       url: canonicalUrl,

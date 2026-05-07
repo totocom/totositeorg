@@ -1,8 +1,8 @@
-const kstDateFormatter = new Intl.DateTimeFormat("en-CA", {
+const kstDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
   year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
+  month: "numeric",
+  day: "numeric",
 });
 
 export function formatKstDate(value: string | null | undefined) {
@@ -27,5 +27,5 @@ export function formatKstDate(value: string | null | undefined) {
     return rawValue;
   }
 
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  return `${parts.year}년 ${Number(parts.month)}월 ${Number(parts.day)}일`;
 }

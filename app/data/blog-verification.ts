@@ -1,4 +1,5 @@
 import { formatDisplayDomain } from "@/app/data/domain-display";
+import { formatKoreanDate } from "@/app/data/public-display";
 
 export type BlogVerificationSummary = {
   representativeDomain: string;
@@ -66,7 +67,7 @@ export function formatKstDateTime(value: string | null) {
       return acc;
     }, {});
 
-  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} KST`;
+  return `${parts.year}년 ${Number(parts.month)}월 ${Number(parts.day)}일 ${parts.hour}:${parts.minute} KST`;
 }
 
 function buildDnsLookupResult(dnsRecords: unknown[]) {
@@ -123,18 +124,18 @@ export function buildBlogVerificationSummary(
       if (!isRecord(domain)) return false;
       return getString(domain.domain) !== representativeDomainValue;
     }).length;
-  const whoisCreatedDate =
+  const whoisCreatedDate = formatBlogDate(
     getString(derivedFacts?.domain_created_date) ||
-    getString(primaryWhois?.created_date) ||
-    null;
-  const whoisUpdatedDate =
+      getString(primaryWhois?.created_date),
+  );
+  const whoisUpdatedDate = formatBlogDate(
     getString(derivedFacts?.domain_updated_date) ||
-    getString(primaryWhois?.updated_date) ||
-    null;
-  const whoisExpirationDate =
+      getString(primaryWhois?.updated_date),
+  );
+  const whoisExpirationDate = formatBlogDate(
     getString(derivedFacts?.domain_expiration_date) ||
-    getString(primaryWhois?.expiration_date) ||
-    null;
+      getString(primaryWhois?.expiration_date),
+  );
   const lastVerifiedAt = getLatestIsoDate([
     snapshot.snapshot_at,
     snapshot.generatedAt,
@@ -156,6 +157,10 @@ export function buildBlogVerificationSummary(
     lastVerifiedAt,
     lastVerifiedText: formatKstDateTime(lastVerifiedAt),
   };
+}
+
+function formatBlogDate(value: string) {
+  return value ? formatKoreanDate(value, "") || null : null;
 }
 
 export function buildBlogVerificationMarkdown(

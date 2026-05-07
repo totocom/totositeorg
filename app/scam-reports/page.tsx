@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicScamReportList } from "@/app/components/public-scam-report-list";
+import { RelatedLinkList } from "@/app/components/related-link-list";
 import {
   buildFaqPageJsonLd,
   JsonLd,
@@ -376,22 +377,7 @@ export default async function ScamReportsPage() {
           <h2 className="text-xl font-bold text-foreground">
             함께 확인하면 좋은 페이지
           </h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {relatedLinks.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded-lg border border-line bg-background p-4 transition hover:border-accent/40"
-              >
-                <h3 className="text-base font-bold text-foreground">
-                  {item.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  {item.description}
-                </p>
-              </Link>
-            ))}
-          </div>
+          <RelatedLinkList items={relatedLinks} />
         </section>
 
         <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">

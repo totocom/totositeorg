@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
+import { formatKoreanDate } from "@/app/data/public-display";
 import type { ReviewTarget } from "@/app/data/sites";
 
 type DomainSortOption = "domain_age" | "domain_count" | "site_name" | "reviews";
@@ -48,12 +49,7 @@ function formatDomainAge(value: string | undefined) {
 }
 
 function formatDate(value: string | undefined) {
-  if (!value) return "확인 불가";
-
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "확인 불가";
-
-  return date.toLocaleDateString("ko-KR");
+  return formatKoreanDate(value, "확인 불가");
 }
 
 export function PublicDomainList({ sites }: PublicDomainListProps) {

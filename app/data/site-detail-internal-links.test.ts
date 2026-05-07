@@ -166,10 +166,16 @@ test("site detail review dates render as KST date-only text", () => {
     "utf8",
   );
 
-  assert.equal(formatKstDate("2026-05-02T14:40:44.749544+00:00"), "2026-05-02");
-  assert.equal(formatKstDate("2026-05-02T16:10:00.000Z"), "2026-05-03");
+  assert.equal(
+    formatKstDate("2026-05-02T14:40:44.749544+00:00"),
+    "2026년 5월 2일",
+  );
+  assert.equal(
+    formatKstDate("2026-05-02T16:10:00.000Z"),
+    "2026년 5월 3일",
+  );
   assert.equal(formatKstDate("not-a-date"), "not-a-date");
-  assert.match(siteDetailPageSource, /formatKstDate\(review\.createdAt\)/);
+  assert.match(siteDetailPageSource, /formatKoreanDate\(review\.createdAt\)/);
   assert.doesNotMatch(siteDetailPageSource, /\{review\.createdAt\}/);
   assert.match(publicReviewListSource, /formatKstDate\(review\.createdAt\)/);
 });

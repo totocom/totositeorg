@@ -151,10 +151,7 @@ export function calculateSiteDetailIndexability({
     missing.push("screenshot");
   }
 
-  if (relatedBlogReport) {
-    uniqueFactScore += 1;
-    reasons.push("related_blog_report");
-  }
+  void relatedBlogReport;
 
   if (source === "fallback") {
     uniqueFactScore = Math.max(0, uniqueFactScore - 3);

@@ -9,8 +9,6 @@ import {
   type BlogCategorySlug,
 } from "@/app/data/blog-posts";
 import {
-  canIndexBlogPostState,
-  getBlogPostIndexStateBySlug,
   getPublicBlogPostBySlug,
   getPublicBlogPosts,
   type PublicBlogPost,
@@ -250,10 +248,7 @@ export async function generateMetadata({
 }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params;
   const { post } = await getPublicBlogPostBySlug(slug);
-  const indexState = await getBlogPostIndexStateBySlug(slug);
-  const robots = canIndexBlogPostState(indexState)
-    ? { index: true, follow: true }
-    : { index: false, follow: true };
+  const robots = { index: false, follow: true };
 
   if (!post) {
     return {

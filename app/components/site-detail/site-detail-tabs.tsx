@@ -46,28 +46,29 @@ export function SiteDetailTabs({
       className="mt-4 border-t border-line pt-3"
       aria-label="사이트 상세 페이지 탐색"
     >
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <ul className="flex gap-2 overflow-x-auto pb-1">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const className =
             "shrink-0 rounded-md border px-3 py-2 text-sm font-bold transition";
 
           return (
-            <Link
-              key={tab.id}
-              href={tab.href}
-              aria-current={isActive ? "page" : undefined}
-              className={
-                isActive
-                  ? `${className} border-accent bg-accent-soft text-accent`
-                  : `${className} border-line bg-background text-foreground hover:border-accent hover:text-accent`
-              }
-            >
-              {tab.label}
-            </Link>
+            <li key={tab.id} className="shrink-0">
+              <Link
+                href={tab.href}
+                aria-current={isActive ? "page" : undefined}
+                className={
+                  isActive
+                    ? `${className} border-accent bg-accent-soft text-accent`
+                    : `${className} border-line bg-background text-foreground hover:border-accent hover:text-accent`
+                }
+              >
+                {tab.label}
+              </Link>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </nav>
   );
 }

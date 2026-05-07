@@ -14,6 +14,7 @@ import {
   normalizePublicSiteDescription,
   normalizePublicSiteDomains,
 } from "./public-site-description";
+import { maskPublicAuthorName } from "./public-display";
 import {
   mapEligiblePublicSiteRelatedBlogReportRow,
   type PublicSiteRelatedBlogReport,
@@ -296,15 +297,17 @@ function mapReviewRow(
   review: PublicReviewRow,
   nicknameMap = new Map<string, string>(),
 ) {
+  const authorNickname = getAuthorNickname(
+    review.user_id,
+    nicknameMap,
+    review.reviewer_name,
+  );
+
   return {
     id: review.id,
     siteId: review.site_id,
     authorUserId: review.user_id,
-    authorNickname: getAuthorNickname(
-      review.user_id,
-      nicknameMap,
-      review.reviewer_name,
-    ),
+    authorNickname: maskPublicAuthorName(authorNickname),
     rating: review.rating,
     title: review.title,
     experience: review.experience,
@@ -320,10 +323,12 @@ function mapScamReportRow(
   report: PublicScamReportRow,
   nicknameMap = new Map<string, string>(),
 ): ScamReport {
+  const authorNickname = getAuthorNickname(report.user_id, nicknameMap);
+
   return {
     id: report.id,
     siteId: report.site_id,
-    authorNickname: getAuthorNickname(report.user_id, nicknameMap),
+    authorNickname: maskPublicAuthorName(authorNickname, "승인된 제보자"),
     incidentDate: report.incident_date,
     usagePeriod: report.usage_period,
     mainCategory: report.main_category,
@@ -450,7 +455,12 @@ async function getPublicSiteDetailUncached(
 
     return {
       site: fallbackSite ?? null,
-      reviews: fallbackSite ? getApprovedReviewsBySiteId(fallbackSite.id) : [],
+      reviews: fallbackSite
+        ? getApprovedReviewsBySiteId(fallbackSite.id).map((review) => ({
+            ...review,
+            authorNickname: maskPublicAuthorName(review.authorNickname),
+          }))
+        : [],
       scamReports: [],
       dnsRecords: [],
       domainCreationDates: [],
@@ -612,6 +622,7 @@ async function getPublicReviewListUncached(): Promise<
     const items = fallbackSites.flatMap((site) =>
       getApprovedReviewsBySiteId(site.id).map((review) => ({
         ...review,
+        authorNickname: maskPublicAuthorName(review.authorNickname),
         site,
       })),
     );

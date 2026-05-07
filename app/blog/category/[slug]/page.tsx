@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   blogCategories,
-  canIndexBlogCategory,
   getBlogCategoryBySlug,
   getBlogCategoryLabel,
   getBlogPrimaryCategoryFromLabel,
@@ -245,17 +244,11 @@ export async function generateMetadata({
   }
 
   const canonicalUrl = `${siteUrl}/blog/category/${category.slug}`;
-  const { posts } = await getPublicBlogPostsByCategory(
-    category.slug as BlogCategorySlug,
-  );
-  const publishedPostCount = posts.length;
-  const canIndexCategory = canIndexBlogCategory(category, publishedPostCount);
-
   return {
     title: `${category.name} | 블로그`,
     description: category.description,
     robots: {
-      index: canIndexCategory,
+      index: false,
       follow: true,
     },
     alternates: { canonical: canonicalUrl },

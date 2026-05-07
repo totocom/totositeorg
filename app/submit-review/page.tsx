@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   title: "토토사이트 만족도 평가",
   description:
     "관리자가 등록한 토토사이트에 대해 이용 목적, 카테고리, 배당, 이벤트, 고객센터, 충환전, 사용성, 신뢰도 만족도를 평가해 주세요.",
+  robots: {
+    index: false,
+    follow: true,
+  },
 };
 
 type SubmitReviewPageProps = {

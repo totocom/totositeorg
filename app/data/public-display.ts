@@ -5,6 +5,10 @@ export function maskPublicAuthorName(
   const normalized = value?.replace(/\s+/g, " ").trim() ?? "";
 
   if (!normalized) return fallback;
+  if (normalized === "승인된 이용자" || normalized === "승인된 제보자") {
+    return normalized;
+  }
+  if (normalized.includes("****")) return normalized;
 
   const characters = Array.from(normalized);
 
@@ -121,6 +125,12 @@ const publicGeneratedClaimReplacements = [
   ["무조건 안전", "보장 불가"],
   ["먹튀 없음", "공개 제보 없음"],
   ["제보 없음 = 안전", "공개 제보 없음"],
+  ["안전한 서비스", "서비스 홍보 표현"],
+  ["빠른 서비스", "처리 속도 홍보 표현"],
+  ["완벽한 서비스", "서비스 품질 홍보 표현"],
+  ["하이퀄리티", "품질 홍보 표현"],
+  ["전문적", "운영 방식 홍보 표현"],
+  ["최고", "우수성 홍보 표현"],
   ["추천 사이트", "정보 확인 대상"],
   ["가입 추천", "가입 유도 제외"],
   ["바로 가입", "가입 유도 제외"],

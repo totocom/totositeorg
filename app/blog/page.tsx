@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   title: "블로그",
   description:
     "토토사이트 도메인·DNS 정보, 이용자 리뷰와 먹튀 피해 제보를 바탕으로 정리한 정보 글을 확인하세요.",
+  robots: {
+    index: false,
+    follow: true,
+  },
   alternates: {
     canonical: `${siteUrl}/blog`,
   },

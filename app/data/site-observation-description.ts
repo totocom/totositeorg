@@ -318,6 +318,10 @@ export async function generateObservationDescription({
     fallback,
   );
   const formattingWarnings: string[] = [];
+  let preFormatProhibitedPhraseCheck = mergeProhibitedPhraseChecks(
+    detectProhibitedPhrases(normalizedOutput.detail_description_md),
+    normalizedOutput.prohibited_phrase_check,
+  );
   const formattedOutput = formatObservationDescriptionForStorage(
     normalizedOutput.detail_description_md,
     fallback.detail_description_md,
@@ -330,7 +334,7 @@ export async function generateObservationDescription({
   let validation = validateObservationDescriptionDraft({
     detailDescriptionMd: normalizedOutput.detail_description_md,
     sourceTextChunks: getSnapshotSourceTextChunks(snapshotResult.snapshot),
-    prohibitedPhraseCheck: normalizedOutput.prohibited_phrase_check,
+    prohibitedPhraseCheck: preFormatProhibitedPhraseCheck,
   });
 
   if (
@@ -356,6 +360,10 @@ export async function generateObservationDescription({
         rewriteResult.output,
         fallback,
       );
+      preFormatProhibitedPhraseCheck = mergeProhibitedPhraseChecks(
+        detectProhibitedPhrases(normalizedOutput.detail_description_md),
+        normalizedOutput.prohibited_phrase_check,
+      );
       const formattedRewriteOutput = formatObservationDescriptionForStorage(
         normalizedOutput.detail_description_md,
         fallback.detail_description_md,
@@ -368,7 +376,7 @@ export async function generateObservationDescription({
       validation = validateObservationDescriptionDraft({
         detailDescriptionMd: normalizedOutput.detail_description_md,
         sourceTextChunks: getSnapshotSourceTextChunks(snapshotResult.snapshot),
-        prohibitedPhraseCheck: normalizedOutput.prohibited_phrase_check,
+        prohibitedPhraseCheck: preFormatProhibitedPhraseCheck,
       });
     } catch (error) {
       generationWarnings.push(

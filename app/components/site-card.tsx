@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDisplayUrl } from "@/app/data/domain-display";
+import { formatDisplayDomain } from "@/app/data/domain-display";
 import {
   calculateSiteTrustScore,
   formatTrustScore,
@@ -27,18 +27,17 @@ function getDomainAge(value: string): string {
   return `${years}년 ${months}개월`;
 }
 
-function formatDamageAmount(amount: number, unknownCount: number) {
-  const formattedAmount = `${amount.toLocaleString("ko-KR")}원`;
+function buildNeutralSummary(site: ReviewTarget, scamReportCount: number) {
+  const evidenceParts = [
+    `후기 ${site.reviewCount}건`,
+    `먹튀 제보 ${scamReportCount}건`,
+  ];
 
-  if (unknownCount > 0 && amount > 0) {
-    return `${formattedAmount} + 미상 ${unknownCount}건`;
+  if (site.oldestDomainCreationDate) {
+    evidenceParts.push(`운영 이력 ${getDomainAge(site.oldestDomainCreationDate)}`);
   }
 
-  if (unknownCount > 0) {
-    return `미상 ${unknownCount}건`;
-  }
-
-  return formattedAmount;
+  return `대표 도메인과 ${evidenceParts.join(", ")}을 기준으로 정리한 공개 정보 요약입니다.`;
 }
 
 function getTrustToneClasses(score: number) {
@@ -99,13 +98,14 @@ export function SiteCard({ site }: SiteCardProps) {
             {site.siteName}
           </h2>
           <p className="mt-0.5 break-all text-xs text-muted">
-            {formatDisplayUrl(site.siteUrl)}
+            대표 도메인: {formatDisplayDomain(site.siteUrl)}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className={`text-sm font-black ${getTrustToneClasses(trustScore.total)}`}>
               신뢰 점수 {formatTrustScore(trustScore)}
             </span>
-            <span className="text-xs text-muted">리뷰 {site.reviewCount}건</span>
+            <span className="text-xs text-muted">후기 {site.reviewCount}건</span>
+            <span className="text-xs text-muted">먹튀 제보 {scamReportCount}건</span>
             {site.oldestDomainCreationDate ? (
               <span className="text-xs text-muted">
                 운영 이력 최소 <span className="font-bold text-accent">{getDomainAge(site.oldestDomainCreationDate)}</span>
@@ -115,24 +115,9 @@ export function SiteCard({ site }: SiteCardProps) {
         </div>
       </div>
 
-      {site.shortDescription ? (
-        <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted">
-          {site.shortDescription}
-        </p>
-      ) : null}
-
-      {scamReportCount > 0 ? (
-        <div className="neon-scam mt-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 dark:bg-red-950/40">
-          <span className="text-sm font-bold text-red-600 dark:text-red-400">⚠ 먹튀 {scamReportCount}건</span>
-          <span className="text-xs text-red-500 dark:text-red-400/70">
-            피해 금액 {formatDamageAmount(scamDamageAmount, scamDamageAmountUnknownCount)}
-          </span>
-        </div>
-      ) : (
-        <div className="neon-safe mt-3 flex items-center gap-2 rounded-lg bg-accent-soft px-3 py-2">
-          <span className="text-xs font-semibold text-accent">✓ 먹튀 신고 없음</span>
-        </div>
-      )}
+      <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted">
+        {buildNeutralSummary(site, scamReportCount)}
+      </p>
     </Link>
   );
 }

@@ -8,10 +8,7 @@ export function Footer() {
       <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-lg font-bold text-white">
-              <span aria-hidden="true" className="text-accent">
-                ★
-              </span>
+            <div className="text-lg font-bold text-white">
               토토사이트 정보
             </div>
             <p className="mt-2 max-w-xs text-sm leading-6 text-white/50">

@@ -1,3 +1,4 @@
+import { sanitizePublicGeneratedText } from "./public-display";
 import { siteDescriptionNoticeText } from "./site-description-notice";
 
 export type SafeMarkdownInline =
@@ -101,9 +102,20 @@ function normalizeObservationDescriptionText(value: string) {
 function formatObservationDescriptionParagraph(value: string) {
   const sentences = splitDescriptionSentences(value)
     .filter((sentence) => !isNoticeSentence(sentence))
-    .filter((sentence) => !isInternalExtractionSentence(sentence));
+    .filter((sentence) => !isInternalExtractionSentence(sentence))
+    .map(formatPublicObservationSentence);
 
   return sentences.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function formatPublicObservationSentence(value: string) {
+  const sanitized = sanitizePublicGeneratedText(value);
+
+  if (isPromotionalObservationSentence(sanitized)) {
+    return "홍보성 문구가 관측됨.";
+  }
+
+  return sanitized;
 }
 
 function splitDescriptionSentences(value: string) {
@@ -154,6 +166,12 @@ function containsNoticeSentence(value: string) {
 
 function isInternalExtractionSentence(value: string) {
   return /문서\s*제목은|페이지\s*제목은|메타\s*설명(?:에는|은)|대표\s*제목\s*영역(?:에는|은)|\bpage_title\b|\bmeta_description\b|\bh1\b|h1\s*(?:에는|은)/i.test(
+    value,
+  );
+}
+
+function isPromotionalObservationSentence(value: string) {
+  return /안전(?:한|하게)?\s*(?:서비스|놀이터|토토|사이트|베팅)|빠른\s*(?:서비스|입출금|환전|처리)|전문적|하이퀄리티|완벽한\s*서비스|최고(?:의)?/i.test(
     value,
   );
 }

@@ -273,7 +273,7 @@ export default async function Home() {
               <h2 className="mt-1 text-2xl font-bold text-foreground">
                 처음 방문했다면 이렇게 확인하세요
               </h2>
-              <ol className="mt-5 grid list-none gap-3 pl-0">
+              <ul className="mt-5 grid list-none gap-3 pl-0">
                 {firstVisitSteps.map((step, index) => (
                   <li
                     key={step.title}
@@ -295,7 +295,7 @@ export default async function Home() {
                     </div>
                   </li>
                 ))}
-              </ol>
+              </ul>
             </section>
           </section>
 

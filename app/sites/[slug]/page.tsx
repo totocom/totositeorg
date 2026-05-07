@@ -21,9 +21,11 @@ import { SiteFeedbackSubmissionGuide } from "@/app/components/site-feedback-subm
 import { SiteObservationSnapshotCard } from "@/app/components/site-observation-snapshot-card";
 import { SiteShareActions } from "@/app/components/site-share-actions";
 import { SiteTelegramAlertSubscription } from "@/app/components/site-telegram-alert-subscription";
-import { formatKstDate } from "@/app/data/date-format";
 import { formatDisplayDomain } from "@/app/data/domain-display";
-import { maskPublicAuthorName } from "@/app/data/public-display";
+import {
+  formatKoreanDate,
+  maskPublicAuthorName,
+} from "@/app/data/public-display";
 import { extractDomain } from "@/app/data/domain-whois";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
 import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
@@ -184,7 +186,6 @@ export async function generateMetadata({
 }: SiteDetailPageProps): Promise<Metadata> {
   const { slug: rawSlug } = await params;
   const slug = rawSlug.trim();
-  const splitEnabled = isSitePageSplitEnabled(slug);
   const detail = await getCachedPublicSiteDetail(slug);
   const {
     site,
@@ -211,7 +212,7 @@ export async function generateMetadata({
   });
 
   return buildSiteDetailMetadata(site, slug, {
-    shouldIndex: splitEnabled ? true : indexability.shouldIndex,
+    shouldIndex: indexability.shouldIndex,
     indexability,
     observationSnapshot,
     relatedBlogReport,
@@ -583,17 +584,18 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">
               상세 페이지 탐색
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <ul className="mt-3 flex flex-wrap gap-2">
               {siteDetailInternalLinks.map((link) => (
-                <Link
-                  key={link.key}
-                  href={link.href}
-                  className="inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
-                >
-                  {link.label}
-                </Link>
+                <li key={link.key}>
+                  <Link
+                    href={link.href}
+                    className="inline-flex min-h-10 items-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
               ))}
-            </div>
+            </ul>
           </nav>
 
           <div className="border-t border-line px-5 py-4">
@@ -697,8 +699,12 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                         {report.damageTypes.join(", ")}
                       </p>
                       <p className="mt-1 text-xs text-muted">
-                        발생일 {report.incidentDate} · 이용 기간 {report.usagePeriod} · 작성자{" "}
-                        {report.authorNickname ?? "익명"}
+                        발생일 {formatKoreanDate(report.incidentDate)} · 이용 기간{" "}
+                        {report.usagePeriod} · 작성자{" "}
+                        {maskPublicAuthorName(
+                          report.authorNickname,
+                          "승인된 제보자",
+                        )}
                       </p>
                     </div>
                     <span className="shrink-0 rounded-md bg-surface px-3 py-1 text-xs font-semibold text-foreground">
@@ -767,7 +773,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                     </div>
                     <p className="shrink-0 text-xs text-muted">
                       {maskPublicAuthorName(review.authorNickname)} ·{" "}
-                      {formatKstDate(review.createdAt)}
+                      {formatKoreanDate(review.createdAt)}
                     </p>
                   </div>
                   <div className="mt-1.5">
