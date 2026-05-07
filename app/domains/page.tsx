@@ -9,6 +9,7 @@ import {
   type SiteFaqItem,
 } from "@/app/components/site-detail/site-json-ld";
 import { formatDisplayDomain } from "@/app/data/domain-display";
+import { toPublicSiteListItem } from "@/app/data/public-site-list-item";
 import { getPublicSites } from "@/app/data/public-sites";
 import type { ReviewTarget } from "@/app/data/sites";
 import { siteName, siteUrl } from "@/lib/config";
@@ -183,6 +184,7 @@ function buildDomainItemListJsonLd(sites: ReviewTarget[]) {
 
 export default async function DomainsPage() {
   const { sites, errorMessage, source } = await getPublicSites();
+  const publicDomainListSites = sites.map(toPublicSiteListItem);
   const totalDomainCount = sites.reduce(
     (total, site) => total + getSiteDomains(site).length,
     0,
@@ -281,7 +283,7 @@ export default async function DomainsPage() {
         ) : null}
 
         {sites.length > 0 ? (
-          <PublicDomainList sites={sites} />
+          <PublicDomainList sites={publicDomainListSites} />
         ) : (
           <section className="rounded-lg border border-line bg-surface p-8 text-center shadow-sm">
             <h2 className="text-lg font-semibold">

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
-import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
+import type { PublicSiteListItem } from "@/app/data/public-site-list-item";
 import {
   formatKoreanDate,
   maskPublicAuthorName,
@@ -25,8 +25,12 @@ type DamageTypeFilter =
   | "입금 후 미반영"
   | "기타";
 
+type PublicScamReportClientItem = Omit<PublicScamReportListItem, "site"> & {
+  site: PublicSiteListItem;
+};
+
 type PublicScamReportListProps = {
-  items: PublicScamReportListItem[];
+  items: PublicScamReportClientItem[];
 };
 
 const damageTypeFilters: { value: DamageTypeFilter; label: string }[] = [
@@ -50,7 +54,7 @@ function getTime(value: string) {
   return Number.isFinite(time) ? time : 0;
 }
 
-function getDamageAmount(report: PublicScamReportListItem) {
+function getDamageAmount(report: PublicScamReportClientItem) {
   return Number(report.damageAmount ?? 0);
 }
 
@@ -72,10 +76,8 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
             report.site.siteName,
             report.site.siteNameKo ?? "",
             report.site.siteNameEn ?? "",
-            report.site.siteUrl,
-            formatDisplayUrl(report.site.siteUrl),
+            report.site.representativeDomain,
             ...report.site.domains,
-            ...report.site.domains.map(formatDisplayDomain),
             maskPublicAuthorName(report.authorNickname, "승인된 제보자"),
           ]
             .join(" ")

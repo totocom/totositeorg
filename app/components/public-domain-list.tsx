@@ -2,24 +2,24 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
+import type { PublicSiteListItem } from "@/app/data/public-site-list-item";
 import { formatKoreanDate } from "@/app/data/public-display";
-import type { ReviewTarget } from "@/app/data/sites";
 
 type DomainSortOption = "domain_age" | "domain_count" | "site_name" | "reviews";
 
 type PublicDomainListProps = {
-  sites: ReviewTarget[];
+  sites: PublicSiteListItem[];
 };
 
 const pageSize = 12;
 
-function getDomains(site: ReviewTarget) {
-  return Array.from(new Set(site.domains.length > 0 ? site.domains : [site.siteUrl]))
-    .filter(Boolean);
+function getDomains(site: PublicSiteListItem) {
+  return Array.from(
+    new Set(site.domains.length > 0 ? site.domains : [site.representativeDomain]),
+  ).filter(Boolean);
 }
 
-function getOldestDomainTime(site: ReviewTarget) {
+function getOldestDomainTime(site: PublicSiteListItem) {
   if (!site.oldestDomainCreationDate) return Number.POSITIVE_INFINITY;
 
   const time = new Date(site.oldestDomainCreationDate).getTime();
@@ -69,10 +69,8 @@ export function PublicDomainList({ sites }: PublicDomainListProps) {
           site.siteName,
           site.siteNameKo ?? "",
           site.siteNameEn ?? "",
-          site.siteUrl,
-          formatDisplayUrl(site.siteUrl),
+          site.representativeDomain,
           ...getDomains(site),
-          ...getDomains(site).map(formatDisplayDomain),
           ...(site.resolvedIps ?? []),
           site.domainSearchText ?? "",
         ]
@@ -162,7 +160,7 @@ export function PublicDomainList({ sites }: PublicDomainListProps) {
           <section className="grid gap-4 md:grid-cols-2">
             {visibleSites.map((site) => {
               const domains = getDomains(site);
-              const representativeDomain = domains[0] ?? site.siteUrl;
+              const representativeDomain = domains[0] ?? site.representativeDomain;
               const additionalDomainCount = Math.max(0, domains.length - 1);
 
               return (
@@ -179,7 +177,7 @@ export function PublicDomainList({ sites }: PublicDomainListProps) {
                         {site.siteName}
                       </Link>
                       <p className="mt-2 break-all text-sm leading-6 text-muted">
-                        대표 도메인 {formatDisplayDomain(representativeDomain)}
+                        대표 도메인 {representativeDomain}
                       </p>
                     </div>
                     <span className="w-fit rounded-md bg-background px-3 py-1 text-xs font-semibold text-muted">
@@ -212,7 +210,7 @@ export function PublicDomainList({ sites }: PublicDomainListProps) {
                         key={domain}
                         className="max-w-full break-all rounded-full bg-background px-3 py-1 text-xs font-semibold text-muted"
                       >
-                        {formatDisplayDomain(domain)}
+                        {domain}
                       </span>
                     ))}
                     {additionalDomainCount > 3 ? (

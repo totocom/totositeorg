@@ -7,9 +7,11 @@ import {
   JsonLd,
   type SiteFaqItem,
 } from "@/app/components/site-detail/site-json-ld";
-import { formatDisplayDomain } from "@/app/data/domain-display";
+import {
+  toPublicSiteListItem,
+  type PublicSiteListItem,
+} from "@/app/data/public-site-list-item";
 import { getPublicSites } from "@/app/data/public-sites";
-import type { ReviewTarget } from "@/app/data/sites";
 import { siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 300;
@@ -148,25 +150,6 @@ const sitesFaqItems: SiteFaqItem[] = [
   },
 ];
 
-function buildDomainSearchText(site: ReviewTarget) {
-  const domains = Array.from(new Set(site.domains.length > 0 ? site.domains : [site.siteUrl]))
-    .filter(Boolean)
-    .slice(0, 6);
-
-  const searchText = domains
-    .flatMap((domain) => [
-      domain,
-      formatDisplayDomain(domain),
-    ])
-    .filter(Boolean)
-    .join(" ");
-
-  return {
-    ...site,
-    domainSearchText: searchText,
-  };
-}
-
 type SitesPageProps = {
   searchParams?: Promise<{
     search?: string | string[];
@@ -178,22 +161,24 @@ function firstSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
-function getSiteSearchText(site: ReviewTarget) {
+function getSiteSearchText(site: PublicSiteListItem) {
   return [
     site.siteName,
-    site.siteUrl,
+    site.siteNameKo ?? "",
+    site.siteNameEn ?? "",
+    site.representativeDomain,
     ...site.domains,
-    site.category,
-    site.shortDescription,
-    site.licenseInfo,
     ...(site.resolvedIps ?? []),
-    site.domainSearchText ?? "",
+    site.domainSearchText,
   ]
     .join(" ")
     .toLowerCase();
 }
 
-function getInitialVisibleSites(sites: ReviewTarget[], initialQuery: string) {
+function getInitialVisibleSites(
+  sites: PublicSiteListItem[],
+  initialQuery: string,
+) {
   const normalizedQuery = initialQuery.trim().toLowerCase();
 
   return sites
@@ -220,7 +205,10 @@ function buildCollectionPageJsonLd() {
   };
 }
 
-function buildSiteItemListJsonLd(sites: ReviewTarget[], initialQuery: string) {
+function buildSiteItemListJsonLd(
+  sites: PublicSiteListItem[],
+  initialQuery: string,
+) {
   const visibleSites = getInitialVisibleSites(sites, initialQuery);
 
   return {
@@ -242,7 +230,7 @@ export default async function SitesPage({ searchParams }: SitesPageProps) {
   const initialQuery =
     firstSearchParam(params.search) || firstSearchParam(params.q);
   const { sites, errorMessage, source } = await getPublicSites();
-  const searchableSites = sites.map(buildDomainSearchText);
+  const searchableSites = sites.map(toPublicSiteListItem);
 
   return (
     <>

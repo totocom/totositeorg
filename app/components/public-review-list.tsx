@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary } from "@/app/components/review-summary";
 import { formatKstDate } from "@/app/data/date-format";
-import { formatDisplayDomain, formatDisplayUrl } from "@/app/data/domain-display";
+import type { PublicSiteListItem } from "@/app/data/public-site-list-item";
 import { maskPublicAuthorName } from "@/app/data/public-display";
 import type { PublicReviewListItem } from "@/app/data/public-sites";
 import { formatRatingScore, issueTypeLabels } from "@/app/data/sites";
@@ -38,7 +38,7 @@ type ReviewSortOption = "latest" | "rating_high" | "rating_low" | "site_name";
 type RatingFilter = "all" | "5" | "4" | "3" | "2" | "1";
 
 type PublicReviewListProps = {
-  items: PublicReviewListItem[];
+  items: Array<Omit<PublicReviewListItem, "site"> & { site: PublicSiteListItem }>;
 };
 
 const ratingFilters: { value: RatingFilter; label: string }[] = [
@@ -71,10 +71,8 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
             review.site.siteName,
             review.site.siteNameKo ?? "",
             review.site.siteNameEn ?? "",
-            review.site.siteUrl,
-            formatDisplayUrl(review.site.siteUrl),
+            review.site.representativeDomain,
             ...review.site.domains,
-            ...review.site.domains.map(formatDisplayDomain),
             review.authorNickname ?? "",
           ]
             .join(" ")

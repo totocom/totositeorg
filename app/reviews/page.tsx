@@ -7,6 +7,7 @@ import {
   JsonLd,
   type SiteFaqItem,
 } from "@/app/components/site-detail/site-json-ld";
+import { toPublicSiteListItem } from "@/app/data/public-site-list-item";
 import { getPublicReviewList } from "@/app/data/public-sites";
 import { siteName, siteUrl } from "@/lib/config";
 
@@ -127,6 +128,10 @@ const reviewFaqItems: SiteFaqItem[] = [
 
 export default async function ReviewsPage() {
   const { items, errorMessage, source } = await getPublicReviewList();
+  const publicReviewItems = items.map((item) => ({
+    ...item,
+    site: toPublicSiteListItem(item.site),
+  }));
 
   return (
     <>
@@ -168,7 +173,7 @@ export default async function ReviewsPage() {
         ) : null}
 
         {items.length > 0 ? (
-          <PublicReviewList items={items} />
+          <PublicReviewList items={publicReviewItems} />
         ) : (
           <section className="rounded-lg border border-line bg-surface p-8 text-center shadow-sm">
             <h2 className="text-lg font-semibold">

@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { SiteCard } from "@/app/components/site-card";
-import { calculateSiteTrustScore, type ReviewTarget } from "@/app/data/sites";
+import type { PublicSiteListItem } from "@/app/data/public-site-list-item";
+import { calculateSiteTrustScore } from "@/app/data/sites";
 
 type SortOption =
   | "latest"
@@ -15,20 +16,20 @@ type SortOption =
   | "name_desc";
 
 type SiteBrowserProps = {
-  sites: ReviewTarget[];
+  sites: PublicSiteListItem[];
   initialQuery?: string;
 };
 
 const pageSize = 12;
 
-function getDomainAgeTime(site: ReviewTarget) {
+function getDomainAgeTime(site: PublicSiteListItem) {
   if (!site.oldestDomainCreationDate) return Number.POSITIVE_INFINITY;
 
   const time = new Date(site.oldestDomainCreationDate).getTime();
   return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
 }
 
-function getTrustScoreTotal(site: ReviewTarget) {
+function getTrustScoreTotal(site: PublicSiteListItem) {
   if (site.trustScore) return site.trustScore.total;
 
   return calculateSiteTrustScore({
@@ -54,11 +55,10 @@ export function SiteBrowser({ sites, initialQuery = "" }: SiteBrowserProps) {
         normalizedQuery.length === 0 ||
         [
           site.siteName,
-          site.siteUrl,
+          site.siteNameKo ?? "",
+          site.siteNameEn ?? "",
+          site.representativeDomain,
           ...site.domains,
-          site.category,
-          site.shortDescription,
-          site.licenseInfo,
           ...(site.resolvedIps ?? []),
           site.domainSearchText ?? "",
         ]

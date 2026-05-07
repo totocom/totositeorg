@@ -88,7 +88,7 @@ addCheck(
 );
 
 for (const term of ["안전한 서비스", "빠른 서비스", "바로가기"]) {
-  addCheck(`/sites does not contain "${term}"`, !sitesText.includes(term));
+  addCheck(`/sites HTML does not contain "${term}"`, !sites.text.includes(term));
 }
 
 addCheck(

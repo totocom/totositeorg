@@ -1,14 +1,13 @@
 import Link from "next/link";
-import { formatDisplayDomain } from "@/app/data/domain-display";
+import type { PublicSiteListItem } from "@/app/data/public-site-list-item";
 import {
   calculateSiteTrustScore,
   formatTrustScore,
   getTrustScoreTone,
-  type ReviewTarget,
 } from "@/app/data/sites";
 
 type SiteCardProps = {
-  site: ReviewTarget;
+  site: PublicSiteListItem;
 };
 
 function getDomainAge(value: string): string {
@@ -27,7 +26,7 @@ function getDomainAge(value: string): string {
   return `${years}년 ${months}개월`;
 }
 
-function buildNeutralSummary(site: ReviewTarget, scamReportCount: number) {
+function buildNeutralSummary(site: PublicSiteListItem, scamReportCount: number) {
   const evidenceParts = [
     `후기 ${site.reviewCount}건`,
     `먹튀 제보 ${scamReportCount}건`,
@@ -98,7 +97,7 @@ export function SiteCard({ site }: SiteCardProps) {
             {site.siteName}
           </h2>
           <p className="mt-0.5 break-all text-xs text-muted">
-            대표 도메인: {formatDisplayDomain(site.siteUrl)}
+            대표 도메인: {site.representativeDomain}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className={`text-sm font-black ${getTrustToneClasses(trustScore.total)}`}>
