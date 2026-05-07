@@ -15,17 +15,19 @@ import {
   JsonLd,
 } from "@/app/components/site-detail/site-json-ld";
 import { getHomePageData } from "@/app/data/public-home";
-import { siteDescription, siteName, siteUrl } from "@/lib/config";
+import { siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 600;
 
-const homeTitle = `${siteName} - 실제 후기·신뢰점수·도메인 이력 리포트`;
+const homeTitle = "토토사이트 정보 - 후기·먹튀 제보·도메인 이력 리포트";
+const homeDescription =
+  "토토사이트 정보를 후기, 먹튀 제보, 도메인 이력, 신뢰점수로 비교하세요. 등록 사이트의 공개 데이터와 이용자 제보를 바탕으로 사이트별 정보를 확인할 수 있습니다.";
 
 export const metadata: Metadata = {
   title: {
     absolute: homeTitle,
   },
-  description: siteDescription,
+  description: homeDescription,
   keywords: null,
   alternates: {
     canonical: siteUrl,
@@ -33,12 +35,12 @@ export const metadata: Metadata = {
   openGraph: {
     url: siteUrl,
     title: homeTitle,
-    description: siteDescription,
+    description: homeDescription,
   },
   twitter: {
     card: "summary",
     title: homeTitle,
-    description: siteDescription,
+    description: homeDescription,
   },
 };
 
@@ -47,7 +49,7 @@ const websiteJsonLd = {
   "@type": "WebSite",
   name: siteName,
   url: siteUrl,
-  description: siteDescription,
+  description: homeDescription,
   potentialAction: {
     "@type": "SearchAction",
     target: {
@@ -64,7 +66,7 @@ const organizationJsonLd = {
   name: siteName,
   url: siteUrl,
   logo: new URL("/logo-96.webp", siteUrl).toString(),
-  description: siteDescription,
+  description: homeDescription,
 };
 
 const selectionCriteria = [
@@ -83,6 +85,30 @@ const selectionCriteria = [
   {
     title: "종합 분석",
     desc: "사이트 정보, 도메인 기록, 먹튀 제보, 이용 후기를 함께 묶어 판단에 필요한 맥락을 정리합니다.",
+  },
+];
+
+const firstVisitSteps = [
+  {
+    title: "토토사이트 목록에서 사이트명을 검색합니다.",
+    href: "/sites",
+    label: "토토사이트 목록",
+  },
+  {
+    title: "도메인 정보에서 대표 주소와 변경 이력을 확인합니다.",
+    href: "/domains",
+    label: "도메인 정보",
+  },
+  {
+    title: "이용자 후기에서 환전, 고객센터, 이벤트 경험을 살펴봅니다.",
+    href: "/reviews",
+    label: "이용자 후기",
+  },
+  {
+    title:
+      "먹튀 제보에서 출금 거부, 계정 차단, 고객센터 차단 사례가 있는지 확인합니다.",
+    href: "/scam-reports",
+    label: "먹튀 제보",
   },
 ];
 
@@ -116,7 +142,7 @@ export default async function Home() {
                   </span>
                 </div>
                 <h1 className="mt-4 text-4xl font-extrabold leading-tight text-white sm:text-5xl">
-                  토토사이트 정보, 실제 후기와 신뢰점수로 확인하세요
+                  토토사이트 정보 리포트: 후기·먹튀 제보·도메인 이력 비교
                 </h1>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-white/60">
                   등록 사이트의 도메인 이력, 이용자 후기, 먹튀 피해 제보,
@@ -199,6 +225,55 @@ export default async function Home() {
                 <p className="mt-2 text-sm leading-6 text-muted">{item.desc}</p>
               </article>
             ))}
+          </section>
+
+          <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+            <article className="rounded-lg border border-line bg-surface p-6 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent">
+                신뢰점수 안내
+              </p>
+              <h2 className="mt-1 text-2xl font-bold text-foreground">
+                신뢰점수는 비교 참고 지표입니다
+              </h2>
+              <p className="mt-4 text-sm leading-7 text-muted">
+                신뢰점수는 사이트 정보를 비교하기 위한 참고 지표입니다. 점수가
+                높다고 해서 안전성이 보장되는 것은 아니며, 점수가 낮다고 해서
+                모든 위험이 확정되는 것도 아닙니다. 이용자 후기, 먹튀 제보,
+                도메인 이력과 함께 확인하는 것이 좋습니다.
+              </p>
+            </article>
+
+            <section className="rounded-lg border border-line bg-surface p-6 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent">
+                확인 순서
+              </p>
+              <h2 className="mt-1 text-2xl font-bold text-foreground">
+                처음 방문했다면 이렇게 확인하세요
+              </h2>
+              <ol className="mt-5 grid gap-3">
+                {firstVisitSteps.map((step, index) => (
+                  <li
+                    key={step.title}
+                    className="flex gap-3 rounded-md bg-background px-3 py-3"
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-black text-white">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold leading-6 text-foreground">
+                        {step.title}
+                      </p>
+                      <Link
+                        href={step.href}
+                        className="mt-1 inline-flex text-xs font-bold text-accent transition hover:text-accent/80"
+                      >
+                        {step.label}
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
           </section>
 
           <HomePopularSites sites={homeData.popularSites} />
