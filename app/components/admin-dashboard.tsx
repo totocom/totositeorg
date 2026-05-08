@@ -912,19 +912,33 @@ export function AdminDashboard({
     setDeletingItem({ table, id });
     setErrorMessage("");
 
-    const { error } = await supabase.from(table).delete().eq("id", id);
+    const token = await getAdminToken();
+
+    if (!token) {
+      setDeletingItem(null);
+      setErrorMessage("관리자 로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    const response = await fetch("/api/admin/moderation/delete", {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ table, id }),
+    });
+    const result = (await response.json().catch(() => null)) as {
+      error?: string;
+      ok?: boolean;
+    } | null;
 
     setDeletingItem(null);
 
-    if (error) {
-      if (isRlsError(error.code)) {
-        setErrorMessage(
-          "삭제 권한이 없습니다. Supabase RLS에서 관리자 delete 정책을 확인해주세요.",
-        );
-        return;
-      }
-
-      setErrorMessage("삭제 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.");
+    if (!response.ok || !result?.ok) {
+      setErrorMessage(
+        result?.error ?? "삭제 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
+      );
       return;
     }
 

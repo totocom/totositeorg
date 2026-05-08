@@ -7,6 +7,14 @@ import type { ReviewTarget } from "./sites";
 const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
 const publicSitesSource = readFileSync("app/data/public-sites.ts", "utf8");
 const layoutSource = readFileSync("app/layout.tsx", "utf8");
+const adminModerationDeleteRouteSource = readFileSync(
+  "app/api/admin/moderation/delete/route.ts",
+  "utf8",
+);
+const adminDashboardSource = readFileSync(
+  "app/components/admin-dashboard.tsx",
+  "utf8",
+);
 
 type SitemapLoaderOptions = NonNullable<
   Parameters<typeof getPublicSitesForSitemapUncached>[0]
@@ -121,6 +129,18 @@ test("public site detail loader only selects public site columns and public rows
   assert.match(publicSitesSource, /\.select\(PUBLIC_SITE_SELECT\)[\s\S]*?\.eq\("slug",\s*slug\)[\s\S]*?\.eq\("status",\s*"approved"\)/);
   assert.match(publicSitesSource, /\.from\("scam_reports"\)[\s\S]*?\.eq\("review_status",\s*"approved"\)[\s\S]*?\.eq\("is_published",\s*true\)/);
   assert.match(publicSitesSource, /\.from\("blog_posts"\)[\s\S]*?\.eq\("status",\s*"published"\)[\s\S]*?\.eq\("legal_review_status",\s*"approved"\)/);
+});
+
+test("admin moderation deletes revalidate public site caches", () => {
+  assert.match(
+    adminModerationDeleteRouteSource,
+    /revalidateTag\("public-sites",\s*"max"\)/,
+  );
+  assert.match(
+    adminDashboardSource,
+    /fetch\("\/api\/admin\/moderation\/delete"/,
+  );
+  assert.equal(adminDashboardSource.includes("supabase.from(table).delete()"), false);
 });
 
 test("favicon is not preloaded and screenshot image is rendered only when present", () => {
