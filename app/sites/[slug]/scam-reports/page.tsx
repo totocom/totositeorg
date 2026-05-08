@@ -68,7 +68,7 @@ function buildScamReportInterpretationNotice(
   const displaySiteName = sanitizePublicSiteName(siteName);
 
   if (scamReportCount <= 0) {
-    return `현재 공개된 ${displaySiteName} 관련 승인 먹튀 제보는 0건입니다. 공개 제보가 없다는 뜻일 뿐 사이트 상태를 판단하는 자료는 아니며, 후기와 도메인 정보를 함께 참고하는 것이 좋습니다.`;
+    return `현재 공개된 ${displaySiteName} 관련 먹튀 제보가 없습니다. 공개 제보가 없다는 사실은 사이트 상태를 단정하는 자료가 아니며, 후기와 도메인 정보를 함께 참고하는 것이 좋습니다.`;
   }
 
   const base = `현재 공개된 ${displaySiteName} 관련 승인 먹튀 제보는 ${scamReportCount}건입니다. 단일 제보나 소수의 제보만으로 사이트 전체의 상태를 확정하기는 어렵습니다. 피해 유형, 발생일, 접수일, 피해 금액, 사이트 대응 여부, 이용자 후기, 도메인 정보와 함께 참고하는 것이 좋습니다.`;
@@ -248,8 +248,8 @@ export default async function SiteScamReportsPage({
           ) : (
             <>
               <SiteEmptyState
-                title="현재 승인된 먹튀 제보가 없습니다"
-                description={`${site.siteName} 관련 공개 승인 제보는 아직 없습니다. 접수된 내용이 관리자 검토를 통과하면 이 페이지에 표시됩니다.`}
+                title="공개된 먹튀 제보가 없습니다"
+                description={`${site.siteName} 관련 공개 제보는 아직 없습니다. 접수된 내용이 관리자 검토를 통과하면 이 페이지에 표시됩니다.`}
                 actionHref={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
                 actionLabel="먹튀 제보 작성"
               />

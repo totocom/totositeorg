@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { SiteBlogVisualSummary } from "@/app/components/site-blog-visual-summary";
 import {
   getBlogCategoryLabel,
@@ -14,6 +14,7 @@ import {
   type PublicBlogPost,
 } from "@/app/data/public-blog-posts";
 import { buildBlogImageMetadata } from "@/app/data/blog-visuals";
+import { getBlogPostRedirect } from "@/app/data/blog-url-lifecycle";
 import { siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 300;
@@ -247,8 +248,19 @@ export async function generateMetadata({
   params,
 }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const { post } = await getPublicBlogPostBySlug(slug);
+  const redirectTarget = getBlogPostRedirect(slug);
+  const { post, source } = await getPublicBlogPostBySlug(slug);
   const robots = { index: false, follow: true };
+
+  if (redirectTarget && !post) {
+    return {
+      title: "블로그 글 이전",
+      robots,
+      alternates: {
+        canonical: `${siteUrl}${redirectTarget.destinationPath}`,
+      },
+    };
+  }
 
   if (!post) {
     return {
@@ -267,7 +279,10 @@ export async function generateMetadata({
   return {
     title: post.metaTitle || post.title,
     description: metaDescription,
-    robots,
+    robots: {
+      index: source === "supabase",
+      follow: true,
+    },
     alternates: {
       canonical: canonicalUrl,
     },
@@ -292,6 +307,12 @@ export async function generateMetadata({
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params;
+  const redirectTarget = getBlogPostRedirect(slug);
+
+  if (redirectTarget) {
+    permanentRedirect(redirectTarget.destinationPath);
+  }
+
   const { post, relatedPosts } = await getPublicBlogPostBySlug(slug);
 
   if (!post) {

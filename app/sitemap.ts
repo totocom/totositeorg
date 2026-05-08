@@ -1,10 +1,13 @@
 import type { MetadataRoute } from "next";
+import { getBlogPostRedirect } from "@/app/data/blog-url-lifecycle";
+import { getPublishedBlogPostsForSitemap } from "@/app/data/public-blog-posts";
 import { getPublicSitesForSitemap } from "@/app/data/public-sites-sitemap";
 import { formatDisplayDomain } from "@/app/data/domain-display";
 import {
   calculateSiteDetailIndexability,
   type SiteDetailIndexabilityResult,
 } from "@/app/data/site-detail-indexability";
+import { calculateSiteDetailSubpageIndexability } from "@/app/data/site-detail-subpage-indexability";
 import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
 import type { ReviewTarget } from "@/app/data/sites";
 import { siteUrl } from "@/lib/config";
@@ -12,7 +15,10 @@ import { siteUrl } from "@/lib/config";
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const publicSitesForSitemapResult = await getPublicSitesForSitemap();
+  const [publicSitesForSitemapResult, publishedBlogPosts] = await Promise.all([
+    getPublicSitesForSitemap(),
+    getPublishedBlogPostsForSitemap(),
+  ]);
 
   const siteEntries: MetadataRoute.Sitemap = publicSitesForSitemapResult.entries
     .map((entry) => ({
@@ -21,6 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         site: entry.site,
         reviewsCount: entry.approvedReviewCount,
         scamReportsCount: entry.approvedScamReportCount,
+        dnsRecordCount: entry.dnsRecordCount,
         observationSnapshot: entry.observationSnapshot,
         relatedBlogReport: entry.relatedBlogReport,
         source: publicSitesForSitemapResult.source,
@@ -39,25 +46,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const splitEnabled = isSitePageSplitEnabled(site.slug);
       const approvedDomainCount = getApprovedDomainCount(site);
 
-      if (!indexability.shouldIndex) {
-        return [];
-      }
-
       const baseUrl = `${siteUrl}/sites/${site.slug}`;
-      const pages: MetadataRoute.Sitemap = [
-        {
+      const pages: MetadataRoute.Sitemap = [];
+
+      if (indexability.shouldIndex) {
+        pages.push({
           url: baseUrl,
           lastModified: lastModified ? new Date(lastModified) : new Date(),
           changeFrequency: "weekly" as const,
           priority: getSiteSitemapPriority(site, indexability),
-        },
-      ];
+        });
+      }
 
       if (!splitEnabled) {
         return pages;
       }
 
-      if (approvedScamReportCount > 0) {
+      if (
+        calculateSiteDetailSubpageIndexability({
+          site,
+          kind: "scam-reports",
+          itemCount: approvedScamReportCount,
+        }).shouldIndex
+      ) {
         pages.push({
           url: `${baseUrl}/scam-reports`,
           lastModified: new Date(latestScamReportAt ?? lastModified ?? Date.now()),
@@ -66,7 +77,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         });
       }
 
-      if (approvedReviewCount > 0) {
+      if (
+        calculateSiteDetailSubpageIndexability({
+          site,
+          kind: "reviews",
+          itemCount: approvedReviewCount,
+        }).shouldIndex
+      ) {
         pages.push({
           url: `${baseUrl}/reviews`,
           lastModified: new Date(latestReviewAt ?? lastModified ?? Date.now()),
@@ -75,7 +92,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         });
       }
 
-      if (approvedDomainCount > 0) {
+      if (
+        calculateSiteDetailSubpageIndexability({
+          site,
+          kind: "domains",
+          itemCount: approvedDomainCount,
+        }).shouldIndex
+      ) {
         pages.push({
           url: `${baseUrl}/domains`,
           lastModified: new Date(latestDomainSignalAt ?? lastModified ?? Date.now()),
@@ -86,6 +109,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
       return pages;
     });
+  const blogEntries: MetadataRoute.Sitemap = publishedBlogPosts
+    .filter((post) => !getBlogPostRedirect(post.slug))
+    .map((post) => ({
+      url: `${siteUrl}/blog/${post.slug}`,
+      lastModified: new Date(post.updatedAt || post.publishedAt || Date.now()),
+      changeFrequency: "weekly" as const,
+      priority: 0.65,
+    }));
 
   return [
     {
@@ -124,6 +155,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.4,
     },
+    ...blogEntries,
     ...siteEntries,
   ];
 }

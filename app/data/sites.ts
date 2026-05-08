@@ -66,8 +66,8 @@ export function getApprovedScamReportStatusCopy(scamReportCount = 0) {
   }
 
   return {
-    primary: "✓ 승인된 먹튀 피해 제보 0건",
-    secondary: "조회 기준 승인된 먹튀 피해 제보 없음",
+    primary: "공개된 먹튀 제보가 없습니다",
+    secondary: "조회 기준 공개 승인 제보 없음",
   };
 }
 

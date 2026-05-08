@@ -37,7 +37,7 @@ test("site detail copy does not render 먹튀 없음 for empty approved reports"
   ].join(" ");
 
   assert.equal(publicText.includes("먹튀 없음"), false);
-  assert.equal(publicText.includes("승인된 먹튀 피해 제보 0건"), true);
+  assert.equal(publicText.includes("공개된 먹튀 제보가 없습니다"), true);
   assert.equal(publicText.includes("피해 제보 현황 점수"), true);
 });
 

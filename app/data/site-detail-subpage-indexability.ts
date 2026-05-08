@@ -21,6 +21,18 @@ export function calculateSiteDetailSubpageIndexability({
     return buildResult(false, "site_missing");
   }
 
+  if (site.moderationStatus !== "approved") {
+    return buildResult(false, "site_not_public");
+  }
+
+  if (!site.slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(site.slug)) {
+    return buildResult(false, "invalid_slug");
+  }
+
+  if (!site.siteName.trim()) {
+    return buildResult(false, "site_name_missing");
+  }
+
   if (kind === "reviews") {
     return buildResult(itemCount > 0, itemCount > 0 ? "reviews_present" : "reviews_empty");
   }

@@ -28,6 +28,7 @@ export type PublicSiteSitemapEntry = {
   relatedBlogReport: PublicSitemapBlogReport | null;
   approvedReviewCount: number;
   approvedScamReportCount: number;
+  dnsRecordCount: number;
   latestReviewAt: string | null;
   latestScamReportAt: string | null;
   latestDomainSignalAt: string | null;
@@ -72,6 +73,7 @@ type SitemapDnsStatRow = {
 type SitemapStats = {
   approvedReviewCountBySiteId: Map<string, number>;
   approvedScamReportCountBySiteId: Map<string, number>;
+  dnsRecordCountBySiteId: Map<string, number>;
   latestReviewAtBySiteId: Map<string, string>;
   latestScamReportAtBySiteId: Map<string, string>;
   latestDomainSignalAtBySiteId: Map<string, string>;
@@ -116,6 +118,7 @@ export async function getPublicSitesForSitemapUncached(
         relatedBlogReport: null,
         approvedReviewCount: site.reviewCount,
         approvedScamReportCount: site.scamReportCount ?? 0,
+        dnsRecordCount: 0,
         latestReviewAt: null,
         latestScamReportAt: null,
         latestDomainSignalAt: site.dnsCheckedAt ?? null,
@@ -171,6 +174,7 @@ export async function getPublicSitesForSitemapUncached(
         statsResult.approvedReviewCountBySiteId.get(site.id) ?? 0;
       const approvedScamReportCount =
         statsResult.approvedScamReportCountBySiteId.get(site.id) ?? 0;
+      const dnsRecordCount = statsResult.dnsRecordCountBySiteId.get(site.id) ?? 0;
       const latestReviewAt = statsResult.latestReviewAtBySiteId.get(site.id) ?? null;
       const latestScamReportAt =
         statsResult.latestScamReportAtBySiteId.get(site.id) ?? null;
@@ -185,6 +189,7 @@ export async function getPublicSitesForSitemapUncached(
         relatedBlogReport,
         approvedReviewCount,
         approvedScamReportCount,
+        dnsRecordCount,
         latestReviewAt,
         latestScamReportAt,
         latestDomainSignalAt,
@@ -216,6 +221,7 @@ async function getSitemapBatchStats(
     return {
       approvedReviewCountBySiteId: new Map(),
       approvedScamReportCountBySiteId: new Map(),
+      dnsRecordCountBySiteId: new Map(),
       latestReviewAtBySiteId: new Map(),
       latestScamReportAtBySiteId: new Map(),
       latestDomainSignalAtBySiteId: new Map(),
@@ -254,6 +260,7 @@ async function getSitemapBatchStats(
   return {
     approvedReviewCountBySiteId: buildCountBySiteId(reviewRows),
     approvedScamReportCountBySiteId: buildCountBySiteId(scamReportRows),
+    dnsRecordCountBySiteId: buildCountBySiteId(dnsRows),
     latestReviewAtBySiteId: buildLatestDateBySiteId(
       reviewRows,
       (row) => firstValidDate(row.updated_at, row.created_at),

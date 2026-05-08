@@ -28,8 +28,41 @@ import {
   reviewBlogDuplicateRisk,
   validateBlogSeoDraft,
 } from "./blog-seo-review";
+import {
+  getBlogPostRedirect,
+  resolveBlogInternalLinkHref,
+} from "./blog-url-lifecycle";
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+
+test("blog URL lifecycle redirects merged posts and removes retired internal links", () => {
+  const redirects = {
+    "old-report": "new-report",
+  };
+  const activeBlogSlugs = new Set(["current-report", "new-report"]);
+
+  assert.deepEqual(getBlogPostRedirect("old-report", redirects), {
+    sourceSlug: "old-report",
+    destinationSlug: "new-report",
+    destinationPath: "/blog/new-report",
+  });
+  assert.equal(
+    resolveBlogInternalLinkHref("/blog/old-report", activeBlogSlugs, redirects),
+    "/blog/new-report",
+  );
+  assert.equal(
+    resolveBlogInternalLinkHref(
+      "/blog/current-report?utm_source=test",
+      activeBlogSlugs,
+      redirects,
+    ),
+    "/blog/current-report",
+  );
+  assert.equal(
+    resolveBlogInternalLinkHref("/blog/deleted-report", activeBlogSlugs, redirects),
+    null,
+  );
+});
 
 const validBody = [
   "# 민속촌 토토사이트 검증 리포트",

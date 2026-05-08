@@ -105,10 +105,14 @@ addCheck(
 for (const excludedPath of ["/blog", "/submit-review", "/submit-scam-report"]) {
   addCheck(
     `sitemap excludes ${excludedPath}`,
-    !sitemapUrls.some((url) => url === `${normalizedBaseUrl}${excludedPath}` ||
-      url.startsWith(`${normalizedBaseUrl}${excludedPath}/`)),
+    !sitemapUrls.some((url) => url === `${normalizedBaseUrl}${excludedPath}`),
   );
 }
+
+addCheck(
+  "sitemap excludes query parameter URLs",
+  !sitemapUrls.some((url) => /[?#]/.test(url)),
+);
 
 const failed = checks.filter((check) => !check.passed);
 

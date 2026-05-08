@@ -191,6 +191,7 @@ export async function generateMetadata({
     site,
     reviews,
     scamReports,
+    dnsRecords,
     observationSnapshot,
     domainCreationDates,
     relatedBlogReport,
@@ -205,6 +206,7 @@ export async function generateMetadata({
     site,
     reviewsCount: reviews.length,
     scamReportsCount: scamReports.length,
+    dnsRecordCount: dnsRecords.length,
     observationSnapshot,
     domainCreationDates,
     relatedBlogReport,
@@ -228,6 +230,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     site,
     reviews,
     scamReports,
+    dnsRecords,
     observationSnapshot,
     relatedBlogReport,
     domainCreationDates,
@@ -267,6 +270,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
     site,
     reviewsCount: reviews.length,
     scamReportsCount: scamReports.length,
+    dnsRecordCount: dnsRecords.length,
     observationSnapshot,
     domainCreationDates,
     relatedBlogReport,
@@ -727,7 +731,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </div>
           ) : (
             <div className="px-5 py-4">
-              <p className="text-sm text-muted">승인된 피해 제보 없음</p>
+              <p className="text-sm text-muted">
+                공개된 먹튀 제보가 없습니다
+              </p>
             </div>
           )}
         </section>

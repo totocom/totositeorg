@@ -9,9 +9,11 @@ import { isSitePageSplitEnabled } from "./site-page-split-flags";
 import type { ReviewTarget } from "./sites";
 
 const baseSite = {
+  slug: "test-site",
   siteName: "테스트",
   siteUrl: "https://test.example",
   domains: ["https://test.example"],
+  moderationStatus: "approved",
   shortDescription: "기본 설명입니다.",
   reviewCount: 0,
   scamReportCount: 0,
@@ -59,22 +61,113 @@ test("site detail indexability noindexes sparse pages", () => {
   assert.equal(result.robots, "noindex,follow");
   assert.equal(result.missing.includes("approved_reviews"), true);
   assert.equal(result.missing.includes("observation_snapshot"), true);
+  assert.equal(result.reasons.includes("data_axes_min_2"), true);
 });
 
-test("site detail indexability indexes approved reviews or reports", () => {
+test("site detail indexability keeps main page noindex when only one data axis exists", () => {
   assert.equal(
     calculateSiteDetailIndexability({
       site: { ...baseSite, reviewCount: 1 },
       reviewsCount: 1,
       source: "supabase",
     }).robots,
-    "index,follow",
+    "noindex,follow",
   );
   assert.equal(
     calculateSiteDetailIndexability({
       site: { ...baseSite, scamReportCount: 1 },
       scamReportsCount: 1,
       source: "supabase",
+    }).robots,
+    "noindex,follow",
+  );
+});
+
+test("site detail indexability can index main page without scam reports", () => {
+  const result = calculateSiteDetailIndexability({
+    site: {
+      ...baseSite,
+      reviewCount: 1,
+      dnsCheckedAt: "2026-05-01T00:00:00.000Z",
+    },
+    reviewsCount: 1,
+    scamReportsCount: 0,
+    source: "supabase",
+  });
+
+  assert.equal(result.robots, "index,follow");
+  assert.equal(result.reasons.some((reason) => reason.startsWith("approved_reviews")), true);
+  assert.equal(result.reasons.includes("dns_info"), true);
+  assert.equal(result.missing.includes("approved_scam_reports"), true);
+});
+
+test("site detail indexability requires a representative domain", () => {
+  assert.equal(
+    calculateSiteDetailIndexability({
+      site: {
+        ...baseSite,
+        siteUrl: "",
+        reviewCount: 1,
+        dnsCheckedAt: "2026-05-01T00:00:00.000Z",
+      },
+      reviewsCount: 1,
+      dnsRecordCount: 1,
+      source: "supabase",
+    }).robots,
+    "noindex,follow",
+  );
+});
+
+test("site detail indexability uses DNS and WHOIS as separate main-page data axes", () => {
+  const result = calculateSiteDetailIndexability({
+    site: {
+      ...baseSite,
+      dnsCheckedAt: "2026-05-01T00:00:00.000Z",
+      oldestDomainCreationDate: "2026-01-01T00:00:00.000Z",
+    },
+    domainCreationDates: [
+      { domain: "test.example", creationDate: "2026-01-01T00:00:00.000Z" },
+    ],
+    source: "supabase",
+  });
+
+  assert.equal(result.robots, "index,follow");
+  assert.equal(result.reasons.includes("dns_info"), true);
+  assert.equal(result.reasons.includes("whois_info"), true);
+  assert.equal(result.missing.includes("approved_scam_reports"), true);
+});
+
+test("site detail indexability noindexes non-public and invalid slug sites", () => {
+  assert.equal(
+    calculateSiteDetailIndexability({
+      site: {
+        ...baseSite,
+        slug: "Bad Slug",
+        moderationStatus: "pending",
+        reviewCount: 1,
+        dnsCheckedAt: "2026-05-01T00:00:00.000Z",
+      },
+      reviewsCount: 1,
+      source: "supabase",
+    }).robots,
+    "noindex,follow",
+  );
+});
+
+test("site detail subpages can index independently from sparse main page", () => {
+  assert.equal(
+    calculateSiteDetailIndexability({
+      site: { ...baseSite, reviewCount: 1 },
+      reviewsCount: 1,
+      source: "supabase",
+    }).robots,
+    "noindex,follow",
+  );
+  assert.equal(
+    calculateSiteDetailSubpageIndexability({
+      site: { ...subpageSite, reviewCount: 1 },
+      kind: "reviews",
+      itemCount: 1,
     }).robots,
     "index,follow",
   );

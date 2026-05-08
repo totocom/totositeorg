@@ -17,6 +17,7 @@ import {
   isAllowedBlogImageUrl,
   selectBlogVisualImages,
 } from "@/app/data/blog-visuals";
+import { resolveBlogInternalLinkHref } from "@/app/data/blog-url-lifecycle";
 import { supabase } from "@/lib/supabase/client";
 
 export type { PublicBlogPost };
@@ -122,8 +123,10 @@ export function sortBlogPosts(posts: PublicBlogPost[]) {
 }
 
 function fallbackBlogPosts(errorMessage = ""): PublicBlogPostsResult {
+  const posts = sortBlogPosts(blogPosts.map(toPublicBlogPost));
+
   return {
-    posts: sortBlogPosts(blogPosts.map(toPublicBlogPost)),
+    posts: normalizePublicBlogInternalLinks(posts),
     errorMessage,
     source: "fallback",
   };
@@ -601,6 +604,23 @@ function mapBlogPostRow(row: BlogPostRow): PublicBlogPost {
   };
 }
 
+function normalizePublicBlogInternalLinks(posts: PublicBlogPost[]) {
+  const activeBlogSlugs = new Set(posts.map((post) => post.slug));
+
+  return posts.map((post) => ({
+    ...post,
+    internalLinks: post.internalLinks
+      .map((link) => {
+        const href = resolveBlogInternalLinkHref(link.href, activeBlogSlugs);
+
+        return href ? { ...link, href } : null;
+      })
+      .filter((link): link is PublicBlogPost["internalLinks"][number] =>
+        Boolean(link),
+      ),
+  }));
+}
+
 async function getPublicBlogPostsUncached(): Promise<PublicBlogPostsResult> {
   const { data, error } = await supabase
     .from("blog_posts")
@@ -620,10 +640,12 @@ async function getPublicBlogPostsUncached(): Promise<PublicBlogPostsResult> {
     return fallbackBlogPosts();
   }
 
+  const posts = sortBlogPosts(
+    (data as unknown as BlogPostRow[]).map(mapBlogPostRow),
+  );
+
   return {
-    posts: sortBlogPosts(
-      (data as unknown as BlogPostRow[]).map(mapBlogPostRow),
-    ),
+    posts: normalizePublicBlogInternalLinks(posts),
     errorMessage: "",
     source: "supabase",
   };

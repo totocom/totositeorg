@@ -1,8 +1,10 @@
 export type SiteDetailIndexabilityInput = {
   site: {
+    slug?: string | null;
     siteName: string;
     siteUrl: string;
     domains: string[];
+    moderationStatus?: string | null;
     shortDescription?: string | null;
     reviewCount: number;
     scamReportCount?: number;
@@ -10,10 +12,13 @@ export type SiteDetailIndexabilityInput = {
     screenshotUrl?: string | null;
     screenshotThumbUrl?: string | null;
     dnsCheckedAt?: string | null;
+    resolvedIps?: string[] | null;
     oldestDomainCreationDate?: string | null;
+    trustScore?: unknown;
   } | null;
   reviewsCount?: number;
   scamReportsCount?: number;
+  dnsRecordCount?: number;
   observationSnapshot?: {
     observed_menu_labels?: unknown;
     observed_account_features?: unknown;
@@ -52,12 +57,14 @@ export type SiteDetailIndexabilityResult = {
   robots: "index,follow" | "noindex,follow";
 };
 
-const descriptionLengthForIndex = 300;
+const minimumMainPageDataAxes = 2;
+const sparseDescriptionLength = 80;
 
 export function calculateSiteDetailIndexability({
   site,
   reviewsCount,
   scamReportsCount,
+  dnsRecordCount = 0,
   observationSnapshot,
   domainCreationDates = [],
   relatedBlogReport,
@@ -72,10 +79,18 @@ export function calculateSiteDetailIndexability({
     0,
     scamReportsCount ?? site.scamReportCount ?? 0,
   );
+  const normalizedSlug = (site.slug ?? "").trim();
   const uniqueDomains = getUniqueDomains(site);
+  const representativeDomain = normalizeDomain(site.siteUrl);
   const descriptionLength = getPlainTextLength(site.shortDescription ?? "");
   const observationFactCount = countObservationFacts(observationSnapshot);
   const hasObservationSnapshot = Boolean(observationSnapshot);
+  const hasAdditionalDomains = uniqueDomains.length >= 2;
+  const hasDnsInfo = Boolean(
+    site.dnsCheckedAt ||
+      (Array.isArray(site.resolvedIps) && site.resolvedIps.length > 0) ||
+      dnsRecordCount > 0,
+  );
   const hasDomainCreationDate =
     domainCreationDates.length > 0 || Boolean(site.oldestDomainCreationDate);
   const hasScreenshot = Boolean(
@@ -86,13 +101,55 @@ export function calculateSiteDetailIndexability({
       observationSnapshot?.screenshotUrl ||
       observationSnapshot?.screenshotThumbUrl,
   );
+  const trustScoreSourceCount = [
+    hasAdditionalDomains,
+    hasDnsInfo,
+    hasDomainCreationDate,
+    hasObservationSnapshot,
+    approvedReviewCount > 0,
+    approvedScamReportCount > 0,
+  ].filter(Boolean).length;
+  const hasTrustScoreCompositionData = Boolean(
+    site.trustScore && trustScoreSourceCount >= 2,
+  );
+  const hasOperatingHistory = Boolean(
+    relatedBlogReport ||
+      (hasDomainCreationDate &&
+        (hasAdditionalDomains || hasDnsInfo || hasObservationSnapshot)),
+  );
   const reasons: string[] = [];
   const missing: string[] = [];
+  const dataAxes: string[] = [];
   let uniqueFactScore = 0;
+
+  if (site.moderationStatus && site.moderationStatus !== "approved") {
+    missing.push("approved_public_site");
+  } else {
+    reasons.push("approved_public_site");
+  }
+
+  if (normalizedSlug && isValidSiteSlug(normalizedSlug)) {
+    reasons.push("valid_slug");
+  } else if (site.slug !== undefined) {
+    missing.push("valid_slug");
+  }
+
+  if (site.siteName.trim()) {
+    reasons.push("site_name");
+  } else {
+    missing.push("site_name");
+  }
+
+  if (representativeDomain) {
+    reasons.push("representative_domain");
+  } else {
+    missing.push("representative_domain");
+  }
 
   if (approvedReviewCount > 0) {
     uniqueFactScore += 3;
     reasons.push(`approved_reviews:${approvedReviewCount}`);
+    dataAxes.push("approved_reviews");
   } else {
     missing.push("approved_reviews");
   }
@@ -100,27 +157,39 @@ export function calculateSiteDetailIndexability({
   if (approvedScamReportCount > 0) {
     uniqueFactScore += 4;
     reasons.push(`approved_scam_reports:${approvedScamReportCount}`);
+    dataAxes.push("approved_scam_reports");
   } else {
     missing.push("approved_scam_reports");
   }
 
-  if (uniqueDomains.length >= 2) {
+  if (hasAdditionalDomains) {
     uniqueFactScore += 1;
-    reasons.push(`domains:${uniqueDomains.length}`);
+    reasons.push(`additional_domains:${uniqueDomains.length - 1}`);
+    dataAxes.push("additional_domains");
   } else {
     missing.push("additional_domains");
   }
 
+  if (hasDnsInfo) {
+    uniqueFactScore += 1;
+    reasons.push("dns_info");
+    dataAxes.push("dns_info");
+  } else {
+    missing.push("dns_info");
+  }
+
   if (hasDomainCreationDate) {
     uniqueFactScore += 1;
-    reasons.push("domain_creation_date");
+    reasons.push("whois_info");
+    dataAxes.push("whois_info");
   } else {
-    missing.push("domain_creation_date");
+    missing.push("whois_info");
   }
 
   if (hasObservationSnapshot) {
     uniqueFactScore += 2;
     reasons.push("observation_snapshot");
+    dataAxes.push("observation_snapshot");
   } else {
     missing.push("observation_snapshot");
   }
@@ -147,11 +216,26 @@ export function calculateSiteDetailIndexability({
   if (hasScreenshot) {
     uniqueFactScore += 1;
     reasons.push("screenshot");
+    dataAxes.push("screenshot");
   } else {
     missing.push("screenshot");
   }
 
-  void relatedBlogReport;
+  if (hasOperatingHistory) {
+    uniqueFactScore += 1;
+    reasons.push("operating_history");
+    dataAxes.push("operating_history");
+  } else {
+    missing.push("operating_history");
+  }
+
+  if (hasTrustScoreCompositionData) {
+    uniqueFactScore += 1;
+    reasons.push("trust_score_data");
+    dataAxes.push("trust_score_data");
+  } else {
+    missing.push("trust_score_data");
+  }
 
   if (source === "fallback") {
     uniqueFactScore = Math.max(0, uniqueFactScore - 3);
@@ -165,17 +249,47 @@ export function calculateSiteDetailIndexability({
     ]);
   }
 
-  const hasReportOrReview = approvedScamReportCount > 0 || approvedReviewCount > 0;
-  const hasEnoughObservedOrDomainData =
-    uniqueDomains.length > 0 || hasObservationSnapshot;
-  const hasEnoughUniqueData =
-    uniqueFactScore >= 5 &&
-    descriptionLength >= descriptionLengthForIndex &&
-    hasEnoughObservedOrDomainData;
-  const shouldIndex = hasReportOrReview || hasEnoughUniqueData;
+  const dataAxisCount = uniqueStrings(dataAxes).length;
+  const blockerReasons: string[] = [];
+
+  if (site.moderationStatus && site.moderationStatus !== "approved") {
+    blockerReasons.push("site_not_public");
+  }
+
+  if (site.slug !== undefined && !isValidSiteSlug(normalizedSlug)) {
+    blockerReasons.push("invalid_slug");
+  }
+
+  if (!site.siteName.trim()) {
+    blockerReasons.push("site_name_missing");
+  }
+
+  if (!representativeDomain) {
+    blockerReasons.push("representative_domain_missing");
+  }
+
+  if (dataAxisCount < minimumMainPageDataAxes) {
+    blockerReasons.push("data_axes_min_2");
+  }
+
+  if (isAbsenceHeavyThinPage({
+    dataAxisCount,
+    descriptionLength,
+    approvedReviewCount,
+    approvedScamReportCount,
+    hasAdditionalDomains,
+    hasDnsInfo,
+    hasDomainCreationDate,
+    hasObservationSnapshot,
+    hasScreenshot,
+  })) {
+    blockerReasons.push("absence_heavy_thin_body");
+  }
+
+  const shouldIndex = blockerReasons.length === 0;
 
   if (!shouldIndex) {
-    reasons.push("insufficient_unique_public_data");
+    reasons.push(...blockerReasons);
   }
 
   return {
@@ -230,6 +344,48 @@ function normalizeDomain(value: string) {
     .replace(/^www\./i, "")
     .replace(/\/.*$/, "")
     .toLowerCase();
+}
+
+function isValidSiteSlug(value: string) {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+}
+
+function isAbsenceHeavyThinPage({
+  dataAxisCount,
+  descriptionLength,
+  approvedReviewCount,
+  approvedScamReportCount,
+  hasAdditionalDomains,
+  hasDnsInfo,
+  hasDomainCreationDate,
+  hasObservationSnapshot,
+  hasScreenshot,
+}: {
+  dataAxisCount: number;
+  descriptionLength: number;
+  approvedReviewCount: number;
+  approvedScamReportCount: number;
+  hasAdditionalDomains: boolean;
+  hasDnsInfo: boolean;
+  hasDomainCreationDate: boolean;
+  hasObservationSnapshot: boolean;
+  hasScreenshot: boolean;
+}) {
+  const absenceSignals = [
+    approvedReviewCount === 0,
+    approvedScamReportCount === 0,
+    !hasAdditionalDomains,
+    !hasDnsInfo,
+    !hasDomainCreationDate,
+    !hasObservationSnapshot,
+    !hasScreenshot,
+  ].filter(Boolean).length;
+
+  return (
+    dataAxisCount < minimumMainPageDataAxes &&
+    descriptionLength < sparseDescriptionLength &&
+    absenceSignals >= 5
+  );
 }
 
 function countObservationFacts(
