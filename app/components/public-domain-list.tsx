@@ -67,7 +67,7 @@ function formatDate(value: string | undefined) {
 export function PublicDomainList({ sites }: PublicDomainListProps) {
   const [query, setQuery] = useState("");
   const [sortOption, setSortOption] =
-    useState<DomainSortOption>("domain_age");
+    useState<DomainSortOption>("latest");
   const [visibleCount, setVisibleCount] = useState(pageSize);
 
   const filteredSites = useMemo(() => {
@@ -113,11 +113,11 @@ export function PublicDomainList({ sites }: PublicDomainListProps) {
 
   const visibleSites = filteredSites.slice(0, visibleCount);
   const hasMoreSites = visibleCount < filteredSites.length;
-  const hasActiveFilters = query.trim() !== "" || sortOption !== "domain_age";
+  const hasActiveFilters = query.trim() !== "" || sortOption !== "latest";
 
   function resetFilters() {
     setQuery("");
-    setSortOption("domain_age");
+    setSortOption("latest");
     setVisibleCount(pageSize);
   }
 

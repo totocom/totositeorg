@@ -134,16 +134,16 @@ function getSiteDomains(site: ReviewTarget) {
     .filter(Boolean);
 }
 
-function getOldestDomainTime(site: ReviewTarget) {
-  if (!site.oldestDomainCreationDate) return Number.POSITIVE_INFINITY;
+function getCreatedTime(site: ReviewTarget) {
+  if (!site.createdAt) return Number.NEGATIVE_INFINITY;
 
-  const time = new Date(site.oldestDomainCreationDate).getTime();
-  return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
+  const time = new Date(site.createdAt).getTime();
+  return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
 }
 
 function getInitialDomainListSites(sites: ReviewTarget[]) {
   return [...sites]
-    .sort((first, second) => getOldestDomainTime(first) - getOldestDomainTime(second))
+    .sort((first, second) => getCreatedTime(second) - getCreatedTime(first))
     .slice(0, domainListPageSize);
 }
 
