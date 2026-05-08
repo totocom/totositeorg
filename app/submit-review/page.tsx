@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { SubmitReviewForm } from "@/app/components/submit-review-form";
 import { getApprovedSites } from "@/app/data/sites";
 
@@ -42,6 +43,9 @@ export default async function SubmitReviewPage({
       </div>
 
       <SubmitReviewForm sites={sites} selectedSiteId={selectedSiteId} />
+      <div className="mt-5">
+        <ResponsibleUseNotice variant="card" />
+      </div>
     </main>
   );
 }

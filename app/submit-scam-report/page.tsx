@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { ScamReportForm } from "@/app/components/scam-report-form";
 
 export const metadata: Metadata = {
@@ -38,6 +39,9 @@ export default async function SubmitScamReportPage({
       </div>
 
       <ScamReportForm selectedSiteId={selectedSiteId} />
+      <div className="mt-5">
+        <ResponsibleUseNotice variant="card" />
+      </div>
     </main>
   );
 }

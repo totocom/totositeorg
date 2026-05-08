@@ -5,6 +5,7 @@ import { cache } from "react";
 import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actions";
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { RelatedBlogReportCard } from "@/app/components/related-blog-report-card";
+import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary } from "@/app/components/review-summary";
 import { SafeMarkdown } from "@/app/components/safe-markdown";
@@ -85,9 +86,6 @@ export const revalidate = 300;
 const getCachedPublicSiteDetail = cache((slug: string) =>
   getPublicSiteDetail(slug),
 );
-
-const primarySubmissionActionClassName =
-  "inline-flex min-h-11 w-full items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-center text-sm font-semibold leading-5 text-white transition hover:bg-accent/80 active:scale-95";
 
 function getDomainAge(value: string) {
   if (!value) return "확인 불가";
@@ -693,14 +691,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 승인된 공개 제보 기준으로 요약하며, 제보 내용은 참고 자료입니다.
               </p>
             </div>
-            <div className="w-full sm:w-auto sm:shrink-0">
-              <Link
-                href={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
-                className={primarySubmissionActionClassName}
-              >
-                {site.siteName} 먹튀 피해 제보하기
-              </Link>
-            </div>
           </div>
           {visibleScamReports.length > 0 ? (
             <div className="grid gap-3 p-4">
@@ -740,12 +730,31 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   {site.siteName} 먹튀 제보 현황 {scamReports.length}건 보기
                 </Link>
               ) : null}
+              <p className="text-sm leading-6 text-muted">
+                추가 피해 사례가 있다면 확인 가능한 정보를 중심으로{" "}
+                <Link
+                  href={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
+                  className="font-semibold text-accent transition hover:text-accent/80"
+                >
+                  제보를 남겨주세요
+                </Link>
+                .
+              </p>
             </div>
           ) : (
-            <div className="px-5 py-4">
-              <p className="text-sm text-muted">
-                공개된 먹튀 제보가 없습니다
+            <div className="px-5 py-5">
+              <h3 className="text-base font-bold text-foreground">
+                현재 공개된 승인 먹튀 제보가 없습니다
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                피해 사례가 있다면 확인 가능한 정보를 중심으로 제보를 남겨주세요.
               </p>
+              <Link
+                href={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
+                className="mt-4 inline-flex min-h-10 items-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
+              >
+                {site.siteName} 먹튀 피해 제보하기
+              </Link>
             </div>
           )}
         </section>
@@ -768,14 +777,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               <h2 className="mt-1 text-base font-bold">
                 {splitEnabled ? "최근 이용 경험 요약" : "최근 이용 경험"}
               </h2>
-            </div>
-            <div className="w-full sm:w-auto sm:shrink-0">
-              <Link
-                href={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
-                className={primarySubmissionActionClassName}
-              >
-                {site.siteName} 후기 남기기
-              </Link>
             </div>
           </div>
           {visibleReviews.length > 0 ? (
@@ -814,10 +815,31 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   {site.siteName} 후기 데이터 {reviews.length}건 보기
                 </Link>
               ) : null}
+              <p className="text-sm leading-6 text-muted">
+                이용 경험이 있다면{" "}
+                <Link
+                  href={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
+                  className="font-semibold text-accent transition hover:text-accent/80"
+                >
+                  후기를 남겨주세요
+                </Link>
+                .
+              </p>
             </div>
           ) : (
-            <div className="px-5 py-4">
-              <p className="text-sm text-muted">승인된 리뷰 없음</p>
+            <div className="px-5 py-5">
+              <h3 className="text-base font-bold text-foreground">
+                현재 공개된 승인 후기가 없습니다
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                이용 경험이 있다면 후기를 남겨주세요.
+              </p>
+              <Link
+                href={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
+                className="mt-4 inline-flex min-h-10 items-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
+              >
+                {site.siteName} 후기 남기기
+              </Link>
             </div>
           )}
         </section>
@@ -830,6 +852,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             siteName={site.siteName}
             reduced={!indexability.shouldIndex}
           />
+
+          <ResponsibleUseNotice variant="compact" />
 
           <RelatedBlogReportCard
             siteName={site.siteName}

@@ -202,12 +202,14 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
                   {buildReviewInterpretationNotice(site.siteName, reviews.length)}
                 </p>
               </div>
-              <Link
-                href={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
-                className="inline-flex min-h-10 items-center justify-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
-              >
-                후기 작성
-              </Link>
+              {reviews.length > 0 ? (
+                <Link
+                  href={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
+                  className="inline-flex min-h-10 items-center justify-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
+                >
+                  {site.siteName} 후기 남기기
+                </Link>
+              ) : null}
             </div>
           </section>
 
@@ -252,9 +254,9 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
             <>
               <SiteEmptyState
                 title="현재 승인된 후기가 없습니다"
-                description={`${site.siteName} 관련 공개 승인 후기는 아직 없습니다. 작성된 후기가 검토를 통과하면 이 페이지에 표시됩니다.`}
+                description={`현재 공개된 승인 후기가 없습니다. 이용 경험이 있다면 후기를 남겨주세요.`}
                 actionHref={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
-                actionLabel="후기 작성"
+                actionLabel={`${site.siteName} 후기 남기기`}
               />
               <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
                 <h2 className="text-lg font-bold text-foreground">

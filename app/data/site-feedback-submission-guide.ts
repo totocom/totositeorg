@@ -35,9 +35,9 @@ export function buildSiteFeedbackSubmissionGuide({
   const scamReportHref = `/submit-scam-report?siteId=${encodedSiteId}`;
 
   return {
-    title: "후기 및 제보 등록",
+    title: "후기 및 제보 등록 안내",
     paragraphs: [
-      `${normalizedSiteName} 관련 승인 후기와 피해 제보는 관리자 검토 후 공개 정보에 반영됩니다.`,
+      `${normalizedSiteName}에 대한 이용 후기나 피해 제보가 있다면 확인 가능한 정보를 중심으로 남겨주세요. 제출된 내용은 관리자 검토 후 공개 정보에 반영될 수 있습니다.`,
       "허위 제보, 광고성 후기, 개인정보가 포함된 내용은 승인되지 않을 수 있습니다.",
     ],
     reviewHref,

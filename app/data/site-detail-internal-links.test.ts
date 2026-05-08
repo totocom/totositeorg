@@ -147,7 +147,7 @@ test("site detail page uses the same two-column detail layout as blog posts", ()
   );
   assert.match(
     siteDetailPageSource,
-    /<aside className="grid content-start gap-4">[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<SiteShareActions[\s\S]*?<\/aside>/,
+    /<aside className="grid content-start gap-4">[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<ResponsibleUseNotice variant="compact" \/>[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<SiteShareActions[\s\S]*?<\/aside>/,
   );
   assert.doesNotMatch(
     siteDetailPageSource,
@@ -230,35 +230,32 @@ test("site detail sections do not render duplicate review and scam report action
   assert.doesNotMatch(siteDetailPageSource, /<SiteAuthorActions\b/);
 });
 
-test("site detail review submission action is rendered in the review section header", () => {
+test("site detail review submission action is not duplicated as a large section header CTA", () => {
   const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
 
-  assert.match(
-    siteDetailPageSource,
-    /const primarySubmissionActionClassName =\s*"inline-flex min-h-11 w-full items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-center text-sm font-semibold leading-5 text-white transition hover:bg-accent\/80 active:scale-95"/,
-  );
   assert.match(
     siteDetailPageSource,
     /href=\{`\/submit-review\?siteId=\$\{encodeURIComponent\(site\.id\)\}`\}/,
   );
   assert.match(siteDetailPageSource, /\{site\.siteName\} 후기 남기기/);
+  assert.match(siteDetailPageSource, /이용 경험이 있다면[\s\S]*?후기를 남겨주세요/);
   assert.match(
+    siteDetailPageSource,
+    /현재 공개된 승인 후기가 없습니다[\s\S]*?이용 경험이 있다면 후기를 남겨주세요/,
+  );
+  assert.doesNotMatch(
     siteDetailPageSource,
     /<p className="text-xs font-semibold uppercase tracking-wider text-accent">커뮤니티 리뷰<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">[\s\S]*?splitEnabled \? "최근 이용 경험 요약" : "최근 이용 경험"[\s\S]*?<\/h2>[\s\S]*?primarySubmissionActionClassName/,
   );
 });
 
-test("site detail scam report submission action is rendered in the scam reports section header", () => {
+test("site detail scam report submission action is not duplicated as a large section header CTA", () => {
   const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
   const feedbackSubmissionGuideSource = readFileSync(
     "app/components/site-feedback-submission-guide.tsx",
     "utf8",
   );
 
-  assert.match(
-    siteDetailPageSource,
-    /const primarySubmissionActionClassName =\s*"inline-flex min-h-11 w-full items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-center text-sm font-semibold leading-5 text-white transition hover:bg-accent\/80 active:scale-95"/,
-  );
   assert.doesNotMatch(siteDetailPageSource, /scamReportSubmissionActionClassName/);
   assert.match(
     siteDetailPageSource,
@@ -266,6 +263,14 @@ test("site detail scam report submission action is rendered in the scam reports 
   );
   assert.match(siteDetailPageSource, /\{site\.siteName\} 먹튀 피해 제보하기/);
   assert.match(
+    siteDetailPageSource,
+    /추가 피해 사례가 있다면 확인 가능한 정보를 중심으로[\s\S]*?제보를 남겨주세요/,
+  );
+  assert.match(
+    siteDetailPageSource,
+    /현재 공개된 승인 먹튀 제보가 없습니다[\s\S]*?피해 사례가 있다면 확인 가능한 정보를 중심으로 제보를 남겨주세요/,
+  );
+  assert.doesNotMatch(
     siteDetailPageSource,
     /<p className="text-xs font-semibold uppercase tracking-wider text-accent">먹튀 제보 현황<\/p>[\s\S]*?<h2 className="mt-1 text-base font-bold">[\s\S]*?splitEnabled \? "최근 승인된 피해 제보" : "승인된 피해 제보"[\s\S]*?<\/h2>[\s\S]*?primarySubmissionActionClassName/,
   );
@@ -346,9 +351,9 @@ test("feedback submission guide copy and actions use review and report routes", 
   ].join("\n");
   const buttonLabels = guide.actions.map((action) => action.label).join("\n");
 
-  assert.equal(guide.title, "후기 및 제보 등록");
-  assert.match(combinedCopy, /벳톡 관련 승인 후기와 피해 제보/);
-  assert.match(combinedCopy, /관리자 검토 후 공개 정보에 반영/);
+  assert.equal(guide.title, "후기 및 제보 등록 안내");
+  assert.match(combinedCopy, /벳톡에 대한 이용 후기나 피해 제보가 있다면/);
+  assert.match(combinedCopy, /제출된 내용은 관리자 검토 후 공개 정보에 반영될 수 있습니다/);
   assert.match(
     combinedCopy,
     /개인정보가 포함된 내용은 승인되지 않을 수 있습니다/,

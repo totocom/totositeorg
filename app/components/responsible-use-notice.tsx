@@ -11,11 +11,25 @@ const responsibleUseExternalLinks = [
   },
 ] as const;
 
+const shortResponsibleUseNotice =
+  "본 사이트는 이용자 경험 공유와 정보 제공을 위한 플랫폼이며, 특정 사이트 이용이나 가입을 권장하지 않습니다. 후기와 제보는 참고 자료이며, 단일 정보만으로 사이트 전체 상태를 단정하지 않는 것이 좋습니다.";
+
 export function ResponsibleUseNotice({
   variant = "footer",
 }: {
-  variant?: "footer" | "card";
+  variant?: "footer" | "card" | "compact";
 }) {
+  if (variant === "compact") {
+    return (
+      <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+        <h2 className="text-base font-bold text-foreground">책임 있는 이용 안내</h2>
+        <p className="mt-3 text-sm leading-7 text-muted">
+          {shortResponsibleUseNotice}
+        </p>
+      </section>
+    );
+  }
+
   if (variant === "card") {
     return (
       <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
@@ -47,11 +61,9 @@ export function ResponsibleUseNotice({
       <h2 className="text-xs font-bold uppercase tracking-wide text-white/40">
         책임 있는 이용 안내
       </h2>
-      <ul className="mt-2 grid gap-1 text-xs leading-6 text-white/30">
-        {responsibleUseNotice.map((notice) => (
-          <li key={notice}>{notice}</li>
-        ))}
-      </ul>
+      <p className="mt-2 max-w-xl text-xs leading-6 text-white/35">
+        {shortResponsibleUseNotice}
+      </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {responsibleUseExternalLinks.map((link) => (
           <a

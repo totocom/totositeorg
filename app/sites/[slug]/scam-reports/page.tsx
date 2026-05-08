@@ -185,12 +185,14 @@ export default async function SiteScamReportsPage({
                   )}
                 </p>
               </div>
-              <Link
-                href={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
-                className="inline-flex min-h-10 items-center justify-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
-              >
-                먹튀 제보 작성
-              </Link>
+              {scamReports.length > 0 ? (
+                <Link
+                  href={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
+                  className="inline-flex min-h-10 items-center justify-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
+                >
+                  {site.siteName} 먹튀 피해 제보하기
+                </Link>
+              ) : null}
             </div>
           </section>
 
@@ -249,9 +251,9 @@ export default async function SiteScamReportsPage({
             <>
               <SiteEmptyState
                 title="공개된 먹튀 제보가 없습니다"
-                description={`${site.siteName} 관련 공개 제보는 아직 없습니다. 접수된 내용이 관리자 검토를 통과하면 이 페이지에 표시됩니다.`}
+                description={`현재 공개된 승인 먹튀 제보가 없습니다. 피해 사례가 있다면 확인 가능한 정보를 중심으로 제보를 남겨주세요.`}
                 actionHref={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
-                actionLabel="먹튀 제보 작성"
+                actionLabel={`${site.siteName} 먹튀 피해 제보하기`}
               />
               <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
                 <h2 className="text-lg font-bold text-foreground">

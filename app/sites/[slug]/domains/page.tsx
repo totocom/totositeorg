@@ -400,7 +400,7 @@ export default async function SiteDomainsPage({ params }: SiteDomainsPageProps) 
             </ul>
           </section>
           <SiteDomainFaq context={context} />
-          <ResponsibleUseNotice variant="card" />
+          <ResponsibleUseNotice variant="compact" />
         </div>
       </main>
     </>
