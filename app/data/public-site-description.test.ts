@@ -17,6 +17,7 @@ import {
   calculateSiteTrustScore,
   getApprovedScamReportStatusCopy,
   scamReportScoreLabel,
+  siteTrustScoreWeights,
 } from "./sites";
 import { siteDescription, siteName } from "../../lib/config";
 
@@ -39,6 +40,52 @@ test("site detail copy does not render 먹튀 없음 for empty approved reports"
   assert.equal(publicText.includes("먹튀 없음"), false);
   assert.equal(publicText.includes("공개된 먹튀 제보가 없습니다"), true);
   assert.equal(publicText.includes("피해 제보 현황 점수"), true);
+});
+
+test("calculateSiteTrustScore applies scam review and domain weights", () => {
+  const score = calculateSiteTrustScore({
+    averageRating: 4,
+    reviewCount: 1,
+    scamReportCount: 1,
+  });
+  const expectedTotal = Math.round(
+    (score.scamRisk * siteTrustScoreWeights.scamRisk +
+      score.userExperience * siteTrustScoreWeights.userExperience +
+      score.domainAge * siteTrustScoreWeights.domainAge) /
+      100,
+  );
+
+  assert.equal(score.scamRisk, 50);
+  assert.equal(score.userExperience, 56);
+  assert.equal(score.domainAge, 24);
+  assert.equal(score.total, expectedTotal);
+  assert.equal(score.total, 42);
+});
+
+test("calculateSiteTrustScore subtracts 50 points per approved scam report", () => {
+  const baseParams = {
+    averageRating: 0,
+    reviewCount: 0,
+    scamDamageAmount: 10_000_000,
+    scamDamageAmountUnknownCount: 1,
+  };
+
+  assert.equal(
+    calculateSiteTrustScore({ ...baseParams, scamReportCount: 0 }).scamRisk,
+    100,
+  );
+  assert.equal(
+    calculateSiteTrustScore({ ...baseParams, scamReportCount: 1 }).scamRisk,
+    50,
+  );
+  assert.equal(
+    calculateSiteTrustScore({ ...baseParams, scamReportCount: 2 }).scamRisk,
+    0,
+  );
+  assert.equal(
+    calculateSiteTrustScore({ ...baseParams, scamReportCount: 3 }).scamRisk,
+    0,
+  );
 });
 
 test("site title header footer copy does not expose 토토사이트 추천", () => {

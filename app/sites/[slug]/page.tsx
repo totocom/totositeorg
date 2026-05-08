@@ -45,7 +45,7 @@ import {
   formatRatingScore,
   formatTrustScore,
   getApprovedScamReportStatusCopy,
-  scamReportScoreLabel,
+  siteTrustScoreWeights,
   getTrustScoreTone,
 } from "@/app/data/sites";
 import { siteUrl } from "@/lib/config";
@@ -155,9 +155,11 @@ function getTrustToneClasses(tone: string) {
 
 function TrustScoreMetric({
   label,
+  weightLabel,
   value,
 }: {
   label: string;
+  weightLabel?: string;
   value: number;
 }) {
   const percentage = Math.max(0, Math.min(100, value));
@@ -165,8 +167,15 @@ function TrustScoreMetric({
 
   return (
     <div className="rounded-lg border border-line bg-background p-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold text-muted">{label}</span>
+      <div className="flex items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="block text-xs font-semibold text-muted">{label}</span>
+          {weightLabel ? (
+            <span className="mt-0.5 block text-[11px] font-semibold text-muted/80">
+              {weightLabel}
+            </span>
+          ) : null}
+        </span>
         <span className={`text-sm font-black ${toneClasses.text}`}>
           {value}/100
         </span>
@@ -564,16 +573,19 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               <TrustScoreMetric
-                label={scamReportScoreLabel}
+                label="먹튀 제보"
+                weightLabel={`${siteTrustScoreWeights.scamRisk}% 반영`}
                 value={trustScore.scamRisk}
               />
               <TrustScoreMetric
-                label="도메인 운영 이력"
-                value={trustScore.domainAge}
+                label="후기"
+                weightLabel={`${siteTrustScoreWeights.userExperience}% 반영`}
+                value={trustScore.userExperience}
               />
               <TrustScoreMetric
-                label="이용자 경험"
-                value={trustScore.userExperience}
+                label="도메인"
+                weightLabel={`${siteTrustScoreWeights.domainAge}% 반영`}
+                value={trustScore.domainAge}
               />
             </div>
             <p className="mt-3 text-xs leading-5 text-muted">

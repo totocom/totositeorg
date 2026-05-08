@@ -5,7 +5,12 @@ import { useMemo, useState } from "react";
 import type { PublicSiteListItem } from "@/app/data/public-site-list-item";
 import { formatKoreanDate } from "@/app/data/public-display";
 
-type DomainSortOption = "domain_age" | "domain_count" | "site_name" | "reviews";
+type DomainSortOption =
+  | "domain_age"
+  | "latest"
+  | "domain_count"
+  | "site_name"
+  | "reviews";
 
 type PublicDomainListProps = {
   sites: PublicSiteListItem[];
@@ -24,6 +29,13 @@ function getOldestDomainTime(site: PublicSiteListItem) {
 
   const time = new Date(site.oldestDomainCreationDate).getTime();
   return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
+}
+
+function getCreatedTime(site: PublicSiteListItem) {
+  if (!site.createdAt) return Number.NEGATIVE_INFINITY;
+
+  const time = new Date(site.createdAt).getTime();
+  return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
 }
 
 function formatDomainAge(value: string | undefined) {
@@ -79,6 +91,10 @@ export function PublicDomainList({ sites }: PublicDomainListProps) {
           .includes(normalizedQuery);
       })
       .sort((first, second) => {
+        if (sortOption === "latest") {
+          return getCreatedTime(second) - getCreatedTime(first);
+        }
+
         if (sortOption === "domain_count") {
           return getDomains(second).length - getDomains(first).length;
         }
@@ -130,6 +146,7 @@ export function PublicDomainList({ sites }: PublicDomainListProps) {
             }}
             className="h-11 rounded-lg border border-line bg-background px-3 text-sm text-foreground transition focus:border-accent focus:outline-none"
           >
+            <option value="latest">최신 등록순</option>
             <option value="domain_age">운영 이력 오래된순</option>
             <option value="domain_count">도메인 많은순</option>
             <option value="site_name">사이트명순</option>

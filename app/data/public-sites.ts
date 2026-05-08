@@ -26,7 +26,7 @@ import { supabase } from "../../lib/supabase/client";
 import { unstable_cache } from "next/cache";
 
 const PUBLIC_SITE_SELECT =
-  "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, category, available_states, license_info, resolved_ips, dns_checked_at, description";
+  "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, category, available_states, license_info, resolved_ips, dns_checked_at, created_at, description";
 
 type PublicSiteRow = SiteCrawlSnapshotSiteColumns & {
   id: string;
@@ -45,6 +45,7 @@ type PublicSiteRow = SiteCrawlSnapshotSiteColumns & {
   license_info: string;
   resolved_ips?: string[] | null;
   dns_checked_at?: string | null;
+  created_at?: string | null;
   description: string;
 };
 
@@ -245,6 +246,7 @@ function mapSiteRow(
     licenseInfo: site.license_info,
     status: "운영 중",
     moderationStatus: "approved",
+    createdAt: site.created_at ?? undefined,
     shortDescription: normalizePublicSiteDescription(site.description),
     averageRating,
     reviewCount,

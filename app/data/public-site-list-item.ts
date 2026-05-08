@@ -17,6 +17,7 @@ export type PublicSiteListItem = {
   scamDamageAmountUnknownCount?: number;
   resolvedIps?: string[];
   domainSearchText: string;
+  createdAt?: string;
   oldestDomainCreationDate?: string;
   trustScore?: SiteTrustScore;
 };
@@ -58,6 +59,7 @@ export function toPublicSiteListItem(site: ReviewTarget): PublicSiteListItem {
     scamDamageAmountUnknownCount: site.scamDamageAmountUnknownCount,
     resolvedIps: site.resolvedIps ?? [],
     domainSearchText: searchParts.join(" ").toLowerCase(),
+    createdAt: site.createdAt,
     oldestDomainCreationDate: site.oldestDomainCreationDate,
     trustScore: site.trustScore,
   };

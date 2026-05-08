@@ -33,6 +33,7 @@ export type ReviewTarget = {
   licenseInfo: string;
   status: SiteStatus;
   moderationStatus: ModerationStatus;
+  createdAt?: string;
   shortDescription: string;
   averageRating: number;
   reviewCount: number;
@@ -56,6 +57,11 @@ export type SiteTrustScore = {
 };
 
 export const scamReportScoreLabel = "피해 제보 현황 점수";
+export const siteTrustScoreWeights = {
+  scamRisk: 50,
+  userExperience: 15,
+  domainAge: 35,
+} as const;
 
 export function getApprovedScamReportStatusCopy(scamReportCount = 0) {
   if (scamReportCount > 0) {
@@ -161,34 +167,8 @@ function getDomainAgeMonths(oldestDomainCreationDate?: string) {
   );
 }
 
-function calculateScamRiskScore(
-  scamReportCount = 0,
-  scamDamageAmount = 0,
-  scamDamageAmountUnknownCount = 0,
-) {
-  let score = 100;
-
-  if (scamReportCount >= 4) {
-    score = 10;
-  } else if (scamReportCount >= 2) {
-    score = 40;
-  } else if (scamReportCount === 1) {
-    score = 70;
-  }
-
-  if (scamDamageAmount >= 10_000_000) {
-    score -= 30;
-  } else if (scamDamageAmount >= 5_000_000) {
-    score -= 20;
-  } else if (scamDamageAmount >= 1_000_000) {
-    score -= 10;
-  }
-
-  if (scamDamageAmountUnknownCount > 0) {
-    score -= 6;
-  }
-
-  return Math.max(0, Math.round(score));
+function calculateScamRiskScore(scamReportCount = 0) {
+  return Math.max(0, 100 - Math.max(0, scamReportCount) * 50);
 }
 
 function calculateDomainAgeScore(oldestDomainCreationDate?: string) {
@@ -236,22 +216,25 @@ export function calculateSiteTrustScore(params: {
   oldestDomainCreationDate?: string;
 }): SiteTrustScore {
   const scamReportCount = params.scamReportCount ?? 0;
-  const scamDamageAmount = params.scamDamageAmount ?? 0;
-  const scamDamageAmountUnknownCount = params.scamDamageAmountUnknownCount ?? 0;
-  const scamRisk = calculateScamRiskScore(
-    scamReportCount,
-    scamDamageAmount,
-    scamDamageAmountUnknownCount,
-  );
+  const scamRisk = calculateScamRiskScore(scamReportCount);
   const domainAge = calculateDomainAgeScore(params.oldestDomainCreationDate);
   const userExperience = calculateUserExperienceScore(
     params.averageRating,
     params.reviewCount,
   );
-  const rawTotal = Math.max(0, Math.min(300, scamRisk + domainAge + userExperience));
+  const rawTotal = Math.max(
+    0,
+    Math.min(
+      100,
+      (scamRisk * siteTrustScoreWeights.scamRisk +
+        userExperience * siteTrustScoreWeights.userExperience +
+        domainAge * siteTrustScoreWeights.domainAge) /
+        100,
+    ),
+  );
 
   return {
-    total: Math.round(rawTotal / 3),
+    total: Math.round(rawTotal),
     rawTotal,
     scamRisk,
     domainAge,
