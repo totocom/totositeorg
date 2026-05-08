@@ -17,7 +17,7 @@ import { siteName, siteUrl } from "@/lib/config";
 export const revalidate = 300;
 
 const sitesH1 = "토토사이트 목록과 사이트별 정보 비교";
-const sitesMetaTitle = "토토사이트 목록과 리뷰·먹튀 제보 비교 | Totosite.ORG";
+const sitesMetaTitle = "토토사이트 목록과 리뷰·먹튀 제보 비교 | 토토사이트 정보";
 const sitesDescription =
   "토토사이트 목록을 검색하고 사이트별 정보를 비교하세요. 신뢰 점수, 운영 이력, 이용자 리뷰, 먹튀 제보, 도메인 정보를 함께 확인할 수 있습니다.";
 const sitesCanonical = `${siteUrl}/sites`;
