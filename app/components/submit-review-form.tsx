@@ -174,6 +174,7 @@ export function SubmitReviewForm({
   const [existingReviewStatus, setExistingReviewStatus] =
     useState<ExistingReview["status"] | null>(null);
   const isAdminEditingReview = isAdmin && isUuid(normalizedReviewId);
+  const canEditReviewAuthorName = isAdmin && Boolean(existingReviewId);
   const isSiteFixed = Boolean(normalizedSelectedSiteId);
 
   const selectedSiteName = useMemo(() => {
@@ -370,7 +371,7 @@ export function SubmitReviewForm({
         "승인된 사이트 정보가 아직 Supabase와 연결되지 않았습니다.";
     }
     if (!user) nextErrors.siteId = "로그인 후 만족도 평가를 작성할 수 있습니다.";
-    if (isAdminEditingReview && !isValidAdminAuthorName(adminAuthorName)) {
+    if (canEditReviewAuthorName && !isValidAdminAuthorName(adminAuthorName)) {
       nextErrors.adminAuthorName = "작성자는 비워두거나 2~20자로 입력해주세요.";
     }
 
@@ -416,14 +417,14 @@ export function SubmitReviewForm({
         title,
         experience,
         issue_type: "general" satisfies SiteReview["issueType"],
-        ...(isAdminEditingReview
+        ...(canEditReviewAuthorName
           ? { reviewer_name: normalizedAdminAuthorName || null }
           : existingReviewId
             ? {}
             : { reviewer_name: null }),
         reviewer_email: null,
         status:
-          isAdminEditingReview && existingReviewStatus
+          canEditReviewAuthorName && existingReviewStatus
             ? existingReviewStatus
             : "pending",
     };
@@ -473,18 +474,18 @@ export function SubmitReviewForm({
       return;
     }
 
-    const notificationError = savedReview?.id && !isAdminEditingReview
+    const notificationError = savedReview?.id && !canEditReviewAuthorName
       ? await sendContentSubmittedNotification(savedReview.id)
       : "";
 
     setSuccessMessage(
-      isAdminEditingReview
+      canEditReviewAuthorName
         ? "관리자 수정 내용이 저장되었습니다."
         : notificationError
           ? `만족도 평가가 관리자 검토 대기 상태로 ${existingReviewId ? "수정" : "접수"}되었습니다. ${notificationError}`
           : `만족도 평가가 관리자 검토 대기 상태로 ${existingReviewId ? "수정" : "접수"}되었습니다.`,
     );
-    if (!isAdminEditingReview) {
+    if (!canEditReviewAuthorName) {
       setValues(initialValues(siteOptions, normalizedSelectedSiteId));
       const selectedSite = siteOptions.find(
         (site) => site.id === normalizedSelectedSiteId,
@@ -586,7 +587,7 @@ export function SubmitReviewForm({
       {successMessage ? (
         <div className="rounded-md border border-accent bg-accent-soft px-4 py-3 text-sm font-semibold text-accent">
           {successMessage}
-          {isAdminEditingReview ? "" : " 관리자 검토 후 공개됩니다."}
+          {canEditReviewAuthorName ? "" : " 관리자 검토 후 공개됩니다."}
         </div>
       ) : null}
 
@@ -598,7 +599,7 @@ export function SubmitReviewForm({
 
       {existingReviewId ? (
         <div className="rounded-md border border-accent bg-accent-soft px-4 py-3 text-sm font-semibold text-accent">
-          {isAdminEditingReview
+          {canEditReviewAuthorName
             ? "관리자 수정 모드입니다. 저장해도 현재 검토 상태가 유지됩니다."
             : "이 사이트에 이미 작성한 만족도 평가가 있습니다. 수정 후 제출하면 관리자 승인 대기 상태로 변경됩니다."}
           {existingReviewStatus
@@ -607,7 +608,7 @@ export function SubmitReviewForm({
         </div>
       ) : null}
 
-      {isAdminEditingReview ? (
+      {canEditReviewAuthorName ? (
         <label
           className="grid gap-1 text-sm font-medium"
           data-error-key="adminAuthorName"
@@ -795,7 +796,7 @@ export function SubmitReviewForm({
       >
         {formStatus === "submitting"
           ? "저장 중..."
-          : isAdminEditingReview
+          : canEditReviewAuthorName
             ? "관리자 리뷰 수정 저장"
             : existingReviewId
             ? "만족도 평가 수정 제출"

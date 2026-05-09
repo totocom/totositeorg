@@ -289,6 +289,7 @@ export function ScamReportForm({
   const [existingReviewStatus, setExistingReviewStatus] =
     useState<ExistingReview["status"] | null>(null);
   const isAdminEditingReport = isAdmin && isUuid(normalizedReportId);
+  const canEditReportAuthorName = isAdmin && Boolean(existingReportId);
   const isSiteFixed = Boolean(normalizedSelectedSiteId);
 
   const selectedSite = useMemo(
@@ -507,7 +508,7 @@ export function ScamReportForm({
         "승인된 사이트 정보가 아직 Supabase와 연결되지 않았습니다.";
     }
     if (!user) nextErrors.siteId = "로그인 후 먹튀 피해 제보를 작성할 수 있습니다.";
-    if (isAdminEditingReport && !isValidAdminAuthorName(adminAuthorName)) {
+    if (canEditReportAuthorName && !isValidAdminAuthorName(adminAuthorName)) {
       nextErrors.adminAuthorName = "작성자는 비워두거나 2~20자로 입력해주세요.";
     }
     if (!values.incidentDate) nextErrors.incidentDate = "발생 일자를 입력해주세요.";
@@ -578,7 +579,7 @@ export function ScamReportForm({
 
     const reportPayload = {
         site_id: values.siteId,
-        ...(isAdminEditingReport
+        ...(canEditReportAuthorName
           ? { reporter_name: normalizedAdminAuthorName || null }
           : {}),
         incident_date: values.incidentDate,
@@ -616,12 +617,12 @@ export function ScamReportForm({
         privacy_masking_agreement: values.privacyMaskingAgreement,
         false_report_agreement: values.falseReportAgreement,
         review_status:
-          isAdminEditingReport && existingReportStatus
+          canEditReportAuthorName && existingReportStatus
             ? existingReportStatus
             : "pending",
-        is_published: isAdminEditingReport ? existingReportIsPublished : false,
+        is_published: canEditReportAuthorName ? existingReportIsPublished : false,
       };
-    const reportUpdatePayload = isAdminEditingReport
+    const reportUpdatePayload = canEditReportAuthorName
       ? reportPayload
       : {
           ...reportPayload,
@@ -668,15 +669,15 @@ export function ScamReportForm({
       return;
     }
 
-    const notificationError = savedReport?.id && !isAdminEditingReport
+    const notificationError = savedReport?.id && !canEditReportAuthorName
       ? await sendContentSubmittedNotification(savedReport.id)
       : "";
 
-    if (!isAdminEditingReport) {
+    if (!canEditReportAuthorName) {
       setValues(initialFormValues(normalizedSelectedSiteId || values.siteId));
     }
     setSuccessMessage(
-      isAdminEditingReport
+      canEditReportAuthorName
         ? "관리자 수정 내용이 저장되었습니다."
         : notificationError
           ? `먹튀 피해 제보가 관리자 승인 대기 상태로 ${existingReportId ? "수정" : "접수"}되었습니다. ${notificationError}`
@@ -855,7 +856,7 @@ export function ScamReportForm({
           {existingReportId ? (
             <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
               <p className="font-semibold">
-                {isAdminEditingReport
+                {canEditReportAuthorName
                   ? "관리자 수정 모드입니다. 저장해도 현재 검토 상태와 공개 여부가 유지됩니다."
                   : "이미 작성한 먹튀 피해 제보가 있습니다. 작성한 글을 수정해서 다시 제출할 수 있습니다."}
                 {existingReportStatus
@@ -895,7 +896,7 @@ export function ScamReportForm({
         className="mt-5 grid gap-5"
         noValidate
       >
-          {isAdminEditingReport ? (
+          {canEditReportAuthorName ? (
             <label
               className="grid gap-1 text-sm font-medium"
               data-error-key="adminAuthorName"
@@ -1119,7 +1120,7 @@ export function ScamReportForm({
           >
             {isSubmitting
               ? "제출 중..."
-              : isAdminEditingReport
+              : canEditReportAuthorName
                 ? "관리자 먹튀 제보 수정 저장"
                 : existingReportId
                 ? "먹튀 피해 제보 수정 제출"

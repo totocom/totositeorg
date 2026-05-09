@@ -15,6 +15,14 @@ const adminDashboardSource = readFileSync(
   "app/components/admin-dashboard.tsx",
   "utf8",
 );
+const submitReviewFormSource = readFileSync(
+  "app/components/submit-review-form.tsx",
+  "utf8",
+);
+const scamReportFormSource = readFileSync(
+  "app/components/scam-report-form.tsx",
+  "utf8",
+);
 
 type SitemapLoaderOptions = NonNullable<
   Parameters<typeof getPublicSitesForSitemapUncached>[0]
@@ -129,6 +137,21 @@ test("public site detail loader only selects public site columns and public rows
   assert.match(publicSitesSource, /\.select\(PUBLIC_SITE_SELECT\)[\s\S]*?\.eq\("slug",\s*slug\)[\s\S]*?\.eq\("status",\s*"approved"\)/);
   assert.match(publicSitesSource, /\.from\("scam_reports"\)[\s\S]*?\.eq\("review_status",\s*"approved"\)[\s\S]*?\.eq\("is_published",\s*true\)/);
   assert.match(publicSitesSource, /\.from\("blog_posts"\)[\s\S]*?\.eq\("status",\s*"published"\)[\s\S]*?\.eq\("legal_review_status",\s*"approved"\)/);
+});
+
+test("admin content author names override profile nicknames on public pages", () => {
+  assert.match(
+    publicSitesSource,
+    /const\s+storedAuthorName\s*=\s*fallbackName\?\.trim\(\);[\s\S]*?if\s*\(storedAuthorName\)\s*\{[\s\S]*?return\s+storedAuthorName;[\s\S]*?if\s*\(userId\s*&&\s*nicknameMap\.has\(userId\)\)/,
+  );
+  assert.match(
+    submitReviewFormSource,
+    /const\s+canEditReviewAuthorName\s*=\s*isAdmin\s*&&\s*Boolean\(existingReviewId\);/,
+  );
+  assert.match(
+    scamReportFormSource,
+    /const\s+canEditReportAuthorName\s*=\s*isAdmin\s*&&\s*Boolean\(existingReportId\);/,
+  );
 });
 
 test("admin moderation deletes revalidate public site caches", () => {

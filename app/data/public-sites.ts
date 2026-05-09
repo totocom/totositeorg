@@ -289,11 +289,17 @@ function getAuthorNickname(
   nicknameMap: Map<string, string>,
   fallbackName?: string | null,
 ) {
+  const storedAuthorName = fallbackName?.trim();
+
+  if (storedAuthorName) {
+    return storedAuthorName;
+  }
+
   if (userId && nicknameMap.has(userId)) {
     return nicknameMap.get(userId) ?? null;
   }
 
-  return fallbackName?.trim() || null;
+  return null;
 }
 
 function mapReviewRow(
