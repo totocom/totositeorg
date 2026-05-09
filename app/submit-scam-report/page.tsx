@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 type SubmitScamReportPageProps = {
   searchParams?: Promise<{
     siteId?: string;
+    reportId?: string;
   }>;
 };
 
@@ -23,6 +24,7 @@ export default async function SubmitScamReportPage({
 }: SubmitScamReportPageProps) {
   const params = await searchParams;
   const selectedSiteId = params?.siteId?.trim() ?? "";
+  const reportId = params?.reportId?.trim() ?? "";
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-5 sm:px-6 lg:px-8">
@@ -38,7 +40,7 @@ export default async function SubmitScamReportPage({
         </p>
       </div>
 
-      <ScamReportForm selectedSiteId={selectedSiteId} />
+      <ScamReportForm selectedSiteId={selectedSiteId} reportId={reportId} />
       <div className="mt-5">
         <ResponsibleUseNotice variant="card" />
       </div>

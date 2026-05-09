@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase/client";
 
 type ScamReportFormProps = {
   selectedSiteId?: string;
+  reportId?: string;
 };
 
 type ScamReportSiteOption = {
@@ -69,6 +70,7 @@ type ExistingScamReport = {
   privacy_masking_agreement: boolean;
   false_report_agreement: boolean;
   review_status: "pending" | "approved" | "rejected";
+  is_published: boolean;
 };
 
 type ExistingReview = {
@@ -252,9 +254,13 @@ function isUuid(value: string) {
   );
 }
 
-export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
+export function ScamReportForm({
+  selectedSiteId = "",
+  reportId = "",
+}: ScamReportFormProps) {
   const normalizedSelectedSiteId = selectedSiteId.trim();
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const normalizedReportId = reportId.trim();
+  const { user, isAdmin, isLoading: isAuthLoading } = useAuth();
   const sectionRef = useRef<HTMLElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [siteOptions, setSiteOptions] = useState<ScamReportSiteOption[]>([]);
@@ -271,8 +277,11 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
   const [existingReportId, setExistingReportId] = useState<string | null>(null);
   const [existingReportStatus, setExistingReportStatus] =
     useState<ExistingScamReport["review_status"] | null>(null);
+  const [existingReportIsPublished, setExistingReportIsPublished] =
+    useState(false);
   const [existingReviewStatus, setExistingReviewStatus] =
     useState<ExistingReview["status"] | null>(null);
+  const isAdminEditingReport = isAdmin && isUuid(normalizedReportId);
   const isSiteFixed = Boolean(normalizedSelectedSiteId);
 
   const selectedSite = useMemo(
@@ -375,25 +384,32 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
     async function loadExistingContent() {
       setExistingReportId(null);
       setExistingReportStatus(null);
+      setExistingReportIsPublished(false);
       setExistingReviewStatus(null);
 
-      if (!user || !isUuid(values.siteId)) return;
+      if (!user) return;
+      if (!isAdminEditingReport && !isUuid(values.siteId)) return;
+
+      const reportQuery = supabase
+        .from("scam_reports")
+        .select(
+          "id, site_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, evidence_image_urls, privacy_masking_agreement, false_report_agreement, review_status, is_published",
+        );
+      const reportRequest = isAdminEditingReport
+        ? reportQuery.eq("id", normalizedReportId).limit(1)
+        : reportQuery.eq("user_id", user.id).eq("site_id", values.siteId).limit(1);
+      const reviewRequest = isAdminEditingReport
+        ? Promise.resolve({ data: [], error: null })
+        : supabase
+            .from("reviews")
+            .select("id, status")
+            .eq("user_id", user.id)
+            .eq("site_id", values.siteId)
+            .limit(1);
 
       const [reportResult, reviewResult] = await Promise.all([
-        supabase
-          .from("scam_reports")
-          .select(
-            "id, site_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, evidence_image_urls, privacy_masking_agreement, false_report_agreement, review_status",
-          )
-          .eq("user_id", user.id)
-          .eq("site_id", values.siteId)
-          .limit(1),
-        supabase
-          .from("reviews")
-          .select("id, status")
-          .eq("user_id", user.id)
-          .eq("site_id", values.siteId)
-          .limit(1),
+        reportRequest,
+        reviewRequest,
       ]);
 
       if (!isMounted) return;
@@ -401,11 +417,19 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
       const review = reviewResult.data?.[0] as ExistingReview | undefined;
       setExistingReviewStatus(review?.status ?? null);
 
-      if (reportResult.error || !reportResult.data?.[0]) return;
+      if (reportResult.error || !reportResult.data?.[0]) {
+        if (isAdminEditingReport) {
+          setErrorMessage(
+            "수정할 먹튀 피해 제보를 불러오지 못했습니다. 관리자 권한과 항목 ID를 확인해주세요.",
+          );
+        }
+        return;
+      }
 
       const report = reportResult.data[0] as ExistingScamReport;
       setExistingReportId(report.id);
       setExistingReportStatus(report.review_status);
+      setExistingReportIsPublished(report.is_published);
       setValues(valuesFromExistingReport(report));
     }
 
@@ -414,7 +438,7 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
     return () => {
       isMounted = false;
     };
-  }, [user, values.siteId]);
+  }, [isAdmin, isAdminEditingReport, normalizedReportId, user, values.siteId]);
 
   function updateField<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -541,7 +565,6 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
 
     const reportPayload = {
         site_id: values.siteId,
-        user_id: user?.id ?? null,
         incident_date: values.incidentDate,
         usage_period: values.usagePeriod,
         main_category: values.mainCategories.join(", "),
@@ -576,21 +599,46 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
         is_contact_public: false,
         privacy_masking_agreement: values.privacyMaskingAgreement,
         false_report_agreement: values.falseReportAgreement,
-        review_status: "pending",
-        is_published: false,
-        reviewed_at: null,
-        approved_at: null,
-        published_at: null,
+        review_status:
+          isAdminEditingReport && existingReportStatus
+            ? existingReportStatus
+            : "pending",
+        is_published: isAdminEditingReport ? existingReportIsPublished : false,
       };
+    const reportUpdatePayload = isAdminEditingReport
+      ? reportPayload
+      : {
+          ...reportPayload,
+          reviewed_at: null,
+          approved_at: null,
+          published_at: null,
+        };
+    const reportInsertPayload = {
+      ...reportPayload,
+      user_id: user?.id ?? null,
+      reviewed_at: null,
+      approved_at: null,
+      published_at: null,
+    };
     const mutation = existingReportId
-      ? supabase
-          .from("scam_reports")
-          .update(reportPayload)
-          .eq("id", existingReportId)
-          .eq("user_id", user?.id ?? "")
+      ? (isAdminEditingReport
+          ? supabase
+              .from("scam_reports")
+              .update(reportUpdatePayload)
+              .eq("id", existingReportId)
+          : supabase
+              .from("scam_reports")
+              .update(reportUpdatePayload)
+              .eq("id", existingReportId)
+              .eq("user_id", user?.id ?? "")
+        )
           .select("id")
           .single()
-      : supabase.from("scam_reports").insert(reportPayload).select("id").single();
+      : supabase
+          .from("scam_reports")
+          .insert(reportInsertPayload)
+          .select("id")
+          .single();
     const { data: savedReport, error } = await mutation;
 
     setIsSubmitting(false);
@@ -604,15 +652,19 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
       return;
     }
 
-    const notificationError = savedReport?.id
+    const notificationError = savedReport?.id && !isAdminEditingReport
       ? await sendContentSubmittedNotification(savedReport.id)
       : "";
 
-    setValues(initialFormValues(normalizedSelectedSiteId || values.siteId));
+    if (!isAdminEditingReport) {
+      setValues(initialFormValues(normalizedSelectedSiteId || values.siteId));
+    }
     setSuccessMessage(
-      notificationError
-        ? `먹튀 피해 제보가 관리자 승인 대기 상태로 ${existingReportId ? "수정" : "접수"}되었습니다. ${notificationError}`
-        : `먹튀 피해 제보가 관리자 승인 대기 상태로 ${existingReportId ? "수정" : "접수"}되었습니다.`,
+      isAdminEditingReport
+        ? "관리자 수정 내용이 저장되었습니다."
+        : notificationError
+          ? `먹튀 피해 제보가 관리자 승인 대기 상태로 ${existingReportId ? "수정" : "접수"}되었습니다. ${notificationError}`
+          : `먹튀 피해 제보가 관리자 승인 대기 상태로 ${existingReportId ? "수정" : "접수"}되었습니다.`,
     );
   }
 
@@ -787,8 +839,9 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
           {existingReportId ? (
             <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
               <p className="font-semibold">
-                이미 작성한 먹튀 피해 제보가 있습니다. 작성한 글을 수정해서 다시
-                제출할 수 있습니다.
+                {isAdminEditingReport
+                  ? "관리자 수정 모드입니다. 저장해도 현재 검토 상태와 공개 여부가 유지됩니다."
+                  : "이미 작성한 먹튀 피해 제보가 있습니다. 작성한 글을 수정해서 다시 제출할 수 있습니다."}
                 {existingReportStatus
                   ? ` 현재 상태: ${moderationStatusLabels[existingReportStatus]}`
                   : ""}
@@ -1021,7 +1074,9 @@ export function ScamReportForm({ selectedSiteId = "" }: ScamReportFormProps) {
           >
             {isSubmitting
               ? "제출 중..."
-              : existingReportId
+              : isAdminEditingReport
+                ? "관리자 먹튀 제보 수정 저장"
+                : existingReportId
                 ? "먹튀 피해 제보 수정 제출"
                 : "먹튀 피해 제보 제출"}
           </button>

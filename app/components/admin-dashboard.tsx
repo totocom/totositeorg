@@ -2856,6 +2856,9 @@ function ReviewTable({
                     <ActionButtons
                       table="reviews"
                       id={review.id}
+                      editHref={`/submit-review?siteId=${encodeURIComponent(
+                        review.site_id,
+                      )}&reviewId=${encodeURIComponent(review.id)}`}
                       isUpdating={isUpdating}
                       isDeleting={isDeleting}
                       onUpdateStatus={onUpdateStatus}
@@ -2953,6 +2956,9 @@ function ScamReportTable({
                       <ActionButtons
                         table="scam_reports"
                         id={report.id}
+                        editHref={`/submit-scam-report?siteId=${encodeURIComponent(
+                          report.site_id,
+                        )}&reportId=${encodeURIComponent(report.id)}`}
                         isUpdating={isUpdating}
                         isDeleting={isDeleting}
                         onUpdateStatus={onUpdateStatus}

@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase/client";
 type SubmitReviewFormProps = {
   sites: ReviewTarget[];
   selectedSiteId?: string;
+  reviewId?: string;
 };
 
 type SurveyAnswers = Record<string, string | string[]>;
@@ -141,9 +142,11 @@ function getTitle(siteName: string, answers: SurveyAnswers) {
 export function SubmitReviewForm({
   sites,
   selectedSiteId = "",
+  reviewId = "",
 }: SubmitReviewFormProps) {
   const normalizedSelectedSiteId = selectedSiteId.trim();
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const normalizedReviewId = reviewId.trim();
+  const { user, isAdmin, isLoading: isAuthLoading } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);
   const fallbackSites = sites.map((site) => ({
     id: site.id,
@@ -163,6 +166,7 @@ export function SubmitReviewForm({
   const [existingReviewId, setExistingReviewId] = useState<string | null>(null);
   const [existingReviewStatus, setExistingReviewStatus] =
     useState<ExistingReview["status"] | null>(null);
+  const isAdminEditingReview = isAdmin && isUuid(normalizedReviewId);
   const isSiteFixed = Boolean(normalizedSelectedSiteId);
 
   const selectedSiteName = useMemo(() => {
@@ -253,18 +257,32 @@ export function SubmitReviewForm({
       setExistingReviewId(null);
       setExistingReviewStatus(null);
 
-      if (!user || !isUuid(values.siteId)) return;
+      if (!user) return;
+      if (!isAdminEditingReview && !isUuid(values.siteId)) return;
 
-      const { data, error } = await supabase
+      const reviewQuery = supabase
         .from("reviews")
-        .select("id, site_id, rating, title, experience, status")
-        .eq("user_id", user.id)
-        .eq("site_id", values.siteId)
-        .maybeSingle();
+        .select("id, site_id, rating, title, experience, status");
+
+      const reviewRequest = isAdminEditingReview
+        ? reviewQuery.eq("id", normalizedReviewId).maybeSingle()
+        : reviewQuery
+            .eq("user_id", user.id)
+            .eq("site_id", values.siteId)
+            .maybeSingle();
+
+      const { data, error } = await reviewRequest;
 
       if (!isMounted) return;
 
-      if (error || !data) return;
+      if (error || !data) {
+        if (isAdminEditingReview) {
+          setSubmitError(
+            "수정할 만족도 평가를 불러오지 못했습니다. 관리자 권한과 항목 ID를 확인해주세요.",
+          );
+        }
+        return;
+      }
 
       const review = data as ExistingReview;
       const parsed = parseExperiencePayload(review.experience);
@@ -286,7 +304,7 @@ export function SubmitReviewForm({
     return () => {
       isMounted = false;
     };
-  }, [user, values.siteId]);
+  }, [isAdmin, isAdminEditingReview, normalizedReviewId, user, values.siteId]);
 
   function updateField<K extends keyof Omit<ReviewFormValues, "answers">>(
     field: K,
@@ -381,24 +399,36 @@ export function SubmitReviewForm({
 
     const reviewPayload = {
         site_id: values.siteId,
-        user_id: user?.id ?? null,
         rating: getRating(visibleAnswers),
         title,
         experience,
         issue_type: "general" satisfies SiteReview["issueType"],
         reviewer_name: null,
         reviewer_email: null,
-        status: "pending",
+        status:
+          isAdminEditingReview && existingReviewStatus
+            ? existingReviewStatus
+            : "pending",
     };
     const mutation = existingReviewId
-      ? supabase
-          .from("reviews")
-          .update(reviewPayload)
-          .eq("id", existingReviewId)
-          .eq("user_id", user?.id ?? "")
+      ? (isAdminEditingReview
+          ? supabase.from("reviews").update(reviewPayload).eq("id", existingReviewId)
+          : supabase
+              .from("reviews")
+              .update(reviewPayload)
+              .eq("id", existingReviewId)
+              .eq("user_id", user?.id ?? "")
+        )
           .select("id")
           .single()
-      : supabase.from("reviews").insert(reviewPayload).select("id").single();
+      : supabase
+          .from("reviews")
+          .insert({
+            ...reviewPayload,
+            user_id: user?.id ?? null,
+          })
+          .select("id")
+          .single();
     const { data: savedReview, error } = await mutation;
 
     setFormStatus("idle");
@@ -426,18 +456,24 @@ export function SubmitReviewForm({
       return;
     }
 
-    const notificationError = savedReview?.id
+    const notificationError = savedReview?.id && !isAdminEditingReview
       ? await sendContentSubmittedNotification(savedReview.id)
       : "";
 
     setSuccessMessage(
-      notificationError
-        ? `만족도 평가가 관리자 검토 대기 상태로 ${existingReviewId ? "수정" : "접수"}되었습니다. ${notificationError}`
-        : `만족도 평가가 관리자 검토 대기 상태로 ${existingReviewId ? "수정" : "접수"}되었습니다.`,
+      isAdminEditingReview
+        ? "관리자 수정 내용이 저장되었습니다."
+        : notificationError
+          ? `만족도 평가가 관리자 검토 대기 상태로 ${existingReviewId ? "수정" : "접수"}되었습니다. ${notificationError}`
+          : `만족도 평가가 관리자 검토 대기 상태로 ${existingReviewId ? "수정" : "접수"}되었습니다.`,
     );
-    setValues(initialValues(siteOptions, normalizedSelectedSiteId));
-    const selectedSite = siteOptions.find((site) => site.id === normalizedSelectedSiteId);
-    setSiteSearch(selectedSite?.siteName ?? "");
+    if (!isAdminEditingReview) {
+      setValues(initialValues(siteOptions, normalizedSelectedSiteId));
+      const selectedSite = siteOptions.find(
+        (site) => site.id === normalizedSelectedSiteId,
+      );
+      setSiteSearch(selectedSite?.siteName ?? "");
+    }
   }
 
   async function sendContentSubmittedNotification(reviewId: string) {
@@ -532,7 +568,8 @@ export function SubmitReviewForm({
     >
       {successMessage ? (
         <div className="rounded-md border border-accent bg-accent-soft px-4 py-3 text-sm font-semibold text-accent">
-          {successMessage} 관리자 검토 후 공개됩니다.
+          {successMessage}
+          {isAdminEditingReview ? "" : " 관리자 검토 후 공개됩니다."}
         </div>
       ) : null}
 
@@ -544,8 +581,9 @@ export function SubmitReviewForm({
 
       {existingReviewId ? (
         <div className="rounded-md border border-accent bg-accent-soft px-4 py-3 text-sm font-semibold text-accent">
-          이 사이트에 이미 작성한 만족도 평가가 있습니다. 수정 후 제출하면
-          관리자 승인 대기 상태로 변경됩니다.
+          {isAdminEditingReview
+            ? "관리자 수정 모드입니다. 저장해도 현재 검토 상태가 유지됩니다."
+            : "이 사이트에 이미 작성한 만족도 평가가 있습니다. 수정 후 제출하면 관리자 승인 대기 상태로 변경됩니다."}
           {existingReviewStatus
             ? ` 현재 상태: ${moderationStatusLabels[existingReviewStatus]}`
             : ""}
@@ -711,7 +749,9 @@ export function SubmitReviewForm({
       >
         {formStatus === "submitting"
           ? "저장 중..."
-          : existingReviewId
+          : isAdminEditingReview
+            ? "관리자 리뷰 수정 저장"
+            : existingReviewId
             ? "만족도 평가 수정 제출"
             : "만족도 평가 제출"}
       </button>
