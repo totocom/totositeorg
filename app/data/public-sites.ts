@@ -112,6 +112,7 @@ type PublicScamReportRow = {
   id: string;
   site_id: string;
   user_id: string | null;
+  reporter_name?: string | null;
   incident_date: string;
   usage_period: string;
   main_category: string;
@@ -325,7 +326,11 @@ function mapScamReportRow(
   report: PublicScamReportRow,
   nicknameMap = new Map<string, string>(),
 ): ScamReport {
-  const authorNickname = getAuthorNickname(report.user_id, nicknameMap);
+  const authorNickname = getAuthorNickname(
+    report.user_id,
+    nicknameMap,
+    report.reporter_name,
+  );
 
   return {
     id: report.id,
@@ -390,7 +395,7 @@ async function getPublicSitesUncached(): Promise<PublicSitesResult> {
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, reporter_name, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("review_status", "approved")
       .eq("is_published", true)
@@ -498,7 +503,7 @@ async function getPublicSiteDetailUncached(
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, reporter_name, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("site_id", publicSiteRow.id)
       .eq("review_status", "approved")
@@ -613,7 +618,7 @@ async function getPublicReviewListUncached(): Promise<
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, reporter_name, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("review_status", "approved")
       .eq("is_published", true),
@@ -682,7 +687,7 @@ async function getPublicScamReportListUncached(): Promise<
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, user_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
+        "id, site_id, user_id, reporter_name, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, deposit_date, evidence_image_urls, evidence_note, review_status, is_published, created_at",
       )
       .eq("review_status", "approved")
       .eq("is_published", true)

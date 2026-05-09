@@ -75,6 +75,7 @@ type ReviewRow = {
 type ScamReportRow = {
   id: string;
   site_id: string;
+  reporter_name: string | null;
   incident_date: string;
   usage_period: string;
   main_category: string;
@@ -351,7 +352,7 @@ async function fetchAdminData(): Promise<AdminDataResult> {
     supabase
       .from("scam_reports")
       .select(
-        "id, site_id, incident_date, usage_period, main_category, damage_types, damage_amount, damage_amount_unknown, situation_description, review_status, is_published, created_at, sites(name, url, screenshot_url, screenshot_thumb_url)",
+        "id, site_id, reporter_name, incident_date, usage_period, main_category, damage_types, damage_amount, damage_amount_unknown, situation_description, review_status, is_published, created_at, sites(name, url, screenshot_url, screenshot_thumb_url)",
       )
       .in("review_status", ["pending", "approved", "rejected"])
       .order("created_at", { ascending: false }),
@@ -2815,11 +2816,12 @@ function ReviewTable({
         <h2 className="font-semibold">{title}</h2>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
           <thead className="bg-background text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-3 font-semibold">리뷰</th>
               <th className="px-4 py-3 font-semibold">사이트</th>
+              <th className="px-4 py-3 font-semibold">작성자</th>
               <th className="px-4 py-3 font-semibold">문제 유형</th>
               <th className="px-4 py-3 font-semibold">평점</th>
               <th className="px-4 py-3 font-semibold">상태</th>
@@ -2841,6 +2843,9 @@ function ReviewTable({
                   </td>
                   <td className="px-4 py-4">
                     {getReviewSiteName(review)}
+                  </td>
+                  <td className="px-4 py-4">
+                    {review.reviewer_name?.trim() || "-"}
                   </td>
                   <td className="px-4 py-4">
                     {issueTypeLabels[review.issue_type]}
@@ -2908,10 +2913,11 @@ function ScamReportTable({
         <h2 className="font-semibold">{title}</h2>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[1240px] border-collapse text-left text-sm">
           <thead className="bg-background text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-3 font-semibold">연결된 사이트</th>
+              <th className="px-4 py-3 font-semibold">작성자</th>
               <th className="px-4 py-3 font-semibold">피해 금액</th>
               <th className="px-4 py-3 font-semibold">피해 유형</th>
               <th className="px-4 py-3 font-semibold">상세 제보 내용</th>
@@ -2934,6 +2940,9 @@ function ScamReportTable({
                     <td className="px-4 py-4">
                       <p className="font-semibold">{site?.name ?? "연결 사이트 없음"}</p>
                       <p className="break-all text-xs text-muted">{site?.url ?? report.site_id}</p>
+                    </td>
+                    <td className="px-4 py-4">
+                      {report.reporter_name?.trim() || "-"}
                     </td>
                     <td className="px-4 py-4">
                       {report.damage_amount_unknown || report.damage_amount === null
@@ -2969,7 +2978,7 @@ function ScamReportTable({
                 );
               })
             ) : (
-              <EmptyRow colSpan={9} />
+              <EmptyRow colSpan={10} />
             )}
           </tbody>
         </table>

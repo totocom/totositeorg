@@ -114,6 +114,7 @@ create table if not exists public.scam_reports (
   id uuid primary key default gen_random_uuid(),
   site_id uuid not null references public.sites(id) on delete cascade,
   user_id uuid null references auth.users(id) on delete set null,
+  reporter_name text null,
   incident_date date not null,
   usage_period text not null,
   main_category text not null,
@@ -150,6 +151,10 @@ create table if not exists public.scam_reports (
   updated_at timestamptz not null default now(),
 
   constraint scam_reports_usage_period_not_blank check (length(trim(usage_period)) > 0),
+  constraint scam_reports_reporter_name_length check (
+    reporter_name is null
+    or char_length(trim(reporter_name)) between 2 and 20
+  ),
   constraint scam_reports_main_category_not_blank check (length(trim(main_category)) > 0),
   constraint scam_reports_damage_types_not_empty check (cardinality(damage_types) > 0),
   constraint scam_reports_damage_amount_required check (
@@ -686,6 +691,25 @@ alter table public.reviews
 alter table public.scam_reports
   add column if not exists site_id uuid not null references public.sites(id)
   on delete cascade;
+
+alter table public.scam_reports
+  add column if not exists reporter_name text null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'scam_reports_reporter_name_length'
+      and conrelid = 'public.scam_reports'::regclass
+  ) then
+    alter table public.scam_reports
+      add constraint scam_reports_reporter_name_length check (
+        reporter_name is null
+        or char_length(trim(reporter_name)) between 2 and 20
+      );
+  end if;
+end $$;
 
 alter table public.scam_reports
   drop column if exists site_name;

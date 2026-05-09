@@ -47,11 +47,12 @@ type FormValues = {
   falseReportAgreement: boolean;
 };
 
-type FormErrors = Partial<Record<keyof FormValues | "siteId", string>>;
+type FormErrors = Partial<Record<keyof FormValues | "siteId" | "adminAuthorName", string>>;
 
 type ExistingScamReport = {
   id: string;
   site_id: string;
+  reporter_name: string | null;
   incident_date: string;
   usage_period: string;
   main_category: string;
@@ -254,6 +255,11 @@ function isUuid(value: string) {
   );
 }
 
+function isValidAdminAuthorName(value: string) {
+  const length = value.trim().length;
+  return length === 0 || (length >= 2 && length <= 20);
+}
+
 export function ScamReportForm({
   selectedSiteId = "",
   reportId = "",
@@ -272,6 +278,7 @@ export function ScamReportForm({
   const [isLoadingSites, setIsLoadingSites] = useState(true);
   const [siteLoadError, setSiteLoadError] = useState("");
   const [siteSearch, setSiteSearch] = useState("");
+  const [adminAuthorName, setAdminAuthorName] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [existingReportId, setExistingReportId] = useState<string | null>(null);
@@ -386,6 +393,7 @@ export function ScamReportForm({
       setExistingReportStatus(null);
       setExistingReportIsPublished(false);
       setExistingReviewStatus(null);
+      setAdminAuthorName("");
 
       if (!user) return;
       if (!isAdminEditingReport && !isUuid(values.siteId)) return;
@@ -393,7 +401,7 @@ export function ScamReportForm({
       const reportQuery = supabase
         .from("scam_reports")
         .select(
-          "id, site_id, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, evidence_image_urls, privacy_masking_agreement, false_report_agreement, review_status, is_published",
+          "id, site_id, reporter_name, incident_date, usage_period, main_category, category_items, category_etc_text, damage_types, damage_type_etc_text, damage_amount, damage_amount_unknown, situation_description, deposit_bank_name, deposit_account_number, deposit_account_holder, deposit_amount, evidence_image_urls, privacy_masking_agreement, false_report_agreement, review_status, is_published",
         );
       const reportRequest = isAdminEditingReport
         ? reportQuery.eq("id", normalizedReportId).limit(1)
@@ -430,6 +438,7 @@ export function ScamReportForm({
       setExistingReportId(report.id);
       setExistingReportStatus(report.review_status);
       setExistingReportIsPublished(report.is_published);
+      setAdminAuthorName(isAdmin ? report.reporter_name ?? "" : "");
       setValues(valuesFromExistingReport(report));
     }
 
@@ -498,6 +507,9 @@ export function ScamReportForm({
         "승인된 사이트 정보가 아직 Supabase와 연결되지 않았습니다.";
     }
     if (!user) nextErrors.siteId = "로그인 후 먹튀 피해 제보를 작성할 수 있습니다.";
+    if (isAdminEditingReport && !isValidAdminAuthorName(adminAuthorName)) {
+      nextErrors.adminAuthorName = "작성자는 비워두거나 2~20자로 입력해주세요.";
+    }
     if (!values.incidentDate) nextErrors.incidentDate = "발생 일자를 입력해주세요.";
     if (!values.usagePeriod) nextErrors.usagePeriod = "이용 기간을 선택해주세요.";
     if (values.mainCategories.length === 0) {
@@ -562,9 +574,13 @@ export function ScamReportForm({
             .filter(Boolean)
             .join(" / ")
         : null;
+    const normalizedAdminAuthorName = adminAuthorName.trim();
 
     const reportPayload = {
         site_id: values.siteId,
+        ...(isAdminEditingReport
+          ? { reporter_name: normalizedAdminAuthorName || null }
+          : {}),
         incident_date: values.incidentDate,
         usage_period: values.usagePeriod,
         main_category: values.mainCategories.join(", "),
@@ -879,6 +895,35 @@ export function ScamReportForm({
         className="mt-5 grid gap-5"
         noValidate
       >
+          {isAdminEditingReport ? (
+            <label
+              className="grid gap-1 text-sm font-medium"
+              data-error-key="adminAuthorName"
+            >
+              작성자
+              <input
+                value={adminAuthorName}
+                onChange={(event) => {
+                  setAdminAuthorName(event.target.value);
+                  setErrors((current) => ({
+                    ...current,
+                    adminAuthorName: undefined,
+                  }));
+                  setSuccessMessage("");
+                  setErrorMessage("");
+                }}
+                className="h-11 rounded-md border border-line px-3 text-sm"
+                placeholder="표시할 작성자명을 입력하세요"
+                maxLength={20}
+              />
+              {errors.adminAuthorName ? (
+                <span className="text-xs text-red-700">
+                  {errors.adminAuthorName}
+                </span>
+              ) : null}
+            </label>
+          ) : null}
+
           <div className="grid gap-4 sm:grid-cols-3">
             <label
               className="grid gap-1 text-sm font-medium"

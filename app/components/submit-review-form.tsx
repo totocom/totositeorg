@@ -37,6 +37,7 @@ type ExistingReview = {
   rating: number;
   title: string;
   experience: string;
+  reviewer_name: string | null;
   status: "pending" | "approved" | "rejected";
 };
 
@@ -66,6 +67,11 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value.trim(),
   );
+}
+
+function isValidAdminAuthorName(value: string) {
+  const length = value.trim().length;
+  return length === 0 || (length >= 2 && length <= 20);
 }
 
 function hasAnswer(value: string | string[] | undefined) {
@@ -163,6 +169,7 @@ export function SubmitReviewForm({
   const [submitError, setSubmitError] = useState("");
   const [siteLoadError, setSiteLoadError] = useState("");
   const [siteSearch, setSiteSearch] = useState("");
+  const [adminAuthorName, setAdminAuthorName] = useState("");
   const [existingReviewId, setExistingReviewId] = useState<string | null>(null);
   const [existingReviewStatus, setExistingReviewStatus] =
     useState<ExistingReview["status"] | null>(null);
@@ -256,13 +263,14 @@ export function SubmitReviewForm({
     async function loadExistingReview() {
       setExistingReviewId(null);
       setExistingReviewStatus(null);
+      setAdminAuthorName("");
 
       if (!user) return;
       if (!isAdminEditingReview && !isUuid(values.siteId)) return;
 
       const reviewQuery = supabase
         .from("reviews")
-        .select("id, site_id, rating, title, experience, status");
+        .select("id, site_id, rating, title, experience, reviewer_name, status");
 
       const reviewRequest = isAdminEditingReview
         ? reviewQuery.eq("id", normalizedReviewId).maybeSingle()
@@ -288,6 +296,7 @@ export function SubmitReviewForm({
       const parsed = parseExperiencePayload(review.experience);
       setExistingReviewId(review.id);
       setExistingReviewStatus(review.status);
+      setAdminAuthorName(isAdmin ? review.reviewer_name ?? "" : "");
 
       if (parsed) {
         setValues((current) => ({
@@ -361,6 +370,9 @@ export function SubmitReviewForm({
         "승인된 사이트 정보가 아직 Supabase와 연결되지 않았습니다.";
     }
     if (!user) nextErrors.siteId = "로그인 후 만족도 평가를 작성할 수 있습니다.";
+    if (isAdminEditingReview && !isValidAdminAuthorName(adminAuthorName)) {
+      nextErrors.adminAuthorName = "작성자는 비워두거나 2~20자로 입력해주세요.";
+    }
 
     for (const section of reviewSurveySections) {
       for (const question of section.questions) {
@@ -396,6 +408,7 @@ export function SubmitReviewForm({
       answers: visibleAnswers,
     });
     const title = getTitle(selectedSiteName, visibleAnswers);
+    const normalizedAdminAuthorName = adminAuthorName.trim();
 
     const reviewPayload = {
         site_id: values.siteId,
@@ -403,7 +416,11 @@ export function SubmitReviewForm({
         title,
         experience,
         issue_type: "general" satisfies SiteReview["issueType"],
-        reviewer_name: null,
+        ...(isAdminEditingReview
+          ? { reviewer_name: normalizedAdminAuthorName || null }
+          : existingReviewId
+            ? {}
+            : { reviewer_name: null }),
         reviewer_email: null,
         status:
           isAdminEditingReview && existingReviewStatus
@@ -588,6 +605,35 @@ export function SubmitReviewForm({
             ? ` 현재 상태: ${moderationStatusLabels[existingReviewStatus]}`
             : ""}
         </div>
+      ) : null}
+
+      {isAdminEditingReview ? (
+        <label
+          className="grid gap-1 text-sm font-medium"
+          data-error-key="adminAuthorName"
+        >
+          작성자
+          <input
+            value={adminAuthorName}
+            onChange={(event) => {
+              setAdminAuthorName(event.target.value);
+              setErrors((current) => ({
+                ...current,
+                adminAuthorName: undefined,
+              }));
+              setSuccessMessage("");
+              setSubmitError("");
+            }}
+            className="h-11 rounded-md border border-line px-3 text-sm"
+            placeholder="표시할 작성자명을 입력하세요"
+            maxLength={20}
+          />
+          {errors.adminAuthorName ? (
+            <span className="text-xs text-red-700">
+              {errors.adminAuthorName}
+            </span>
+          ) : null}
+        </label>
       ) : null}
 
       <div className="grid gap-2 text-sm font-medium" data-error-key="siteId">
