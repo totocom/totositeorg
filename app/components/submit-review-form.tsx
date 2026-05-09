@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { revalidatePublicSiteCache } from "@/app/components/admin-cache-revalidation";
 import { useAuth } from "@/app/components/auth-provider";
 import { reviewSurveySections, type SurveyQuestion } from "@/app/data/review-survey";
 import {
@@ -477,6 +478,10 @@ export function SubmitReviewForm({
     const notificationError = savedReview?.id && !canEditReviewAuthorName
       ? await sendContentSubmittedNotification(savedReview.id)
       : "";
+
+    if (canEditReviewAuthorName) {
+      await revalidatePublicSiteCache();
+    }
 
     setSuccessMessage(
       canEditReviewAuthorName

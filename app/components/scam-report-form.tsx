@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { revalidatePublicSiteCache } from "@/app/components/admin-cache-revalidation";
 import { useAuth } from "@/app/components/auth-provider";
 import { moderationStatusLabels } from "@/app/data/sites";
 import { supabase } from "@/lib/supabase/client";
@@ -672,6 +673,10 @@ export function ScamReportForm({
     const notificationError = savedReport?.id && !canEditReportAuthorName
       ? await sendContentSubmittedNotification(savedReport.id)
       : "";
+
+    if (canEditReportAuthorName) {
+      await revalidatePublicSiteCache();
+    }
 
     if (!canEditReportAuthorName) {
       setValues(initialFormValues(normalizedSelectedSiteId || values.siteId));

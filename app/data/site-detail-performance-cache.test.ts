@@ -23,6 +23,14 @@ const scamReportFormSource = readFileSync(
   "app/components/scam-report-form.tsx",
   "utf8",
 );
+const adminCacheRevalidationSource = readFileSync(
+  "app/components/admin-cache-revalidation.ts",
+  "utf8",
+);
+const adminPublicRevalidationRouteSource = readFileSync(
+  "app/api/admin/revalidate-public-sites/route.ts",
+  "utf8",
+);
 
 type SitemapLoaderOptions = NonNullable<
   Parameters<typeof getPublicSitesForSitemapUncached>[0]
@@ -151,6 +159,21 @@ test("admin content author names override profile nicknames on public pages", ()
   assert.match(
     scamReportFormSource,
     /const\s+canEditReportAuthorName\s*=\s*isAdmin\s*&&\s*Boolean\(existingReportId\);/,
+  );
+  assert.equal(
+    countOccurrences(
+      `${submitReviewFormSource}\n${scamReportFormSource}`,
+      "await revalidatePublicSiteCache();",
+    ),
+    2,
+  );
+  assert.match(
+    adminCacheRevalidationSource,
+    /fetch\("\/api\/admin\/revalidate-public-sites"/,
+  );
+  assert.match(
+    adminPublicRevalidationRouteSource,
+    /revalidateTag\("public-sites",\s*"max"\)/,
   );
 });
 
