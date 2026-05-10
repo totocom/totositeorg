@@ -58,11 +58,11 @@ test("site share title and description are site specific", () => {
 
   assert.equal(
     buildSiteDetailShareTitle(site),
-    "벳톡 도메인 정보 | 토토사이트 정보",
+    "벳톡 도메인 현황 | 토토사이트 정보",
   );
   assert.equal(
     buildSiteDetailShareDescription(site),
-    "벳톡의 대표 도메인 bettok.example 정보를 확인하세요. 제보와 후기는 참고 자료이며 사이트 이용을 권장하지 않습니다. 확인되지 않은 내용은 사실로 단정하지 않습니다.",
+    "벳톡의 먹튀 제보 현황과 대표 도메인 bettok.example를 정리했습니다. 제보 내용은 참고 자료이며 사이트 전체 상태를 단정하지 않습니다.",
   );
 });
 

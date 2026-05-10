@@ -16,13 +16,15 @@ const shortResponsibleUseNotice =
 
 export function ResponsibleUseNotice({
   variant = "footer",
+  heading = "책임 있는 이용 안내",
 }: {
   variant?: "footer" | "card" | "compact";
+  heading?: string;
 }) {
   if (variant === "compact") {
     return (
       <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
-        <h2 className="text-base font-bold text-foreground">책임 있는 이용 안내</h2>
+        <h2 className="text-base font-bold text-foreground">{heading}</h2>
         <p className="mt-3 text-sm leading-7 text-muted">
           {shortResponsibleUseNotice}
         </p>
@@ -33,7 +35,7 @@ export function ResponsibleUseNotice({
   if (variant === "card") {
     return (
       <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
-        <h2 className="text-lg font-bold text-foreground">책임 있는 이용 안내</h2>
+        <h2 className="text-lg font-bold text-foreground">{heading}</h2>
         <ul className="mt-3 grid gap-2 text-sm leading-6 text-muted">
           {responsibleUseNotice.map((notice) => (
             <li key={notice}>{notice}</li>

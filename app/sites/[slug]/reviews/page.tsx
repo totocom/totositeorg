@@ -22,8 +22,10 @@ import {
 import {
   formatKoreanDate,
   maskPublicAuthorName,
+  sanitizePublicSiteName,
 } from "@/app/data/public-display";
 import { getSiteReviewsDetail } from "@/app/data/public-site-detail";
+import { buildReviewCardTitle } from "@/app/data/public-seo-selection";
 import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
 import {
   buildSiteReviewsDescription,
@@ -84,6 +86,17 @@ function buildReviewInterpretationNotice(siteName: string, reviewCount: number) 
   return `${base} 후기는 참고 자료이며 사이트 이용을 권장하는 의미가 아닙니다.`;
 }
 
+function getShortSiteName(site: { siteName: string; siteNameKo?: string | null }) {
+  return (
+    site.siteNameKo?.trim() ||
+    sanitizePublicSiteName(site.siteName)
+      .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() ||
+    site.siteName
+  );
+}
+
 export async function generateMetadata({
   params,
 }: SiteReviewsPageProps): Promise<Metadata> {
@@ -134,8 +147,10 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
     siteUrl,
   ).toString();
   const title = buildSiteReviewsTitle(site.siteName);
-  const description = buildSiteReviewsDescription(site);
+  const description = buildSiteReviewsDescription(site, reviews);
   const aggregateRatingJsonLd = buildAggregateRatingJsonLd(site);
+  const shortSiteName = getShortSiteName(site);
+  const responsibleUseHeading = `${shortSiteName} 후기 확인 시 참고사항`;
 
   return (
     <>
@@ -205,9 +220,10 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
               {reviews.length > 0 ? (
                 <Link
                   href={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
+                  rel="nofollow"
                   className="inline-flex min-h-10 items-center justify-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
                 >
-                  {site.siteName} 후기 남기기
+                  {shortSiteName} 후기 작성
                 </Link>
               ) : null}
             </div>
@@ -229,7 +245,7 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
                         </span>
                       </div>
                       <h3 className="mt-2 text-lg font-bold text-foreground">
-                        {review.title}
+                        {buildReviewCardTitle(review.experience, review.title)}
                       </h3>
                     </div>
                     <p className="text-xs text-muted">
@@ -256,7 +272,8 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
                 title="현재 승인된 후기가 없습니다"
                 description={`현재 공개된 승인 후기가 없습니다. 이용 경험이 있다면 후기를 남겨주세요.`}
                 actionHref={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
-                actionLabel={`${site.siteName} 후기 남기기`}
+                actionLabel={`${shortSiteName} 후기 작성`}
+                actionRel="nofollow"
               />
               <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
                 <h2 className="text-lg font-bold text-foreground">
@@ -274,7 +291,10 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
           )}
 
           <SiteReviewFaq context={context} />
-          <ResponsibleUseNotice variant="card" />
+          <ResponsibleUseNotice
+            variant="card"
+            heading={responsibleUseHeading}
+          />
         </div>
       </main>
     </>

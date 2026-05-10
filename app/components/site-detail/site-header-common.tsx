@@ -83,6 +83,7 @@ export function SiteHeaderCommon({
       {splitEnabled ? (
         <SiteDetailTabs
           slug={site.slug}
+          siteName={site.siteNameKo?.trim() || site.siteName}
           activeTab={activeTab}
           counts={common.tabCounts}
         />

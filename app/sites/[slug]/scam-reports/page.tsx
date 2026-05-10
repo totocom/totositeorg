@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { cache } from "react";
+import { PageShareButton } from "@/app/components/page-share-button";
 import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteEmptyState } from "@/app/components/site-detail/site-empty-state";
@@ -23,6 +24,8 @@ import {
   sanitizePublicSiteName,
 } from "@/app/data/public-display";
 import { getSiteScamReportsDetail } from "@/app/data/public-site-detail";
+import { buildScamReportCardTitle } from "@/app/data/public-seo-selection";
+import { formatScamReportDepositAmount } from "@/app/data/scam-report-deposit-display";
 import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
 import {
   buildSiteScamReportsDescription,
@@ -56,9 +59,18 @@ function formatDamageAmount(report: ScamReport) {
 }
 
 function formatDepositAmount(report: ScamReport) {
-  if (report.depositAmount === null) return "미확인";
+  return formatScamReportDepositAmount(report);
+}
 
-  return `${report.depositAmount.toLocaleString("ko-KR")}원`;
+function getShortSiteName(site: { siteName: string; siteNameKo?: string | null }) {
+  return (
+    site.siteNameKo?.trim() ||
+    sanitizePublicSiteName(site.siteName)
+      .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() ||
+    site.siteName
+  );
 }
 
 function buildScamReportInterpretationNotice(
@@ -133,6 +145,8 @@ export default async function SiteScamReportsPage({
   ).toString();
   const title = buildSiteScamReportsTitle(site.siteName);
   const description = buildSiteScamReportsDescription(site, scamReports);
+  const shortSiteName = getShortSiteName(site);
+  const responsibleUseHeading = `${shortSiteName} 제보 확인 시 참고사항`;
 
   return (
     <>
@@ -186,12 +200,20 @@ export default async function SiteScamReportsPage({
                 </p>
               </div>
               {scamReports.length > 0 ? (
-                <Link
-                  href={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
-                  className="inline-flex min-h-10 items-center justify-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
-                >
-                  {site.siteName} 먹튀 피해 제보하기
-                </Link>
+                <div className="flex flex-col items-start gap-2 sm:items-end">
+                  <Link
+                    href={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
+                    rel="nofollow"
+                    className="inline-flex min-h-10 items-center justify-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
+                  >
+                    {site.siteName} 먹튀 피해 제보하기
+                  </Link>
+                  <PageShareButton
+                    title={title}
+                    text={description}
+                    url={canonical}
+                  />
+                </div>
               ) : null}
             </div>
           </section>
@@ -206,7 +228,7 @@ export default async function SiteScamReportsPage({
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <h3 className="text-lg font-bold text-foreground">
-                        {report.damageTypes.join(", ") || report.mainCategory}
+                        {buildScamReportCardTitle(report)}
                       </h3>
                       <p className="mt-1 text-xs text-muted">
                         발생일 {formatKoreanDate(report.incidentDate)} · 접수일{" "}
@@ -254,6 +276,7 @@ export default async function SiteScamReportsPage({
                 description={`현재 공개된 승인 먹튀 제보가 없습니다. 피해 사례가 있다면 확인 가능한 정보를 중심으로 제보를 남겨주세요.`}
                 actionHref={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
                 actionLabel={`${site.siteName} 먹튀 피해 제보하기`}
+                actionRel="nofollow"
               />
               <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
                 <h2 className="text-lg font-bold text-foreground">
@@ -271,7 +294,10 @@ export default async function SiteScamReportsPage({
           )}
 
           <SiteScamReportFaq context={context} />
-          <ResponsibleUseNotice variant="card" />
+          <ResponsibleUseNotice
+            variant="card"
+            heading={responsibleUseHeading}
+          />
         </div>
       </main>
     </>

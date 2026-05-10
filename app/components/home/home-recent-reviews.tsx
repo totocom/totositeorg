@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatKoreanDate } from "@/app/data/public-display";
+import { buildReviewCardTitle } from "@/app/data/public-seo-selection";
 import type { PublicReviewListItem } from "@/app/data/public-sites";
 import { formatRatingScore, issueTypeLabels } from "@/app/data/sites";
 
@@ -48,7 +49,7 @@ export function HomeRecentReviews({ reviews }: HomeRecentReviewsProps) {
                 {issueTypeLabels[review.issueType]}
               </p>
               <h3 className="mt-2 text-sm font-bold text-foreground">
-                {review.title}
+                {buildReviewCardTitle(review.experience, review.title)}
               </h3>
               <p className="mt-2 text-xs text-muted">
                 작성일 {formatKoreanDate(review.createdAt)}

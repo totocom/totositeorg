@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { sanitizePublicSiteName } from "@/app/data/public-display";
 
 export type SiteDetailTab = "main" | "scam-reports" | "reviews" | "domains";
 
 type SiteDetailTabsProps = {
   slug: string;
+  siteName: string;
   activeTab: SiteDetailTab;
   counts: {
     scamReports: number;
@@ -14,25 +16,31 @@ type SiteDetailTabsProps = {
 
 export function SiteDetailTabs({
   slug,
+  siteName,
   activeTab,
   counts,
 }: SiteDetailTabsProps) {
   const encodedSlug = encodeURIComponent(slug);
+  const tabSiteName = getTabSiteName(siteName);
   const tabs = [
-    { id: "main", label: "메인 정보", href: `/sites/${encodedSlug}` },
+    {
+      id: "main",
+      label: `${tabSiteName} 기본 정보`,
+      href: `/sites/${encodedSlug}`,
+    },
     {
       id: "scam-reports",
-      label: `먹튀 제보 (${counts.scamReports})`,
+      label: `${tabSiteName} 먹튀 제보 ${counts.scamReports}건`,
       href: `/sites/${encodedSlug}/scam-reports`,
     },
     {
       id: "reviews",
-      label: `후기 (${counts.reviews})`,
+      label: `${tabSiteName} 후기 ${counts.reviews}건`,
       href: `/sites/${encodedSlug}/reviews`,
     },
     {
       id: "domains",
-      label: `주소·도메인 (${counts.domains})`,
+      label: `${tabSiteName} 도메인 ${counts.domains}개`,
       href: `/sites/${encodedSlug}/domains`,
     },
   ] satisfies Array<{
@@ -57,6 +65,7 @@ export function SiteDetailTabs({
               <Link
                 href={tab.href}
                 aria-current={isActive ? "page" : undefined}
+                aria-label={`${tab.label} 페이지`}
                 className={
                   isActive
                     ? `${className} border-accent bg-accent-soft text-accent`
@@ -70,5 +79,14 @@ export function SiteDetailTabs({
         })}
       </ul>
     </nav>
+  );
+}
+
+function getTabSiteName(siteName: string) {
+  return (
+    sanitizePublicSiteName(siteName)
+      .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() || "사이트"
   );
 }

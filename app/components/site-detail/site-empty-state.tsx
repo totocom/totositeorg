@@ -5,6 +5,7 @@ type SiteEmptyStateProps = {
   description: string;
   actionHref: string;
   actionLabel: string;
+  actionRel?: string;
 };
 
 export function SiteEmptyState({
@@ -12,6 +13,7 @@ export function SiteEmptyState({
   description,
   actionHref,
   actionLabel,
+  actionRel,
 }: SiteEmptyStateProps) {
   return (
     <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
@@ -19,6 +21,7 @@ export function SiteEmptyState({
       <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
       <Link
         href={actionHref}
+        rel={actionRel}
         className="mt-4 inline-flex min-h-10 items-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
       >
         {actionLabel}

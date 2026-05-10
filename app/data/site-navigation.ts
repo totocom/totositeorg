@@ -16,4 +16,7 @@ export const primaryNavigationLinks: SiteNavigationLink[] = [
 export const footerNavigationLinks: SiteNavigationLink[] = [
   { href: "/blog", label: "블로그" },
   { href: "/telegram-guide", label: "텔레그램 기능 안내" },
+  { href: "/privacy-policy", label: "개인정보 처리방침" },
+  { href: "/terms", label: "이용약관" },
+  { href: "/content-policy", label: "후기·제보 운영정책" },
 ];

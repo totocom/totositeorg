@@ -566,12 +566,19 @@ export function ScamReportForm({
       ...values.miniGameItems,
       ...values.otherBettingItems,
     ];
+    const normalizedDepositCoinName = values.depositCoinName.trim();
+    const normalizedDepositWalletAddress = values.depositWalletAddress.trim();
+    const normalizedDepositTxHash = values.depositTxHash.trim();
     const depositNote =
       values.depositMethod === "coin"
         ? [
-            values.depositCoinName ? `코인: ${values.depositCoinName}` : "",
-            values.depositWalletAddress ? `지갑: ${values.depositWalletAddress}` : "",
-            values.depositTxHash ? `TX: ${values.depositTxHash}` : "",
+            normalizedDepositCoinName
+              ? `코인: ${normalizedDepositCoinName}`
+              : "",
+            normalizedDepositWalletAddress
+              ? `지갑: ${normalizedDepositWalletAddress}`
+              : "",
+            normalizedDepositTxHash ? `TX: ${normalizedDepositTxHash}` : "",
           ]
             .filter(Boolean)
             .join(" / ")
@@ -604,11 +611,11 @@ export function ScamReportForm({
         deposit_account_number:
           values.depositMethod === "bank"
             ? values.depositAccountNumber.trim() || null
-            : values.depositWalletAddress.trim() || null,
+            : normalizedDepositWalletAddress || null,
         deposit_account_holder:
           values.depositMethod === "bank"
             ? values.depositAccountHolder.trim() || null
-            : values.depositCoinName.trim() || null,
+            : normalizedDepositCoinName || null,
         deposit_amount: parseNumber(values.depositAmount),
         deposit_date: null,
         evidence_image_urls: values.evidenceImageUrls,

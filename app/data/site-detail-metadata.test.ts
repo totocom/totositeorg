@@ -14,9 +14,21 @@ import {
   buildReviewsTitleSuffix,
   buildSiteDomainsDescription,
   buildSiteDomainsTitle,
+  buildSiteReviewsDescription,
   buildSiteScamReportsDescription,
   buildSiteScamReportsTitle,
 } from "./site-detail-subpage-metadata";
+import {
+  buildReviewCardTitle,
+  buildReviewSelectionSummary,
+  buildScamReportCardTitle,
+  buildScamReportSelectionSummary,
+  parseReviewSurveyPayload,
+} from "./public-seo-selection";
+import {
+  formatScamReportDepositAmount,
+  getScamReportDepositCoinUnit,
+} from "./scam-report-deposit-display";
 import type { ReviewTarget } from "./sites";
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://project.supabase.co";
@@ -107,20 +119,120 @@ test("scam reports title avoids volatile counts and confirmation wording", () =>
   assert.equal(title.includes("위험 사이트"), false);
 });
 
-test("scam reports description uses submitted damage types without count emphasis", () => {
+test("scam reports description stays short and uses limited selected fields", () => {
   const description = buildSiteScamReportsDescription(
     createSite({ siteName: "유튜벳 (YOUTOOBET)" }),
     [
-      { damageTypes: ["출금 거부", "계정 차단"] },
-      { damageTypes: ["출금 거부", "고객센터 차단"] },
+      {
+        damageTypes: ["출금 거부", "계정 차단"],
+        mainCategory: "카지노베팅",
+        categoryItems: ["바카라"],
+      },
     ],
   );
 
-  assert.match(description, /^유튜벳 \(YOUTOOBET\)의 승인된 먹튀 제보/);
-  assert.match(description, /출금 거부, 계정 차단, 고객센터 차단 등/);
-  assert.match(description, /단일 제보만으로 사이트 전체를 단정하지 않는 것/);
-  assert.equal(description.includes("1건"), false);
+  assert.equal(
+    description,
+    "유튜벳(YOUTOOBET)의 먹튀 제보 1건과 바카라 출금 거부 사례를 정리했습니다. 제보는 참고 자료이며 사실 확정이 아닙니다.",
+  );
+  assert.equal(description.length >= 70 && description.length <= 95, true);
+  assert.equal(description.includes("계정 차단"), false);
+  assert.equal(description.includes("단일 제보"), false);
+  assert.equal(description.includes("후기"), false);
   assert.equal(description.includes("먹튀 확정"), false);
+  assert.equal(description.includes("피해 금액"), false);
+});
+
+test("scam report card and summary use limited selected fields", () => {
+  const report = {
+    damageTypes: ["출금 지연", "계정 차단", "기타"],
+    mainCategory: "카지노베팅",
+    categoryItems: ["바카라"],
+  };
+
+  assert.equal(
+    buildScamReportCardTitle(report),
+    "출금 지연·계정 차단 · 카지노베팅 제보",
+  );
+  assert.equal(
+    buildScamReportSelectionSummary(report, "애니카지노(anicasino)"),
+    "승인된 공개 제보 기준으로, 작성자는 애니카지노(anicasino) 이용 중 바카라 관련 출금 지연·계정 차단 피해를 주장했습니다.",
+  );
+});
+
+test("coin scam report deposit amount uses the submitted coin unit", () => {
+  const report = {
+    depositAmount: 100,
+    depositBankName:
+      "코인: usdt / 지갑: TPu7sensitiveWalletValue / TX: 123456",
+  };
+
+  assert.equal(getScamReportDepositCoinUnit(report), "usdt");
+  assert.equal(formatScamReportDepositAmount(report), "100usdt");
+});
+
+test("scam report deposit amount keeps bank deposits in won", () => {
+  assert.equal(
+    formatScamReportDepositAmount({
+      depositAmount: 100,
+      depositBankName: "국민은행",
+    }),
+    "100원",
+  );
+});
+
+test("coin deposit amount does not expose suspicious unit values", () => {
+  assert.equal(
+    formatScamReportDepositAmount({
+      depositAmount: 100,
+      depositBankName: "코인: 0x1234567890abcdef1234 / 지갑: 비공개",
+    }),
+    "100 (코인 단위 미확인)",
+  );
+});
+
+test("reviews description card and summary keep title stable while reflecting choices", () => {
+  const experience = JSON.stringify({
+    type: "site_satisfaction_survey",
+    answers: {
+      betting_category: ["카지노베팅", "기타 베팅"],
+      casino_betting: ["바카라"],
+      overall_satisfaction: "보통",
+      withdraw_speed: "5~10분",
+      cs_response_speed: "빠름",
+      recommendation: "추천",
+    },
+  });
+  const payload = parseReviewSurveyPayload(experience);
+
+  assert.ok(payload);
+  assert.equal(
+    buildSiteReviewsDescription(createSite({ siteName: "베베(BEBE)" }), [
+      { experience },
+    ]),
+    "베베(BEBE)의 후기 1건과 카지노베팅·환전·고객센터 평가를 작성자 응답 기준으로 정리했습니다. 후기는 참고 자료이며 단정 근거가 아닙니다.",
+  );
+  assert.equal(
+    buildSiteReviewsDescription(createSite({ siteName: "베베(BEBE)" }), [
+      { experience },
+    ]).length >= 70,
+    true,
+  );
+  assert.equal(
+    buildReviewCardTitle(experience, "기존 제목"),
+    "카지노베팅 이용 보통 평가",
+  );
+  assert.equal(
+    buildReviewSelectionSummary("베베(BEBE)", payload),
+    "승인된 후기 기준으로, 작성자는 베베(BEBE) 이용 중 카지노베팅과 바카라 경험, 환전 처리와 고객센터 응답에 대한 평가를 남겼습니다.",
+  );
+  assert.equal(buildReviewCardTitle(experience).includes("추천"), false);
+  assert.equal(
+    buildSiteReviewsDescription(createSite({ siteName: "베베(BEBE)" }), [
+      { experience },
+    ]).includes("추천"),
+    false,
+  );
 });
 
 test("domains title suffix uses operating history when present", () => {
@@ -176,9 +288,10 @@ test("site detail meta description does not use full markdown description", () =
   assert.equal(description.includes("카지노"), false);
   assert.equal(description.includes("<script"), false);
   assert.equal(description.length >= 80, true);
-  assert.match(description, /^벳톡의 대표 도메인 bettok\.example/);
-  assert.match(description, /사이트 이용을 권장하지 않습니다/);
-  assert.match(description, /사실로 단정하지 않습니다/);
+  assert.match(description, /^벳톡의 먹튀 제보 현황과 대표 도메인 bettok\.example/);
+  assert.match(description, /제보 내용은 참고 자료/);
+  assert.match(description, /사이트 전체 상태를 단정하지 않습니다/);
+  assert.equal(description.includes("후기"), false);
 });
 
 test("stripMarkdownForMeta removes markdown html newlines lists and long urls", () => {
@@ -217,7 +330,10 @@ test("open graph and twitter descriptions use short site specific plain text", (
   assert.equal(twitter.description, buildSiteDetailMetaDescription(createSite()));
   assertShortPlainMetaDescription(openGraph.description);
   assertShortPlainMetaDescription(twitter.description);
-  assert.match(twitter.description ?? "", /^벳톡의 대표 도메인 bettok\.example/);
+  assert.match(
+    twitter.description ?? "",
+    /^벳톡의 먹튀 제보 현황과 대표 도메인 bettok\.example/,
+  );
   assert.equal(twitter.card, "summary_large_image");
 });
 
@@ -228,9 +344,10 @@ test("site detail title avoids duplicated 토토사이트 정보 suffix", () => 
 
   assert.equal(
     title,
-    "벳톡 도메인 정보 | 토토사이트 정보",
+    "벳톡 도메인 현황 | 토토사이트 정보",
   );
   assert.equal(countOccurrences(title, "토토사이트 정보"), 1);
+  assert.equal(title.includes("도메인 정보 | 토토사이트 정보"), false);
 });
 
 test("site detail H1 uses descriptive site report wording", () => {
@@ -240,8 +357,50 @@ test("site detail H1 uses descriptive site report wording", () => {
   assert.equal(heading.endsWith(site.siteName), false);
   assert.equal(heading.includes(site.siteName), true);
   assert.equal(heading.includes(`${site.siteName} 토토사이트`), false);
-  assert.match(heading, /도메인 정보|먹튀 제보|후기/);
+  assert.match(heading, /도메인 현황|먹튀 제보|후기/);
   assert.equal(heading.length >= 8, true);
+});
+
+test("site detail title H1 and description keep reviews conditional", () => {
+  const site = createSite({
+    siteName: "애니카지노 (anicasino)",
+    siteNameKo: "애니카지노",
+    siteUrl: "https://an-g1.com",
+    domains: [
+      "https://an-g1.com",
+      "https://an-g2.com",
+      "https://an-g3.com",
+      "https://an-g4.com",
+    ],
+    scamReportCount: 1,
+    reviewCount: 0,
+  });
+  const title = buildSiteDetailTitle(site);
+  const heading = buildSiteDetailHeading(site);
+  const description = buildSiteDetailMetaDescription(site);
+
+  assert.equal(
+    title,
+    "애니카지노(anicasino) 먹튀 제보·도메인 현황 | 토토사이트 정보",
+  );
+  assert.equal(
+    heading,
+    "애니카지노 (anicasino) 먹튀 제보·도메인 현황",
+  );
+  assert.equal(
+    description,
+    "애니카지노(anicasino)의 먹튀 제보 1건과 대표 도메인 an-g1.com, 추가 도메인 3개를 정리했습니다. 제보 내용은 참고 자료이며 사이트 전체 상태를 단정하지 않습니다.",
+  );
+  assert.equal(description.length >= 80 && description.length <= 120, true);
+  assert.equal(title.includes("후기"), false);
+  assert.equal(heading.includes("후기"), false);
+  assert.equal(description.includes("후기"), false);
+  assert.equal(description.includes("먹튀 확정"), false);
+
+  assert.equal(
+    buildSiteDetailTitle(createSite({ scamReportCount: 1, reviewCount: 1 })),
+    "벳톡 먹튀 제보·후기·도메인 현황 | 토토사이트 정보",
+  );
 });
 
 test("site detail H1 uses report review and domain data axes", () => {
@@ -255,7 +414,7 @@ test("site detail H1 uses report review and domain data axes", () => {
 
   assert.equal(
     heading,
-    "유튜벳 (YOUTOOBET) 먹튀 제보·후기·도메인 정보",
+    "유튜벳 (YOUTOOBET) 먹튀 제보·후기·도메인 현황",
   );
 });
 
@@ -269,7 +428,7 @@ test("site detail H1 removes prohibited promotional terms", () => {
     forbiddenTerms.some((term) => heading.includes(term)),
     false,
   );
-  assert.equal(heading.includes("도메인 정보"), true);
+  assert.equal(heading.includes("도메인 현황"), true);
 });
 
 test("twitter title is generated from the site detail title", () => {
@@ -278,18 +437,18 @@ test("twitter title is generated from the site detail title", () => {
 
   assert.equal(
     twitter.title,
-    "벳톡 도메인 정보 | 토토사이트 정보",
+    "벳톡 도메인 현황 | 토토사이트 정보",
   );
 });
 
 test("site detail title reflects approved reports reviews and domains", () => {
   assert.equal(
     buildSiteDetailTitle(createSite({ scamReportCount: 2, reviewCount: 1 })),
-    "벳톡 먹튀 제보·후기·도메인 정보 | 토토사이트 정보",
+    "벳톡 먹튀 제보·후기·도메인 현황 | 토토사이트 정보",
   );
   assert.equal(
     buildSiteDetailTitle(createSite({ reviewCount: 3 })),
-    "벳톡 후기·도메인 정보 | 토토사이트 정보",
+    "벳톡 후기·도메인 현황 | 토토사이트 정보",
   );
   assert.equal(
     buildSiteDetailTitle(
@@ -298,7 +457,7 @@ test("site detail title reflects approved reports reviews and domains", () => {
         domains: ["https://bettok.example", "https://bettok.kr"],
       }),
     ),
-    "벳톡 도메인 정보 | 토토사이트 정보",
+    "벳톡 도메인 현황 | 토토사이트 정보",
   );
   assert.equal(
     buildSiteDetailTitle(createSite(), {
@@ -308,7 +467,7 @@ test("site detail title reflects approved reports reviews and domains", () => {
         ),
       },
     }),
-    "벳톡 도메인 정보 | 토토사이트 정보",
+    "벳톡 도메인 현황 | 토토사이트 정보",
   );
 });
 

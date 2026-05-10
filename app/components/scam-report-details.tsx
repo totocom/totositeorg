@@ -2,10 +2,10 @@ import type { ScamReport } from "@/app/data/sites";
 import { ScamReportPublicDetailsDisclosure } from "@/app/components/scam-report-public-details-disclosure";
 import {
   formatKoreanDate,
-  sanitizePublicGeneratedText,
-  sanitizePublicSiteName,
   sanitizePublicUserText,
 } from "@/app/data/public-display";
+import { buildScamReportSelectionSummary } from "@/app/data/public-seo-selection";
+import { formatScamReportDepositAmount } from "@/app/data/scam-report-deposit-display";
 
 type ScamReportDetailsProps = {
   report: ScamReport;
@@ -46,24 +46,11 @@ function HighlightItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function listText(values: string[], fallback: string) {
-  return values.length > 0 ? values.join(", ") : fallback;
-}
-
 function sanitizeOptionalPublicText(value: string | null | undefined) {
   const normalized = value?.trim();
   if (!normalized) return null;
 
   return sanitizePublicUserText(normalized);
-}
-
-function buildScamReportSummary(report: ScamReport, siteName?: string) {
-  const targetSite = sanitizePublicSiteName(siteName);
-  const damage = listText(report.damageTypes, "피해");
-
-  return sanitizePublicGeneratedText(
-    `승인된 공개 제보 기준으로, 작성자는 ${targetSite} 이용 중 ${damage} 관련 피해를 주장했습니다. 발생일, 이용 기간, 피해 금액, 입금액은 제보자가 제출한 정보를 기준으로 표시됩니다. 이 제보는 참고 자료이며 단일 제보만으로 사이트 전체를 단정하기는 어렵습니다.`,
-  );
 }
 
 export function ScamReportDetails({ report, siteName }: ScamReportDetailsProps) {
@@ -76,7 +63,7 @@ export function ScamReportDetails({ report, siteName }: ScamReportDetailsProps) 
   return (
     <div className="mt-3 grid gap-3">
       <p className="rounded-md bg-surface p-3 text-sm leading-6 text-foreground">
-        {buildScamReportSummary(report, siteName)}
+        {buildScamReportSelectionSummary(report, siteName)}
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -98,7 +85,7 @@ export function ScamReportDetails({ report, siteName }: ScamReportDetailsProps) 
         />
         <HighlightItem
           label="입금액"
-          value={formatAmount(report.depositAmount)}
+          value={formatScamReportDepositAmount(report)}
         />
       </div>
 
@@ -151,7 +138,7 @@ export function ScamReportDetails({ report, siteName }: ScamReportDetailsProps) 
             />
             <DetailItem
               label="입금액"
-              value={formatAmount(report.depositAmount)}
+              value={formatScamReportDepositAmount(report)}
             />
             <DetailItem
               label="입금일"

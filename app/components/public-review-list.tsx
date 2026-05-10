@@ -7,6 +7,7 @@ import { ReviewSummary } from "@/app/components/review-summary";
 import { formatKstDate } from "@/app/data/date-format";
 import type { PublicSiteListItem } from "@/app/data/public-site-list-item";
 import { maskPublicAuthorName } from "@/app/data/public-display";
+import { buildReviewCardTitle } from "@/app/data/public-seo-selection";
 import type { PublicReviewListItem } from "@/app/data/public-sites";
 import { formatRatingScore, issueTypeLabels } from "@/app/data/sites";
 
@@ -177,7 +178,7 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
                   {review.site.siteName}
                 </Link>
                 <h2 className="mt-1 text-lg font-bold text-foreground">
-                  {review.title}
+                  {buildReviewCardTitle(review.experience, review.title)}
                 </h2>
                 <div className="mt-2 flex flex-wrap items-center gap-3">
                   <ReviewScoreBadge rating={review.rating} />

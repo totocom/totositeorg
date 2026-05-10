@@ -23,6 +23,31 @@ import {
 import { formatKstDate } from "./date-format";
 
 const siteName = "벳톡";
+const siteDetailTabsSource = readFileSync(
+  "app/components/site-detail/site-detail-tabs.tsx",
+  "utf8",
+);
+const siteScamReportsPageSource = readFileSync(
+  "app/sites/[slug]/scam-reports/page.tsx",
+  "utf8",
+);
+const siteReviewsPageSource = readFileSync(
+  "app/sites/[slug]/reviews/page.tsx",
+  "utf8",
+);
+const pageShareButtonSource = readFileSync(
+  "app/components/page-share-button.tsx",
+  "utf8",
+);
+const submitScamReportPageSource = readFileSync(
+  "app/submit-scam-report/page.tsx",
+  "utf8",
+);
+const submitReviewPageSource = readFileSync(
+  "app/submit-review/page.tsx",
+  "utf8",
+);
+const sitemapSource = readFileSync("app/sitemap.ts", "utf8");
 
 test("site detail body anchors use the allowed unique text set", () => {
   const links = buildSiteDetailInternalLinks({ siteName });
@@ -103,6 +128,16 @@ test("rendered site detail anchors do not duplicate body text or header nav sets
 test("header and footer navigation label sets are individually unique", () => {
   assert.deepEqual(findDuplicateStrings(primaryNavigationLinks.map((link) => link.label)), []);
   assert.deepEqual(findDuplicateStrings(footerNavigationLinks.map((link) => link.label)), []);
+  assert.deepEqual(
+    footerNavigationLinks.filter((link) =>
+      ["/privacy-policy", "/terms", "/content-policy"].includes(link.href),
+    ),
+    [
+      { href: "/privacy-policy", label: "개인정보 처리방침" },
+      { href: "/terms", label: "이용약관" },
+      { href: "/content-policy", label: "후기·제보 운영정책" },
+    ],
+  );
 });
 
 test("site header renders mobile nav only after the mobile menu is open", () => {
@@ -126,6 +161,52 @@ test("site detail page renders the feedback and scam report submission guide", (
   );
 });
 
+test("site detail tabs use unique site-specific anchor text", () => {
+  assert.match(siteDetailTabsSource, /\$\{tabSiteName\} 기본 정보/);
+  assert.match(siteDetailTabsSource, /\$\{tabSiteName\} 먹튀 제보 \$\{counts\.scamReports\}건/);
+  assert.match(siteDetailTabsSource, /\$\{tabSiteName\} 후기 \$\{counts\.reviews\}건/);
+  assert.match(siteDetailTabsSource, /\$\{tabSiteName\} 도메인 \$\{counts\.domains\}개/);
+  assert.doesNotMatch(siteDetailTabsSource, /먹튀 제보 \(\$\{counts\.scamReports\}\)/);
+  assert.doesNotMatch(siteDetailTabsSource, /주소·도메인 \(\$\{counts\.domains\}\)/);
+});
+
+test("site scam reports page uses nofollow submit links and a single share button", () => {
+  assert.match(siteScamReportsPageSource, /rel="nofollow"/);
+  assert.match(siteScamReportsPageSource, /actionRel="nofollow"/);
+  assert.match(siteScamReportsPageSource, /<PageShareButton/);
+  assert.match(pageShareButtonSource, /navigator\.share/);
+  assert.match(pageShareButtonSource, /navigator\.clipboard\.writeText\(url\)/);
+  assert.match(pageShareButtonSource, /이 페이지 공유하기/);
+  assert.match(siteScamReportsPageSource, /heading=\{responsibleUseHeading\}/);
+});
+
+test("site reviews page uses contextual heading and nofollow submit links", () => {
+  assert.match(siteReviewsPageSource, /heading=\{responsibleUseHeading\}/);
+  assert.match(siteReviewsPageSource, /후기 확인 시 참고사항/);
+  assert.match(siteReviewsPageSource, /rel="nofollow"/);
+  assert.match(siteReviewsPageSource, /actionRel="nofollow"/);
+  assert.match(siteReviewsPageSource, /\{shortSiteName\} 후기 작성/);
+  assert.doesNotMatch(
+    siteReviewsPageSource,
+    /<ResponsibleUseNotice variant="card" \/>/,
+  );
+});
+
+test("submit form routes stay noindex with query-free canonicals", () => {
+  assert.match(submitScamReportPageSource, /canonical:\s*new URL\("\/submit-scam-report", siteUrl\)\.toString\(\)/);
+  assert.match(submitReviewPageSource, /canonical:\s*new URL\("\/submit-review", siteUrl\)\.toString\(\)/);
+  assert.match(submitScamReportPageSource, /index:\s*false[\s\S]*follow:\s*true/);
+  assert.match(submitReviewPageSource, /index:\s*false[\s\S]*follow:\s*true/);
+  assert.doesNotMatch(sitemapSource, /submit-scam-report/);
+  assert.doesNotMatch(sitemapSource, /submit-review/);
+});
+
+test("legal policy pages are linked in sitemap", () => {
+  assert.match(sitemapSource, /\/privacy-policy/);
+  assert.match(sitemapSource, /\/terms/);
+  assert.match(sitemapSource, /\/content-policy/);
+});
+
 test("site detail page uses the same two-column detail layout as blog posts", () => {
   const siteDetailPageSource = readFileSync("app/sites/[slug]/page.tsx", "utf8");
   const blogDetailPageSource = readFileSync("app/blog/[slug]/page.tsx", "utf8");
@@ -147,7 +228,7 @@ test("site detail page uses the same two-column detail layout as blog posts", ()
   );
   assert.match(
     siteDetailPageSource,
-    /<aside className="grid content-start gap-4">[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<ResponsibleUseNotice variant="compact" \/>[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<SiteShareActions[\s\S]*?<\/aside>/,
+    /<aside className="grid content-start gap-4">[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<ResponsibleUseNotice[\s\S]*variant="compact"[\s\S]*heading=\{responsibleUseHeading\}[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<SiteShareActions[\s\S]*?<\/aside>/,
   );
   assert.doesNotMatch(
     siteDetailPageSource,

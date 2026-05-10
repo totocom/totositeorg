@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { ScamReportForm } from "@/app/components/scam-report-form";
+import { siteUrl } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "먹튀 피해 제보",
   description:
     "등록된 토토사이트에 대해 먹튀 피해 발생 일자, 피해 유형, 금액, 상황 설명을 작성해 관리자 검토를 요청하세요.",
+  alternates: {
+    canonical: new URL("/submit-scam-report", siteUrl).toString(),
+  },
   robots: {
     index: false,
     follow: true,

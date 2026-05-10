@@ -5,7 +5,7 @@ import type { ReviewTarget } from "./sites";
 import { siteName, siteUrl } from "../../lib/config";
 
 const DEFAULT_SITE_DETAIL_OG_IMAGE_PATH = "/logo.png";
-const META_DESCRIPTION_MAX_LENGTH = 160;
+const META_DESCRIPTION_MAX_LENGTH = 120;
 const SITE_DETAIL_HEADING_FORBIDDEN_TERMS = [
   "추천",
   "안전",
@@ -145,12 +145,12 @@ export function buildSiteDetailMetaDescription(
     reviewCount: site.reviewCount,
     scamReportCount,
   });
-  const firstDescriptionSentence = getFirstMetaSafeSentence(site.shortDescription);
-  let templateDescription = `${displayName}의 ${dataParts.join(", ")} 정보를 확인하세요. 제보와 후기는 참고 자료이며 사이트 이용을 권장하지 않습니다. 확인되지 않은 내용은 사실로 단정하지 않습니다.`;
-
-  if (firstDescriptionSentence && templateDescription.length < 125) {
-    templateDescription = `${templateDescription} ${firstDescriptionSentence}`;
-  }
+  const templateDescription = buildSiteDetailMetaDescriptionText({
+    displayName,
+    dataParts,
+    hasScamReports: scamReportCount > 0,
+    hasReviews: site.reviewCount > 0,
+  });
 
   return truncateMetaDescription(stripMarkdownForMeta(templateDescription));
 }
@@ -218,7 +218,7 @@ export function buildMissingSiteMetadata(): Metadata {
   };
 }
 
-function normalizeTitleSiteName(value: string) {
+function normalizeBaseSiteName(value: string) {
   const name = stripMarkdownForMeta(value).replace(/\s+/g, " ").trim();
   const withoutRepeatedCategory = name
     .replace(/(?:\s*토토사이트\s*정보)+$/g, "")
@@ -228,12 +228,16 @@ function normalizeTitleSiteName(value: string) {
   return withoutRepeatedCategory || name || "사이트";
 }
 
+function normalizeTitleSiteName(value: string) {
+  return normalizeBaseSiteName(value).replace(/\s+\(/g, "(");
+}
+
 function normalizeMetaSiteName(value: string) {
   return normalizeTitleSiteName(value);
 }
 
 function normalizeHeadingSiteName(value: string) {
-  const normalizedName = normalizeTitleSiteName(value);
+  const normalizedName = normalizeBaseSiteName(value);
   const safeName = removeForbiddenHeadingTerms(normalizedName)
     .replace(/\s+/g, " ")
     .trim();
@@ -260,10 +264,10 @@ function getSiteDetailVisibleDataAxes(site: SiteDetailMetaInput) {
   }
 
   if (getSiteDomainCount(site) > 0) {
-    axes.push("도메인 정보");
+    axes.push("도메인 현황");
   }
 
-  return axes.length > 0 ? axes : ["기본 정보"];
+  return axes.length > 0 ? axes : ["기본 현황"];
 }
 
 function getSiteDetailMetaDataParts({
@@ -279,21 +283,50 @@ function getSiteDetailMetaDataParts({
 }) {
   const parts: string[] = [];
 
-  if (scamReportCount > 0) {
-    parts.push(`승인된 먹튀 제보 ${scamReportCount}건`);
-  }
+  parts.push(
+    scamReportCount > 0 ? `먹튀 제보 ${scamReportCount}건` : "먹튀 제보 현황",
+  );
 
   if (reviewCount > 0) {
     parts.push(`이용자 후기 ${reviewCount}건`);
   }
 
   if (domainCount > 1) {
-    parts.push(`대표 도메인 ${representativeDomain} 외 ${domainCount - 1}개`);
+    parts.push(`대표 도메인 ${representativeDomain}, 추가 도메인 ${domainCount - 1}개`);
   } else if (domainCount > 0) {
     parts.push(`대표 도메인 ${representativeDomain}`);
+  } else {
+    parts.push("도메인 현황");
   }
 
-  return parts.length > 0 ? parts : ["현재 공개 가능한 기본"];
+  return parts;
+}
+
+function buildSiteDetailMetaDescriptionText({
+  displayName,
+  dataParts,
+  hasScamReports,
+  hasReviews,
+}: {
+  displayName: string;
+  dataParts: string[];
+  hasScamReports: boolean;
+  hasReviews: boolean;
+}) {
+  const firstSentence = `${displayName}의 ${joinKoreanDataParts(dataParts)}를 정리했습니다.`;
+  const notice = hasScamReports && hasReviews
+    ? "제보와 후기는 참고 자료이며 사이트 전체 상태를 단정하지 않습니다."
+    : hasReviews
+      ? "후기는 참고 자료이며 사이트 전체 상태를 단정하지 않습니다."
+      : "제보 내용은 참고 자료이며 사이트 전체 상태를 단정하지 않습니다.";
+
+  return `${firstSentence} ${notice}`;
+}
+
+function joinKoreanDataParts(parts: string[]) {
+  if (parts.length <= 1) return parts[0] ?? "공개 기본 정보";
+
+  return `${parts.slice(0, -1).join(", ")}과 ${parts.at(-1)}`;
 }
 
 function truncateMetaDescription(value: string) {
@@ -349,20 +382,4 @@ function getRepresentativeDomain(value: string) {
     .replace(/\/.*$/, "");
 
   return domain || "대표 도메인";
-}
-
-function getFirstMetaSafeSentence(value: string | null | undefined) {
-  const plainText = stripMarkdownForMeta(value ?? "");
-  const sentence = plainText
-    .replace(/([.!?。！？])\s+/g, "$1\n")
-    .split(/\n+/)
-    .map((part) => part.trim())
-    .find((part) => part.length >= 20 && part.length <= 90);
-
-  if (!sentence) return "";
-  if (/추천|가입|입금|충전|보너스|이벤트|바로가기|최신\s*주소|먹튀\s*없음|검증\s*완료|안전|관리자|원문/.test(sentence)) {
-    return "";
-  }
-
-  return sentence;
 }

@@ -29,6 +29,10 @@ import {
 } from "@/app/data/public-display";
 import { extractDomain } from "@/app/data/domain-whois";
 import { getPublicSiteDetail } from "@/app/data/public-sites";
+import {
+  buildReviewCardTitle,
+  buildScamReportCardTitle,
+} from "@/app/data/public-seo-selection";
 import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
 import { getSiteOverviewMarkdownBlocks } from "@/app/data/public-site-description";
 import { calculateSiteDetailIndexability } from "@/app/data/site-detail-indexability";
@@ -363,6 +367,11 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const overviewBlocks = getSiteOverviewMarkdownBlocks(site.shortDescription);
   const visibleScamReports = splitEnabled ? scamReports.slice(0, 3) : scamReports;
   const visibleReviews = splitEnabled ? reviews.slice(0, 3) : reviews;
+  const responsibleUseHeadingSiteName =
+    site.siteNameKo?.trim() || site.siteName.replace(/\s*\([^)]*\)\s*/g, " ").trim();
+  const responsibleUseHeading = `${
+    responsibleUseHeadingSiteName || site.siteName
+  } 정보 이용 시 참고사항`;
 
   return (
     <>
@@ -506,6 +515,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             {splitEnabled ? (
               <SiteDetailTabs
                 slug={site.slug}
+                siteName={site.siteNameKo?.trim() || site.siteName}
                 activeTab="main"
                 counts={{
                   scamReports: scamReports.length,
@@ -702,7 +712,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-sm font-semibold text-foreground">
-                        {report.damageTypes.join(", ")}
+                        {buildScamReportCardTitle(report)}
                       </p>
                       <p className="mt-1 text-xs text-muted">
                         발생일 {formatKoreanDate(report.incidentDate)} · 이용 기간{" "}
@@ -734,6 +744,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 추가 피해 사례가 있다면 확인 가능한 정보를 중심으로{" "}
                 <Link
                   href={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
+                  rel="nofollow"
                   className="font-semibold text-accent transition hover:text-accent/80"
                 >
                   제보를 남겨주세요
@@ -751,6 +762,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </p>
               <Link
                 href={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
+                rel="nofollow"
                 className="mt-4 inline-flex min-h-10 items-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
               >
                 {site.siteName} 먹튀 피해 제보하기
@@ -788,7 +800,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="font-bold text-foreground">{review.title}</h3>
+                      <h3 className="font-bold text-foreground">
+                        {buildReviewCardTitle(review.experience, review.title)}
+                      </h3>
                     </div>
                     <p className="shrink-0 text-xs text-muted">
                       {maskPublicAuthorName(review.authorNickname)} ·{" "}
@@ -819,6 +833,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 이용 경험이 있다면{" "}
                 <Link
                   href={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
+                  rel="nofollow"
                   className="font-semibold text-accent transition hover:text-accent/80"
                 >
                   후기를 남겨주세요
@@ -836,6 +851,7 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </p>
               <Link
                 href={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
+                rel="nofollow"
                 className="mt-4 inline-flex min-h-10 items-center rounded-md border border-accent bg-accent px-4 text-sm font-bold text-white transition hover:bg-accent/80"
               >
                 {site.siteName} 후기 남기기
@@ -853,7 +869,10 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             reduced={!indexability.shouldIndex}
           />
 
-          <ResponsibleUseNotice variant="compact" />
+          <ResponsibleUseNotice
+            variant="compact"
+            heading={responsibleUseHeading}
+          />
 
           <RelatedBlogReportCard
             siteName={site.siteName}

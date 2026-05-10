@@ -155,6 +155,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.4,
     },
+    {
+      url: `${siteUrl}/privacy-policy`,
+      lastModified: new Date("2026-05-11"),
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${siteUrl}/terms`,
+      lastModified: new Date("2026-05-11"),
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${siteUrl}/content-policy`,
+      lastModified: new Date("2026-05-11"),
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
     ...blogEntries,
     ...siteEntries,
   ];

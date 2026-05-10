@@ -8,6 +8,7 @@ import {
   formatKoreanDate,
   maskPublicAuthorName,
 } from "@/app/data/public-display";
+import { buildScamReportCardTitle } from "@/app/data/public-seo-selection";
 import type { PublicScamReportListItem } from "@/app/data/public-sites";
 
 type ScamReportSortOption =
@@ -191,7 +192,7 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
                     {report.site.siteName}
                   </Link>
                   <h2 className="mt-1 text-xl font-bold text-foreground">
-                    {report.damageTypes.join(", ") || report.mainCategory}
+                    {buildScamReportCardTitle(report)}
                   </h2>
                   <p className="mt-1 text-xs text-muted">
                     발생일 {formatKoreanDate(report.incidentDate)} · 접수일{" "}

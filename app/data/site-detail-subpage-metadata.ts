@@ -8,6 +8,10 @@ import {
   getSiteDetailSocialImage,
 } from "./site-detail-metadata";
 import { calculateSiteDetailSubpageIndexability } from "./site-detail-subpage-indexability";
+import {
+  buildReviewsMetaDescription,
+  buildScamReportsMetaDescription,
+} from "./public-seo-selection";
 import type { ReviewTarget } from "./sites";
 import { siteName, siteUrl } from "../../lib/config";
 
@@ -28,6 +32,8 @@ type SiteScamReportsDetailResult = {
   };
   scamReports: Array<{
     damageTypes?: string[];
+    mainCategory?: string | null;
+    categoryItems?: string[] | null;
   }>;
 };
 
@@ -35,7 +41,9 @@ type SiteReviewsDetailResult = {
   common: {
     site: ReviewTarget | null;
   };
-  reviews: unknown[];
+  reviews: Array<{
+    experience?: string | null;
+  }>;
 };
 
 type SiteDomainsDetailResult = {
@@ -120,7 +128,7 @@ export function buildSiteReviewsMetadata(
     title: site
       ? buildSiteReviewsTitle(site.siteName)
       : "사이트 정보를 찾을 수 없습니다",
-    description: site ? buildSiteReviewsDescription(site) : "",
+    description: site ? buildSiteReviewsDescription(site, detail.reviews) : "",
     imageAlt: site ? `${site.siteName} 토토사이트 후기` : undefined,
   });
 }
@@ -164,11 +172,11 @@ export function buildSiteReviewsTitle(siteDisplayName: string) {
 
 export function buildSiteReviewsDescription(
   site: Pick<ReviewTarget, "siteName">,
+  reviews: Array<{ experience?: string | null }> = [],
 ) {
   const normalizedSiteName = site.siteName.replace(/\s+/g, " ").trim();
-  const displayName = sanitizePublicSiteName(normalizedSiteName);
 
-  return `${displayName}의 승인된 이용자 후기와 만족도 평가를 확인하세요. 환전, 고객센터, 이벤트, 모바일 사용성, 안전성 체감 등 세부 응답을 참고하되, 단일 후기로 사이트 전체를 단정하지 않는 것이 좋습니다.`;
+  return buildReviewsMetaDescription(normalizedSiteName, reviews);
 }
 
 export function buildSiteScamReportsTitle(siteDisplayName: string) {
@@ -181,15 +189,15 @@ export function buildSiteScamReportsTitle(siteDisplayName: string) {
 
 export function buildSiteScamReportsDescription(
   site: Pick<ReviewTarget, "siteName">,
-  scamReports: Array<{ damageTypes?: string[] }> = [],
+  scamReports: Array<{
+    damageTypes?: string[];
+    mainCategory?: string | null;
+    categoryItems?: string[] | null;
+  }> = [],
 ) {
   const normalizedSiteName = site.siteName.replace(/\s+/g, " ").trim();
-  const displayName = sanitizePublicSiteName(normalizedSiteName);
-  const damageTypeText = getScamReportDamageTypeText(scamReports);
 
-  return sanitizePublicGeneratedText(
-    `${displayName}의 승인된 먹튀 제보와 피해 사례를 확인하세요. ${damageTypeText} 공개 제보를 참고하되, 단일 제보만으로 사이트 전체를 단정하지 않는 것이 좋습니다.`,
-  );
+  return buildScamReportsMetaDescription(normalizedSiteName, scamReports);
 }
 
 export function buildDomainsTitleSuffix(
@@ -305,25 +313,6 @@ function normalizeReviewTitleSiteName(siteDisplayName: string) {
     .replace(/\s+\(/g, "(");
 
   return normalizedSiteName || "해당 사이트";
-}
-
-function getScamReportDamageTypeText(
-  scamReports: Array<{ damageTypes?: string[] }>,
-) {
-  const damageTypes = Array.from(
-    new Set(
-      scamReports.flatMap((report) =>
-        Array.isArray(report.damageTypes) ? report.damageTypes : [],
-      ),
-    ),
-  )
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .slice(0, 3);
-
-  if (damageTypes.length > 0) return `${damageTypes.join(", ")} 등`;
-
-  return "출금 거부, 출금 지연, 계정 차단, 고객센터 차단 등";
 }
 
 function toAbsoluteSiteUrl(path: string) {

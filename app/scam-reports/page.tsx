@@ -8,6 +8,7 @@ import {
   type SiteFaqItem,
 } from "@/app/components/site-detail/site-json-ld";
 import { toPublicSiteListItem } from "@/app/data/public-site-list-item";
+import { buildScamReportCardTitle } from "@/app/data/public-seo-selection";
 import {
   getPublicScamReportList,
   type PublicScamReportListItem,
@@ -189,7 +190,7 @@ function buildScamReportItemListJsonLd(items: PublicScamReportListItem[]) {
     itemListElement: items.map((report, index) => ({
       "@type": "ListItem",
       position: index + 1,
-      name: `${report.site.siteName} ${report.damageTypes.join(", ") || report.mainCategory}`,
+      name: `${report.site.siteName} ${buildScamReportCardTitle(report)}`,
       url: new URL(
         `/sites/${encodeURIComponent(report.site.slug)}/scam-reports`,
         siteUrl,

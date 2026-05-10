@@ -32,6 +32,7 @@ export function SiteFeedbackSubmissionGuide({
             <Link
               key={action.kind}
               href={action.href}
+              rel="nofollow"
               className="inline-flex min-h-11 items-center justify-center rounded-md border border-line bg-background px-3 text-sm font-bold text-foreground transition hover:border-accent hover:text-accent"
             >
               {action.label}

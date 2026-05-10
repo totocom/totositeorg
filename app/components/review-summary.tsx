@@ -1,11 +1,10 @@
 import { reviewSurveySections } from "@/app/data/review-survey";
 import { sanitizePublicUserText } from "@/app/data/public-display";
-
-type SurveyPayload = {
-  type?: string;
-  answers?: Record<string, string | string[]>;
-  comment?: string | null;
-};
+import {
+  buildReviewSelectionSummary,
+  parseReviewSurveyPayload,
+  publicReviewAnswerText,
+} from "@/app/data/public-seo-selection";
 
 type ReviewSummaryProps = {
   siteName: string;
@@ -26,19 +25,6 @@ const publicQuestionLabelOverrides = new Map([
   ["site_trust", "사이트 신뢰도 체감"],
   ["privacy_satisfaction", "개인정보 보호 체감"],
   ["transaction_stability", "거래 안정성 체감"],
-]);
-
-const publicAnswerReplacements = new Map([
-  ["지인 추천", "지인 소개"],
-  ["적극 추천", "매우 긍정"],
-  ["추천", "긍정"],
-  ["비추천", "부정"],
-  ["반드시 이용", "강한 재이용 의향"],
-  ["이용할 것 같음", "재이용 가능성 있음"],
-  ["안전하다고 느낌", "긍정 체감"],
-  ["매우 신뢰", "매우 신뢰한다고 응답"],
-  ["신뢰", "신뢰한다고 응답"],
-  ["안정적", "안정적으로 느꼈다고 응답"],
 ]);
 
 const surveyAnswerGroups = [
@@ -124,79 +110,27 @@ const surveyAnswerGroups = [
   },
 ];
 
-function parseSurveyPayload(experience: string): SurveyPayload | null {
-  try {
-    const parsed = JSON.parse(experience) as SurveyPayload;
-    if (parsed?.type !== "site_satisfaction_survey" || !parsed.answers) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
 function publicQuestionLabel(id: string) {
   return publicQuestionLabelOverrides.get(id) ?? questionLabelById.get(id) ?? id;
 }
 
-function publicAnswerText(value: string | string[] | undefined) {
-  if (!value) return "";
-
-  const values = Array.isArray(value) ? value : [value];
-
-  return values
-    .map((item) => {
-      const trimmed = item.trim();
-
-      return publicAnswerReplacements.get(trimmed) ?? trimmed;
-    })
-    .filter(Boolean)
-    .join(", ");
-}
-
 function getHighlights(answers: Record<string, string | string[]>) {
   return [
-    ["이용 목적", publicAnswerText(answers.purpose)],
-    ["이용 빈도", publicAnswerText(answers.frequency)],
-    ["전체 만족도", publicAnswerText(answers.overall_satisfaction)],
-    ["재이용 관련 응답", publicAnswerText(answers.reuse_intention)],
-    ["타인 공유 의향", publicAnswerText(answers.recommendation)],
-    ["만족한 부분", publicAnswerText(answers.best_part)],
-    ["개선 우선순위", publicAnswerText(answers.improvement_priority)],
+    ["이용 목적", publicReviewAnswerText(answers.purpose)],
+    ["이용 빈도", publicReviewAnswerText(answers.frequency)],
+    ["전체 만족도", publicReviewAnswerText(answers.overall_satisfaction)],
+    ["재이용 관련 응답", publicReviewAnswerText(answers.reuse_intention)],
+    ["타인 공유 의향", publicReviewAnswerText(answers.recommendation)],
+    ["만족한 부분", publicReviewAnswerText(answers.best_part)],
+    ["개선 우선순위", publicReviewAnswerText(answers.improvement_priority)],
   ].filter(([, value]) => value);
-}
-
-function getCategorySummary(answers: Record<string, string | string[]>) {
-  return [
-    publicAnswerText(answers.betting_category),
-    publicAnswerText(answers.sports_betting),
-    publicAnswerText(answers.casino_betting),
-    publicAnswerText(answers.slot_betting),
-    publicAnswerText(answers.mini_game_betting),
-    publicAnswerText(answers.other_betting),
-  ]
-    .filter(Boolean)
-    .join(", ");
-}
-
-function buildSeoSummary(siteName: string, payload: SurveyPayload) {
-  const answers = payload.answers ?? {};
-  const satisfaction = publicAnswerText(answers.overall_satisfaction) || "보통";
-  const purpose = publicAnswerText(answers.purpose) || "이용 경험 확인";
-  const bestPart = publicAnswerText(answers.best_part) || "서비스 전반";
-  const improvement =
-    publicAnswerText(answers.improvement_priority) || "추가 개선 항목";
-  const categories = getCategorySummary(answers) || "주요 서비스";
-
-  return `승인된 후기 기준, ${siteName} 이용자는 ${purpose} 목적으로 ${categories} 항목을 이용했다고 응답했으며, 전체 만족도는 ${satisfaction}으로 평가했습니다. 작성자는 ${bestPart} 항목을 상대적으로 긍정적으로 보았고, ${improvement}을 개선 우선순위로 선택했습니다. 이 평가는 참고 자료이며 사이트 전체 상태를 단정하지 않습니다.`;
 }
 
 function getGroupedSurveyAnswers(answers: Record<string, string | string[]>) {
   const usedIds = new Set<string>();
   const groups = surveyAnswerGroups.flatMap((group) => {
     const entries = group.ids.flatMap((id) => {
-      const value = publicAnswerText(answers[id]);
+      const value = publicReviewAnswerText(answers[id]);
 
       if (!value) return [];
 
@@ -223,7 +157,7 @@ function getGroupedSurveyAnswers(answers: Record<string, string | string[]>) {
   const remainingEntries = Object.entries(answers).flatMap(([id, value]) => {
     if (usedIds.has(id)) return [];
 
-    const text = publicAnswerText(value);
+    const text = publicReviewAnswerText(value);
 
     if (!text) return [];
 
@@ -249,7 +183,7 @@ export function ReviewSummary({
   experience,
   compact = false,
 }: ReviewSummaryProps) {
-  const payload = parseSurveyPayload(experience);
+  const payload = parseReviewSurveyPayload(experience);
 
   if (!payload) {
     return (
@@ -275,7 +209,7 @@ export function ReviewSummary({
   return (
     <div className="mt-3 grid gap-3 text-sm">
       <p className="rounded-md bg-background p-3 leading-6 text-foreground">
-        {buildSeoSummary(siteName, payload)}
+        {buildReviewSelectionSummary(siteName, payload)}
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -342,7 +276,7 @@ export function ReviewSummary({
 }
 
 export function getReviewSeoSummary(siteName: string, experience: string) {
-  const payload = parseSurveyPayload(experience);
+  const payload = parseReviewSurveyPayload(experience);
   if (!payload) return sanitizePublicUserText(experience);
-  return buildSeoSummary(siteName, payload);
+  return buildReviewSelectionSummary(siteName, payload);
 }

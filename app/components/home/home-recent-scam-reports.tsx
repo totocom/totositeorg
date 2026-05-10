@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatKoreanDate } from "@/app/data/public-display";
+import { buildScamReportCardTitle } from "@/app/data/public-seo-selection";
 import type { PublicScamReportListItem } from "@/app/data/public-sites";
 
 type HomeRecentScamReportsProps = {
@@ -12,10 +13,6 @@ function formatDamageAmount(report: PublicScamReportListItem) {
   }
 
   return `${report.damageAmount.toLocaleString("ko-KR")}원`;
-}
-
-function getDamageSummary(report: PublicScamReportListItem) {
-  return report.damageTypes.join(", ") || report.mainCategory;
 }
 
 export function HomeRecentScamReports({
@@ -57,7 +54,7 @@ export function HomeRecentScamReports({
                 {report.site.siteName}
               </Link>
               <h3 className="mt-2 text-sm font-bold text-foreground">
-                {getDamageSummary(report)}
+                {buildScamReportCardTitle(report)}
               </h3>
               <p className="mt-1 text-sm font-semibold text-red-600 dark:text-red-400">
                 피해 금액: {formatDamageAmount(report)}
