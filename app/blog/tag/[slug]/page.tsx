@@ -10,6 +10,10 @@ import {
   getPublicBlogPostsByTag,
   getPublicBlogTags,
 } from "@/app/data/public-blog-posts";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import { siteName, siteUrl } from "@/lib/config";
 
 type BlogTagPageProps = {
@@ -65,6 +69,13 @@ export async function generateMetadata({
       url: canonicalUrl,
       title: `${tag.label} 태그 글 | ${siteName}`,
       description: `${tag.label} 태그로 묶인 발행 블로그 글 목록입니다.`,
+      images: [getReportOpenGraphImage("default")],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${tag.label} 태그 글 | ${siteName}`,
+      description: `${tag.label} 태그로 묶인 발행 블로그 글 목록입니다.`,
+      images: [getReportTwitterImage("default")],
     },
   };
 }

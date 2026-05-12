@@ -562,6 +562,31 @@ test("buildBlogImageMetadata maps featured image to JSON-LD, OG, and Twitter ima
   assert.deepEqual(metadata.twitterImages, [imageUrl]);
 });
 
+test("buildBlogImageMetadata falls back to the default OG image", () => {
+  const metadata = buildBlogImageMetadata({
+    featuredImageUrl: null,
+    featuredImageAlt: null,
+  });
+  const openGraphImage = metadata.openGraphImages?.[0] as
+    | {
+        url: string;
+        width?: number;
+        height?: number;
+      }
+    | undefined;
+
+  assert.equal(metadata.jsonLdImage?.[0].endsWith("/og-default.webp"), true);
+  assert.equal(openGraphImage?.url.endsWith("/og-default.webp"), true);
+  assert.equal(openGraphImage?.width, 1200);
+  assert.equal(openGraphImage?.height, 630);
+  assert.deepEqual(metadata.twitterImages, [
+    {
+      url: "https://totosite.org/og-default.webp",
+      alt: "토토사이트 정보 - 후기, 먹튀 제보, 도메인 기록",
+    },
+  ]);
+});
+
 test("getPlacementInternalAnchorText returns section-specific site detail anchors", () => {
   assert.equal(
     getPlacementInternalAnchorText({

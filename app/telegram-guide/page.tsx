@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import { siteName, siteUrl } from "@/lib/config";
 
 export const metadata: Metadata = {
@@ -14,6 +18,14 @@ export const metadata: Metadata = {
     title: `텔레그램 기능 안내 | ${siteName}`,
     description:
       "현재 사이트에 적용된 텔레그램 인증, 사이트별 구독, 승인 알림 기능을 확인하세요.",
+    images: [getReportOpenGraphImage("default")],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `텔레그램 기능 안내 | ${siteName}`,
+    description:
+      "현재 사이트에 적용된 텔레그램 인증, 사이트별 구독, 승인 알림 기능을 확인하세요.",
+    images: [getReportTwitterImage("default")],
   },
 };
 

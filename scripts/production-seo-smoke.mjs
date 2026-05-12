@@ -54,6 +54,15 @@ function getRobotsContent(html) {
   return robotsTag.match(/content=["']([^"']+)["']/i)?.[1]?.toLowerCase() ?? "";
 }
 
+function getMetaContent(html, attribute, value) {
+  const metaTags = html.match(/<meta\b[^>]*>/gi) ?? [];
+  const metaTag = metaTags.find((tag) =>
+    new RegExp(`${attribute}=["']${value}["']`, "i").test(tag),
+  );
+
+  return metaTag?.match(/content=["']([^"']+)["']/i)?.[1] ?? "";
+}
+
 function getSitemapUrls(xml) {
   return Array.from(xml.matchAll(/<loc>(.*?)<\/loc>/g), (match) =>
     normalizeUrl(match[1]),
@@ -73,6 +82,7 @@ const blog = await fetchText("/blog");
 const sitemap = await fetchText("/sitemap.xml");
 const sitemapUrls = getSitemapUrls(sitemap.text);
 const normalizedBaseUrl = normalizeUrl(baseUrl);
+const defaultOgImageUrl = `${normalizedBaseUrl}/og-default.webp`;
 
 for (const term of [
   "계정 상태를 불러오는 중입니다.",
@@ -83,8 +93,48 @@ for (const term of [
 }
 
 addCheck(
+  "home og:title is present",
+  Boolean(getMetaContent(home.text, "property", "og:title")),
+);
+
+addCheck(
+  "home og:description is present",
+  Boolean(getMetaContent(home.text, "property", "og:description")),
+);
+
+addCheck(
+  "home og:image uses absolute default image",
+  getMetaContent(home.text, "property", "og:image") === defaultOgImageUrl,
+  getMetaContent(home.text, "property", "og:image"),
+);
+
+addCheck(
+  "home twitter:card is summary_large_image",
+  getMetaContent(home.text, "name", "twitter:card") === "summary_large_image",
+  getMetaContent(home.text, "name", "twitter:card"),
+);
+
+addCheck(
+  "home twitter:image uses absolute default image",
+  getMetaContent(home.text, "name", "twitter:image") === defaultOgImageUrl,
+  getMetaContent(home.text, "name", "twitter:image"),
+);
+
+addCheck(
   "/sites visible text does not expose direct http URLs",
   !/https?:\/\//i.test(sitesText),
+);
+
+addCheck(
+  "/sites og:image falls back to absolute default image",
+  getMetaContent(sites.text, "property", "og:image") === defaultOgImageUrl,
+  getMetaContent(sites.text, "property", "og:image"),
+);
+
+addCheck(
+  "/sites twitter:image falls back to absolute default image",
+  getMetaContent(sites.text, "name", "twitter:image") === defaultOgImageUrl,
+  getMetaContent(sites.text, "name", "twitter:image"),
 );
 
 for (const term of ["안전한 서비스", "빠른 서비스", "바로가기"]) {

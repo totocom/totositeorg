@@ -7,6 +7,10 @@ import {
   JsonLd,
   type SiteFaqItem,
 } from "@/app/components/site-detail/site-json-ld";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import { siteName, siteUrl } from "@/lib/config";
 
 const registrationTitle = "토토사이트 등록 및 사이트 제보 요청";
@@ -36,11 +40,13 @@ export const metadata: Metadata = {
     siteName,
     locale: "ko_KR",
     type: "website",
+    images: [getReportOpenGraphImage("default")],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: registrationMetaTitle,
     description: registrationDescription,
+    images: [getReportTwitterImage("default")],
   },
 };
 

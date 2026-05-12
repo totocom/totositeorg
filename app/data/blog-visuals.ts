@@ -1,5 +1,10 @@
 import { siteUrl } from "../../lib/config";
 import {
+  getAbsoluteReportOgImageUrl,
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "./social-images";
+import {
   getAllowedStoredImageUrl,
   isAllowedStoredImageUrl,
 } from "./storage-image-url";
@@ -165,17 +170,25 @@ export function buildBlogImageMetadata({
 }) {
   const absoluteImageUrl = getAbsoluteImageUrl(featuredImageUrl);
 
+  if (!absoluteImageUrl) {
+    const defaultImageUrl = getAbsoluteReportOgImageUrl("default");
+
+    return {
+      jsonLdImage: [defaultImageUrl],
+      openGraphImages: [getReportOpenGraphImage("default")],
+      twitterImages: [getReportTwitterImage("default")],
+    };
+  }
+
   return {
-    jsonLdImage: absoluteImageUrl ? [absoluteImageUrl] : undefined,
-    openGraphImages: absoluteImageUrl
-      ? [
-          {
-            url: absoluteImageUrl,
-            ...(featuredImageAlt ? { alt: featuredImageAlt } : {}),
-          },
-        ]
-      : undefined,
-    twitterImages: absoluteImageUrl ? [absoluteImageUrl] : undefined,
+    jsonLdImage: [absoluteImageUrl],
+    openGraphImages: [
+      {
+        url: absoluteImageUrl,
+        ...(featuredImageAlt ? { alt: featuredImageAlt } : {}),
+      },
+    ],
+    twitterImages: [absoluteImageUrl],
   };
 }
 

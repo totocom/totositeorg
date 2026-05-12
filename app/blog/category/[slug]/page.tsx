@@ -14,6 +14,10 @@ import {
   getPublicBlogPostsByCategory,
   type PublicBlogPost,
 } from "@/app/data/public-blog-posts";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import { siteName, siteUrl } from "@/lib/config";
 
 type BlogCategoryPageProps = {
@@ -256,6 +260,13 @@ export async function generateMetadata({
       url: canonicalUrl,
       title: `${category.name} | ${siteName}`,
       description: category.description,
+      images: [getReportOpenGraphImage("default")],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${category.name} | ${siteName}`,
+      description: category.description,
+      images: [getReportTwitterImage("default")],
     },
   };
 }

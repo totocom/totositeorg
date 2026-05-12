@@ -7,8 +7,8 @@ export const reportOgImageSize = {
 
 export const reportOgImages = {
   default: {
-    path: "/og/totosite-report-default.webp",
-    alt: "후기, 먹튀 제보, 주소·도메인 기록을 정리한 토토사이트 정보 리포트 이미지",
+    path: "/og-default.webp",
+    alt: "토토사이트 정보 - 후기, 먹튀 제보, 도메인 기록",
   },
   reviews: {
     path: "/og/totosite-report-reviews.webp",

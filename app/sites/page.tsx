@@ -12,6 +12,10 @@ import {
   type PublicSiteListItem,
 } from "@/app/data/public-site-list-item";
 import { getPublicSites } from "@/app/data/public-sites";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import { siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 300;
@@ -39,11 +43,13 @@ export const metadata: Metadata = {
     siteName,
     locale: "ko_KR",
     type: "website",
+    images: [getReportOpenGraphImage("default")],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: sitesMetaTitle,
     description: sitesDescription,
+    images: [getReportTwitterImage("default")],
   },
 };
 

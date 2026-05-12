@@ -10,6 +10,10 @@ import {
   getPublicBlogPosts,
   getPublicBlogTagsFromPosts,
 } from "@/app/data/public-blog-posts";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 300;
@@ -29,6 +33,13 @@ export const metadata: Metadata = {
     url: `${siteUrl}/blog`,
     title: `블로그 | ${siteName}`,
     description: siteDescription,
+    images: [getReportOpenGraphImage("default")],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `블로그 | ${siteName}`,
+    description: siteDescription,
+    images: [getReportTwitterImage("default")],
   },
 };
 
