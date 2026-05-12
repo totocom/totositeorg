@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { EmptyStateIllustration } from "@/app/components/empty-state-illustration";
 import { PublicDomainList } from "@/app/components/public-domain-list";
 import { RelatedLinkList } from "@/app/components/related-link-list";
 import {
@@ -11,6 +12,10 @@ import {
 import { formatDisplayDomain } from "@/app/data/domain-display";
 import { toPublicSiteListItem } from "@/app/data/public-site-list-item";
 import { getPublicSites } from "@/app/data/public-sites";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import type { ReviewTarget } from "@/app/data/sites";
 import { siteName, siteUrl } from "@/lib/config";
 
@@ -40,11 +45,13 @@ export const metadata: Metadata = {
     siteName,
     locale: "ko_KR",
     type: "website",
+    images: [getReportOpenGraphImage("domains")],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: domainsMetaTitle,
     description: domainsDescription,
+    images: [getReportTwitterImage("domains")],
   },
 };
 
@@ -286,6 +293,10 @@ export default async function DomainsPage() {
           <PublicDomainList sites={publicDomainListSites} />
         ) : (
           <section className="rounded-lg border border-line bg-surface p-8 text-center shadow-sm">
+            <EmptyStateIllustration
+              kind="domains"
+              alt="공개 가능한 토토사이트 주소와 도메인 기록이 아직 없는 상태"
+            />
             <h2 className="text-lg font-semibold">
               공개된 도메인 정보가 없습니다
             </h2>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120" viewBox="0 0 160 120" role="img" aria-labelledby="title desc">
+  <title id="title">도메인 기록 빈 상태</title>
+  <desc id="desc">어두운 카드 위의 검색 렌즈와 도메인 기록 아이콘</desc>
+  <rect x="18" y="12" width="124" height="96" rx="18" fill="#101827" stroke="#2c3748"/>
+  <rect x="42" y="32" width="70" height="56" rx="10" fill="#f8fafc"/>
+  <rect x="54" y="47" width="34" height="6" rx="3" fill="#111827"/>
+  <rect x="54" y="63" width="44" height="5" rx="2.5" fill="#cbd5e1"/>
+  <circle cx="99" cy="75" r="17" fill="none" stroke="#38bdf8" stroke-width="6"/>
+  <path d="M112 88l16 16" fill="none" stroke="#b9ecff" stroke-width="6" stroke-linecap="round"/>
+</svg>

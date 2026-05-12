@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { EmptyStateIllustration } from "@/app/components/empty-state-illustration";
 import { PublicReviewList } from "@/app/components/public-review-list";
 import { RelatedLinkList } from "@/app/components/related-link-list";
 import {
@@ -9,6 +10,10 @@ import {
 } from "@/app/components/site-detail/site-json-ld";
 import { toPublicSiteListItem } from "@/app/data/public-site-list-item";
 import { getPublicReviewList } from "@/app/data/public-sites";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import { siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 300;
@@ -33,11 +38,13 @@ export const metadata: Metadata = {
     siteName,
     locale: "ko_KR",
     type: "website",
+    images: [getReportOpenGraphImage("reviews")],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: reviewsTitle,
     description: reviewsDescription,
+    images: [getReportTwitterImage("reviews")],
   },
 };
 
@@ -176,6 +183,10 @@ export default async function ReviewsPage() {
           <PublicReviewList items={publicReviewItems} />
         ) : (
           <section className="rounded-lg border border-line bg-surface p-8 text-center shadow-sm">
+            <EmptyStateIllustration
+              kind="reviews"
+              alt="승인된 토토사이트 만족도 평가가 아직 없는 상태"
+            />
             <h2 className="text-lg font-semibold">
               공개된 만족도 평가가 없습니다
             </h2>

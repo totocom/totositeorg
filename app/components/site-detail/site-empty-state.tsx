@@ -1,4 +1,8 @@
 import Link from "next/link";
+import {
+  EmptyStateIllustration,
+  type EmptyStateIllustrationKind,
+} from "@/app/components/empty-state-illustration";
 
 type SiteEmptyStateProps = {
   title: string;
@@ -6,6 +10,8 @@ type SiteEmptyStateProps = {
   actionHref: string;
   actionLabel: string;
   actionRel?: string;
+  illustrationKind?: EmptyStateIllustrationKind;
+  illustrationAlt?: string;
 };
 
 export function SiteEmptyState({
@@ -14,9 +20,15 @@ export function SiteEmptyState({
   actionHref,
   actionLabel,
   actionRel,
+  illustrationKind = "search",
+  illustrationAlt,
 }: SiteEmptyStateProps) {
   return (
-    <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
+    <section className="rounded-lg border border-line bg-surface p-5 text-center shadow-sm">
+      <EmptyStateIllustration
+        kind={illustrationKind}
+        alt={illustrationAlt}
+      />
       <h2 className="text-lg font-bold text-foreground">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
       <Link

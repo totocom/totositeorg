@@ -3,6 +3,7 @@ import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
+import { EmptyStateIllustration } from "@/app/components/empty-state-illustration";
 import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { SiteDomainFaq } from "@/app/components/site-detail/site-domain-faq";
 import { buildSiteFaqContext } from "@/app/components/site-detail/site-faq-context";
@@ -334,10 +335,16 @@ export default async function SiteDomainsPage({ params }: SiteDomainsPageProps) 
                 })}
               </ul>
             ) : (
-              <p className="mt-4 rounded-md bg-background p-4 text-sm leading-6 text-muted">
-                공개 가능한 대표 도메인 또는 추가 도메인 정보가 아직 정리되지
-                않았습니다.
-              </p>
+              <div className="mt-4 rounded-md bg-background p-6 text-center">
+                <EmptyStateIllustration
+                  kind="domains"
+                  alt={`${site.siteName} 공개 도메인 기록이 아직 없는 상태`}
+                />
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  공개 가능한 대표 도메인 또는 추가 도메인 정보가 아직 정리되지
+                  않았습니다.
+                </p>
+              </div>
             )}
           </section>
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { EmptyStateIllustration } from "@/app/components/empty-state-illustration";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary } from "@/app/components/review-summary";
 import { formatKstDate } from "@/app/data/date-format";
@@ -212,7 +213,10 @@ export function PublicReviewList({ items }: PublicReviewListProps) {
         </section>
       ) : (
         <section className="rounded-xl border border-line bg-surface p-10 text-center shadow-sm">
-          <p className="text-2xl">🔍</p>
+          <EmptyStateIllustration
+            kind="search"
+            alt="후기 검색 조건과 일치하는 결과가 없는 상태"
+          />
           <h2 className="mt-3 text-lg font-bold">검색 결과가 없습니다</h2>
           <p className="mt-2 text-sm leading-6 text-muted">
             사이트명 또는 평가 제목을 다르게 입력해보세요.

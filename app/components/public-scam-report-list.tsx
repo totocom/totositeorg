@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { EmptyStateIllustration } from "@/app/components/empty-state-illustration";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import type { PublicSiteListItem } from "@/app/data/public-site-list-item";
 import {
@@ -241,6 +242,10 @@ export function PublicScamReportList({ items }: PublicScamReportListProps) {
         </section>
       ) : (
         <section className="rounded-lg border border-line bg-surface p-8 text-center shadow-sm">
+          <EmptyStateIllustration
+            kind="search"
+            alt="먹튀 제보 검색 조건과 일치하는 결과가 없는 상태"
+          />
           <h2 className="text-lg font-semibold">검색 결과가 없습니다</h2>
           <p className="mt-2 text-sm leading-6 text-muted">
             사이트명 또는 피해 유형을 다르게 입력해보세요.

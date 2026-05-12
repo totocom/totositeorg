@@ -277,6 +277,8 @@ export default async function SiteScamReportsPage({
                 actionHref={`/submit-scam-report?siteId=${encodeURIComponent(site.id)}`}
                 actionLabel={`${site.siteName} 먹튀 피해 제보하기`}
                 actionRel="nofollow"
+                illustrationKind="scam-reports"
+                illustrationAlt={`${site.siteName} 승인 먹튀 제보 데이터가 아직 없는 상태`}
               />
               <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
                 <h2 className="text-lg font-bold text-foreground">

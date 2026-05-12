@@ -471,7 +471,7 @@ test("site detail title reflects approved reports reviews and domains", () => {
   );
 });
 
-test("stored screenshot url is used as open graph and twitter image", () => {
+test("stored screenshot url is not used as open graph and twitter image", () => {
   const screenshotUrl =
     "https://project.supabase.co/storage/v1/object/public/site-screenshots/captures/main.webp";
   const metadata = buildSiteDetailMetadata(
@@ -485,11 +485,19 @@ test("stored screenshot url is used as open graph and twitter image", () => {
     images?: Array<{ url: string }>;
   };
 
-  assert.equal(openGraph.images?.[0]?.url, screenshotUrl);
-  assert.equal(twitter.images?.[0]?.url, screenshotUrl);
+  assert.notEqual(openGraph.images?.[0]?.url, screenshotUrl);
+  assert.notEqual(twitter.images?.[0]?.url, screenshotUrl);
+  assert.equal(
+    openGraph.images?.[0]?.url.endsWith("/og/totosite-report-site.webp"),
+    true,
+  );
+  assert.equal(
+    twitter.images?.[0]?.url.endsWith("/og/totosite-report-site.webp"),
+    true,
+  );
 });
 
-test("stored screenshot url takes priority over thumbnail for social image", () => {
+test("site detail social image always uses the neutral report artwork", () => {
   const screenshotUrl =
     "https://project.supabase.co/storage/v1/object/public/site-screenshots/captures/main.webp";
   const screenshotThumbUrl =
@@ -498,7 +506,7 @@ test("stored screenshot url takes priority over thumbnail for social image", () 
     createSite({ screenshotUrl, screenshotThumbUrl }),
   );
 
-  assert.equal(image, screenshotUrl);
+  assert.equal(image.endsWith("/og/totosite-report-site.webp"), true);
 });
 
 test("favicon only is not used as site detail social image", () => {
@@ -513,7 +521,7 @@ test("favicon only is not used as site detail social image", () => {
   );
 
   assert.notEqual(image, faviconUrl);
-  assert.equal(image.endsWith("/logo.png"), true);
+  assert.equal(image.endsWith("/og/totosite-report-site.webp"), true);
 });
 
 test("external site screenshot is not used as social image", () => {
@@ -526,7 +534,7 @@ test("external site screenshot is not used as social image", () => {
   );
 
   assert.notEqual(image, externalImageUrl);
-  assert.equal(image.endsWith("/logo.png"), true);
+  assert.equal(image.endsWith("/og/totosite-report-site.webp"), true);
 });
 
 test("empty site description still produces valid meta description", () => {

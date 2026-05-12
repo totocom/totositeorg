@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import type { SiteDetailIndexabilityResult } from "./site-detail-indexability";
-import { getAllowedStoredImageUrl } from "./storage-image-url";
+import {
+  getAbsoluteReportOgImageUrl,
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "./social-images";
 import type { ReviewTarget } from "./sites";
 import { siteName, siteUrl } from "../../lib/config";
 
-const DEFAULT_SITE_DETAIL_OG_IMAGE_PATH = "/logo.png";
 const META_DESCRIPTION_MAX_LENGTH = 120;
 const SITE_DETAIL_HEADING_FORBIDDEN_TERMS = [
   "추천",
@@ -158,11 +161,9 @@ export function buildSiteDetailMetaDescription(
 export function getSiteDetailSocialImage(
   site: Pick<ReviewTarget, "screenshotUrl" | "screenshotThumbUrl">,
 ) {
-  const screenshotUrl =
-    getAllowedStoredImageUrl(site.screenshotUrl) ??
-    getAllowedStoredImageUrl(site.screenshotThumbUrl);
+  void site;
 
-  return toAbsoluteSiteUrl(screenshotUrl ?? DEFAULT_SITE_DETAIL_OG_IMAGE_PATH);
+  return getAbsoluteReportOgImageUrl("siteDetail");
 }
 
 export function buildSiteDetailMetadata(
@@ -176,6 +177,16 @@ export function buildSiteDetailMetadata(
   const socialImage = getSiteDetailSocialImage(site);
   const imageAlt = `${normalizeMetaSiteName(site.siteName)} 토토사이트 정보`;
   const shouldIndex = options.shouldIndex ?? true;
+  const openGraphImage = {
+    ...getReportOpenGraphImage("siteDetail"),
+    url: socialImage,
+    alt: imageAlt,
+  };
+  const twitterImage = {
+    ...getReportTwitterImage("siteDetail"),
+    url: socialImage,
+    alt: imageAlt,
+  };
 
   return {
     title: { absolute: title },
@@ -190,23 +201,13 @@ export function buildSiteDetailMetadata(
       url: pageUrl,
       title,
       description,
-      images: [
-        {
-          url: socialImage,
-          alt: imageAlt,
-        },
-      ],
+      images: [openGraphImage],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [
-        {
-          url: socialImage,
-          alt: imageAlt,
-        },
-      ],
+      images: [twitterImage],
     },
   };
 }

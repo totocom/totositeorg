@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { EmptyStateIllustration } from "@/app/components/empty-state-illustration";
 import { PublicScamReportList } from "@/app/components/public-scam-report-list";
 import { RelatedLinkList } from "@/app/components/related-link-list";
 import {
@@ -13,6 +14,10 @@ import {
   getPublicScamReportList,
   type PublicScamReportListItem,
 } from "@/app/data/public-sites";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import { siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 300;
@@ -40,11 +45,13 @@ export const metadata: Metadata = {
     siteName,
     locale: "ko_KR",
     type: "website",
+    images: [getReportOpenGraphImage("scamReports")],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: scamReportsMetaTitle,
     description: scamReportsDescription,
+    images: [getReportTwitterImage("scamReports")],
   },
 };
 
@@ -254,6 +261,10 @@ export default async function ScamReportsPage() {
           <PublicScamReportList items={publicScamReportItems} />
         ) : (
           <section className="rounded-lg border border-line bg-surface p-8 text-center shadow-sm">
+            <EmptyStateIllustration
+              kind="scam-reports"
+              alt="승인된 먹튀 피해 제보가 아직 없는 상태"
+            />
             <h2 className="text-lg font-semibold">
               공개된 먹튀 피해 제보가 없습니다
             </h2>

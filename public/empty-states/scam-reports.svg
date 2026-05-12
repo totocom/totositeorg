@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120" viewBox="0 0 160 120" role="img" aria-labelledby="title desc">
+  <title id="title">먹튀 제보 빈 상태</title>
+  <desc id="desc">어두운 카드 위의 경고 표시와 문서 아이콘</desc>
+  <rect x="18" y="12" width="124" height="96" rx="18" fill="#101827" stroke="#2c3748"/>
+  <rect x="42" y="32" width="76" height="56" rx="10" fill="#f8fafc"/>
+  <rect x="55" y="47" width="44" height="6" rx="3" fill="#111827"/>
+  <rect x="55" y="64" width="50" height="5" rx="2.5" fill="#cbd5e1"/>
+  <path d="M80 22l29 52H51z" fill="#3b2411" stroke="#f59e0b" stroke-width="2.5"/>
+  <path d="M80 41v16M80 65h.1" fill="none" stroke="#ffd28a" stroke-width="4" stroke-linecap="round"/>
+</svg>

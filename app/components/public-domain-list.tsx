@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { EmptyStateIllustration } from "@/app/components/empty-state-illustration";
 import type { PublicSiteListItem } from "@/app/data/public-site-list-item";
 import { formatKoreanDate } from "@/app/data/public-display";
 
@@ -272,6 +273,10 @@ export function PublicDomainList({ sites }: PublicDomainListProps) {
         </>
       ) : (
         <section className="rounded-xl border border-line bg-surface p-10 text-center">
+          <EmptyStateIllustration
+            kind="search"
+            alt="도메인 검색 조건과 일치하는 결과가 없는 상태"
+          />
           <h2 className="text-lg font-bold">검색 결과가 없습니다</h2>
           <p className="mt-2 text-sm leading-6 text-muted">
             사이트명이나 도메인을 다르게 입력해보세요.

@@ -4,6 +4,10 @@ import { Footer } from "@/app/components/footer";
 import { Header } from "@/app/components/header";
 import { SiteShell } from "@/app/components/site-shell";
 import { ThemeProvider } from "@/app/components/theme-provider";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import { siteDescription, siteName, siteUrl } from "@/lib/config";
 import "./globals.css";
 
@@ -37,11 +41,13 @@ export const metadata: Metadata = {
     siteName: siteName,
     title: `${siteName} - 토토사이트 데이터 리포트 및 리뷰`,
     description: siteDescription,
+    images: [getReportOpenGraphImage("default")],
   },
   twitter: {
     card: "summary_large_image",
     title: `${siteName} - 토토사이트 데이터 리포트 및 리뷰`,
     description: siteDescription,
+    images: [getReportTwitterImage("default")],
   },
   robots: {
     index: true,

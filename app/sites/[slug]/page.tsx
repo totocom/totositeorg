@@ -4,6 +4,7 @@ import Link from "next/link";
 import { cache } from "react";
 import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actions";
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
+import { EmptyStateIllustration } from "@/app/components/empty-state-illustration";
 import { RelatedBlogReportCard } from "@/app/components/related-blog-report-card";
 import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
@@ -753,7 +754,11 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </p>
             </div>
           ) : (
-            <div className="px-5 py-5">
+            <div className="px-5 py-5 text-center">
+              <EmptyStateIllustration
+                kind="scam-reports"
+                alt={`${site.siteName} 승인 먹튀 제보 데이터가 아직 없는 상태`}
+              />
               <h3 className="text-base font-bold text-foreground">
                 현재 공개된 승인 먹튀 제보가 없습니다
               </h3>
@@ -842,7 +847,11 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
               </p>
             </div>
           ) : (
-            <div className="px-5 py-5">
+            <div className="px-5 py-5 text-center">
+              <EmptyStateIllustration
+                kind="reviews"
+                alt={`${site.siteName} 승인 후기 데이터가 아직 없는 상태`}
+              />
               <h3 className="text-base font-bold text-foreground">
                 현재 공개된 승인 후기가 없습니다
               </h3>

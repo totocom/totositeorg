@@ -274,6 +274,8 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
                 actionHref={`/submit-review?siteId=${encodeURIComponent(site.id)}`}
                 actionLabel={`${shortSiteName} 후기 작성`}
                 actionRel="nofollow"
+                illustrationKind="reviews"
+                illustrationAlt={`${site.siteName} 승인 후기 데이터가 아직 없는 상태`}
               />
               <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
                 <h2 className="text-lg font-bold text-foreground">
