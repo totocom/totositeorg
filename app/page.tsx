@@ -16,6 +16,10 @@ import {
 } from "@/app/components/site-detail/site-json-ld";
 import { sanitizePublicSiteName } from "@/app/data/public-display";
 import { getHomePageData } from "@/app/data/public-home";
+import {
+  getReportOpenGraphImage,
+  getReportTwitterImage,
+} from "@/app/data/social-images";
 import { siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 600;
@@ -37,11 +41,16 @@ export const metadata: Metadata = {
     url: siteUrl,
     title: homeTitle,
     description: homeDescription,
+    siteName,
+    locale: "ko_KR",
+    type: "website",
+    images: [getReportOpenGraphImage("default")],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: homeTitle,
     description: homeDescription,
+    images: [getReportTwitterImage("default")],
   },
 };
 
