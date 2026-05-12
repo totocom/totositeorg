@@ -471,7 +471,7 @@ test("site detail title reflects approved reports reviews and domains", () => {
   );
 });
 
-test("stored screenshot url is not used as open graph and twitter image", () => {
+test("stored screenshot url is used as open graph and twitter image", () => {
   const screenshotUrl =
     "https://project.supabase.co/storage/v1/object/public/site-screenshots/captures/main.webp";
   const metadata = buildSiteDetailMetadata(
@@ -479,25 +479,25 @@ test("stored screenshot url is not used as open graph and twitter image", () => 
     "bettok",
   );
   const openGraph = metadata.openGraph as {
-    images?: Array<{ url: string }>;
+    images?: Array<{
+      url: string;
+      width?: number;
+      height?: number;
+      type?: string;
+    }>;
   };
   const twitter = metadata.twitter as {
     images?: Array<{ url: string }>;
   };
 
-  assert.notEqual(openGraph.images?.[0]?.url, screenshotUrl);
-  assert.notEqual(twitter.images?.[0]?.url, screenshotUrl);
-  assert.equal(
-    openGraph.images?.[0]?.url.endsWith("/og/totosite-report-site.webp"),
-    true,
-  );
-  assert.equal(
-    twitter.images?.[0]?.url.endsWith("/og/totosite-report-site.webp"),
-    true,
-  );
+  assert.equal(openGraph.images?.[0]?.url, screenshotUrl);
+  assert.equal(openGraph.images?.[0]?.width, undefined);
+  assert.equal(openGraph.images?.[0]?.height, undefined);
+  assert.equal(openGraph.images?.[0]?.type, undefined);
+  assert.equal(twitter.images?.[0]?.url, screenshotUrl);
 });
 
-test("site detail social image always uses the neutral report artwork", () => {
+test("site detail social image prefers stored screenshot over thumbnail", () => {
   const screenshotUrl =
     "https://project.supabase.co/storage/v1/object/public/site-screenshots/captures/main.webp";
   const screenshotThumbUrl =
@@ -506,7 +506,17 @@ test("site detail social image always uses the neutral report artwork", () => {
     createSite({ screenshotUrl, screenshotThumbUrl }),
   );
 
-  assert.equal(image.endsWith("/og/totosite-report-site.webp"), true);
+  assert.equal(image, screenshotUrl);
+});
+
+test("site detail social image falls back to stored screenshot thumbnail", () => {
+  const screenshotThumbUrl =
+    "https://project.supabase.co/storage/v1/object/public/site-screenshots/capture-thumbs/thumb.webp";
+  const image = getSiteDetailSocialImage(
+    createSite({ screenshotUrl: null, screenshotThumbUrl }),
+  );
+
+  assert.equal(image, screenshotThumbUrl);
 });
 
 test("favicon only is not used as site detail social image", () => {

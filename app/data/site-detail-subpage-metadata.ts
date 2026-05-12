@@ -5,12 +5,9 @@ import {
 } from "./public-display";
 import {
   buildSiteDetailRobots,
-  getSiteDetailSocialImage,
+  getSiteDetailOpenGraphImage,
+  getSiteDetailTwitterImage,
 } from "./site-detail-metadata";
-import {
-  getReportOpenGraphImage,
-  getReportTwitterImage,
-} from "./social-images";
 import { calculateSiteDetailSubpageIndexability } from "./site-detail-subpage-indexability";
 import {
   buildReviewsMetaDescription,
@@ -277,18 +274,9 @@ function buildSubpageMetadata(input: SiteSubpageMetaInput): Metadata {
     };
   }
 
-  const socialImage = getSiteDetailSocialImage(input.site);
   const imageAlt = input.imageAlt ?? input.title;
-  const openGraphImage = {
-    ...getReportOpenGraphImage("siteDetail"),
-    url: socialImage,
-    alt: imageAlt,
-  };
-  const twitterImage = {
-    ...getReportTwitterImage("siteDetail"),
-    url: socialImage,
-    alt: imageAlt,
-  };
+  const openGraphImage = getSiteDetailOpenGraphImage(input.site, imageAlt);
+  const twitterImage = getSiteDetailTwitterImage(input.site, imageAlt);
 
   return {
     title: { absolute: input.title },

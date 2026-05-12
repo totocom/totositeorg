@@ -6,6 +6,7 @@ import {
   getReportTwitterImage,
 } from "./social-images";
 import type { ReviewTarget } from "./sites";
+import { getAllowedStoredImageUrl } from "./storage-image-url";
 import { siteName, siteUrl } from "../../lib/config";
 
 const META_DESCRIPTION_MAX_LENGTH = 120;
@@ -161,9 +162,51 @@ export function buildSiteDetailMetaDescription(
 export function getSiteDetailSocialImage(
   site: Pick<ReviewTarget, "screenshotUrl" | "screenshotThumbUrl">,
 ) {
-  void site;
+  const screenshotUrl =
+    getAllowedStoredImageUrl(site.screenshotUrl) ??
+    getAllowedStoredImageUrl(site.screenshotThumbUrl);
 
-  return getAbsoluteReportOgImageUrl("siteDetail");
+  return screenshotUrl
+    ? toAbsoluteSiteUrl(screenshotUrl)
+    : getAbsoluteReportOgImageUrl("siteDetail");
+}
+
+export function getSiteDetailOpenGraphImage(
+  site: Pick<ReviewTarget, "screenshotUrl" | "screenshotThumbUrl">,
+  alt: string,
+) {
+  const socialImage = getSiteDetailSocialImage(site);
+
+  if (socialImage === getAbsoluteReportOgImageUrl("siteDetail")) {
+    return {
+      ...getReportOpenGraphImage("siteDetail"),
+      alt,
+    };
+  }
+
+  return {
+    url: socialImage,
+    alt,
+  };
+}
+
+export function getSiteDetailTwitterImage(
+  site: Pick<ReviewTarget, "screenshotUrl" | "screenshotThumbUrl">,
+  alt: string,
+) {
+  const socialImage = getSiteDetailSocialImage(site);
+
+  if (socialImage === getAbsoluteReportOgImageUrl("siteDetail")) {
+    return {
+      ...getReportTwitterImage("siteDetail"),
+      alt,
+    };
+  }
+
+  return {
+    url: socialImage,
+    alt,
+  };
 }
 
 export function buildSiteDetailMetadata(
@@ -174,19 +217,10 @@ export function buildSiteDetailMetadata(
   const title = buildSiteDetailTitle(site, options);
   const description = buildSiteDetailMetaDescription(site, options);
   const pageUrl = toAbsoluteSiteUrl(`/sites/${encodeURIComponent(slug)}`);
-  const socialImage = getSiteDetailSocialImage(site);
   const imageAlt = `${normalizeMetaSiteName(site.siteName)} 토토사이트 정보`;
   const shouldIndex = options.shouldIndex ?? true;
-  const openGraphImage = {
-    ...getReportOpenGraphImage("siteDetail"),
-    url: socialImage,
-    alt: imageAlt,
-  };
-  const twitterImage = {
-    ...getReportTwitterImage("siteDetail"),
-    url: socialImage,
-    alt: imageAlt,
-  };
+  const openGraphImage = getSiteDetailOpenGraphImage(site, imageAlt);
+  const twitterImage = getSiteDetailTwitterImage(site, imageAlt);
 
   return {
     title: { absolute: title },
