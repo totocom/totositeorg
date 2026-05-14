@@ -3,7 +3,6 @@ import Link from "next/link";
 import { RelatedLinkList } from "@/app/components/related-link-list";
 import { SiteBrowser } from "@/app/components/site-browser";
 import {
-  buildFaqPageJsonLd,
   JsonLd,
   type SiteFaqItem,
 } from "@/app/components/site-detail/site-json-ld";
@@ -244,7 +243,6 @@ export default async function SitesPage({ searchParams }: SitesPageProps) {
       {searchableSites.length > 0 ? (
         <JsonLd value={buildSiteItemListJsonLd(searchableSites, initialQuery)} />
       ) : null}
-      <JsonLd value={buildFaqPageJsonLd(sitesFaqItems)} />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
         <header className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
           <div>

@@ -4,7 +4,6 @@ import { EmptyStateIllustration } from "@/app/components/empty-state-illustratio
 import { PublicDomainList } from "@/app/components/public-domain-list";
 import { RelatedLinkList } from "@/app/components/related-link-list";
 import {
-  buildFaqPageJsonLd,
   buildSiteBreadcrumbJsonLd,
   JsonLd,
   type SiteFaqItem,
@@ -205,7 +204,6 @@ export default async function DomainsPage() {
     <>
       <JsonLd value={buildCollectionPageJsonLd()} />
       {sites.length > 0 ? <JsonLd value={buildDomainItemListJsonLd(sites)} /> : null}
-      <JsonLd value={buildFaqPageJsonLd(domainFaqItems)} />
       <JsonLd
         value={buildSiteBreadcrumbJsonLd({
           items: [
