@@ -80,6 +80,7 @@ export default function RootLayout({
   return (
     <html lang="ko" className="h-full antialiased" suppressHydrationWarning>
       <head>
+        <meta name="naver-site-verification" content="6e156de1ff53b554217256bfd873cc49b14f0228" />
         <link rel="manifest" href="/site.webmanifest" />
         <script
           dangerouslySetInnerHTML={{
