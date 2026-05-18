@@ -129,6 +129,12 @@ test("header and footer navigation label sets are individually unique", () => {
   assert.deepEqual(findDuplicateStrings(primaryNavigationLinks.map((link) => link.label)), []);
   assert.deepEqual(findDuplicateStrings(footerNavigationLinks.map((link) => link.label)), []);
   assert.deepEqual(
+    primaryNavigationLinks
+      .filter((link) => ["/site-registration", "/tools", "/blog"].includes(link.href))
+      .map((link) => link.href),
+    ["/site-registration", "/tools", "/blog"],
+  );
+  assert.deepEqual(
     footerNavigationLinks.filter((link) =>
       ["/privacy-policy", "/terms", "/content-policy"].includes(link.href),
     ),

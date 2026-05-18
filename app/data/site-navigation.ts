@@ -10,6 +10,7 @@ export const primaryNavigationLinks: SiteNavigationLink[] = [
   { href: "/scam-reports", label: "먹튀 제보" },
   { href: "/domains", label: "도메인 정보" },
   { href: "/site-registration", label: "사이트 등록" },
+  { href: "/tools", label: "계산기" },
   { href: "/blog", label: "블로그" },
 ];
 
