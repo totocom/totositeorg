@@ -3,7 +3,6 @@ import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { PageShareButton } from "@/app/components/page-share-button";
-import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { ScamReportDetails } from "@/app/components/scam-report-details";
 import { SiteEmptyState } from "@/app/components/site-detail/site-empty-state";
 import { buildSiteFaqContext } from "@/app/components/site-detail/site-faq-context";
@@ -61,17 +60,6 @@ function formatDamageAmount(report: ScamReport) {
 
 function formatDepositAmount(report: ScamReport) {
   return formatScamReportDepositAmount(report);
-}
-
-function getShortSiteName(site: { siteName: string; siteNameKo?: string | null }) {
-  return (
-    site.siteNameKo?.trim() ||
-    sanitizePublicSiteName(site.siteName)
-      .replace(/\s*\([^)]*\)\s*/g, " ")
-      .replace(/\s+/g, " ")
-      .trim() ||
-    site.siteName
-  );
 }
 
 function buildScamReportInterpretationNotice(
@@ -147,8 +135,6 @@ export default async function SiteScamReportsPage({
   const title = buildSiteScamReportsTitle(site);
   const description = buildSiteScamReportsDescription(site, scamReports);
   const bodySiteName = getSiteBodyName(site);
-  const shortSiteName = getShortSiteName(site);
-  const responsibleUseHeading = `${shortSiteName} 제보 확인 시 참고사항`;
 
   return (
     <>
@@ -298,10 +284,6 @@ export default async function SiteScamReportsPage({
           )}
 
           <SiteScamReportFaq context={context} />
-          <ResponsibleUseNotice
-            variant="card"
-            heading={responsibleUseHeading}
-          />
         </div>
       </main>
     </>

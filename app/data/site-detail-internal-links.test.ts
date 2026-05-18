@@ -35,6 +35,10 @@ const siteReviewsPageSource = readFileSync(
   "app/sites/[slug]/reviews/page.tsx",
   "utf8",
 );
+const siteDomainsPageSource = readFileSync(
+  "app/sites/[slug]/domains/page.tsx",
+  "utf8",
+);
 const pageShareButtonSource = readFileSync(
   "app/components/page-share-button.tsx",
   "utf8",
@@ -183,19 +187,21 @@ test("site scam reports page uses nofollow submit links and a single share butto
   assert.match(pageShareButtonSource, /navigator\.share/);
   assert.match(pageShareButtonSource, /navigator\.clipboard\.writeText\(url\)/);
   assert.match(pageShareButtonSource, /이 페이지 공유하기/);
-  assert.match(siteScamReportsPageSource, /heading=\{responsibleUseHeading\}/);
+  assert.doesNotMatch(siteScamReportsPageSource, /ResponsibleUseNotice/);
+  assert.doesNotMatch(siteScamReportsPageSource, /제보 확인 시 참고사항/);
 });
 
-test("site reviews page uses contextual heading and nofollow submit links", () => {
-  assert.match(siteReviewsPageSource, /heading=\{responsibleUseHeading\}/);
-  assert.match(siteReviewsPageSource, /후기 확인 시 참고사항/);
+test("site reviews page uses nofollow submit links without duplicate notice card", () => {
   assert.match(siteReviewsPageSource, /rel="nofollow"/);
   assert.match(siteReviewsPageSource, /actionRel="nofollow"/);
   assert.match(siteReviewsPageSource, /\{shortSiteName\} 후기 작성/);
-  assert.doesNotMatch(
-    siteReviewsPageSource,
-    /<ResponsibleUseNotice variant="card" \/>/,
-  );
+  assert.doesNotMatch(siteReviewsPageSource, /ResponsibleUseNotice/);
+  assert.doesNotMatch(siteReviewsPageSource, /후기 확인 시 참고사항/);
+});
+
+test("site domains page omits duplicate responsible use notice card", () => {
+  assert.doesNotMatch(siteDomainsPageSource, /ResponsibleUseNotice/);
+  assert.doesNotMatch(siteDomainsPageSource, /책임 있는 이용 안내/);
 });
 
 test("submit form routes stay noindex with query-free canonicals", () => {
@@ -234,8 +240,9 @@ test("site detail page uses the same two-column detail layout as blog posts", ()
   );
   assert.match(
     siteDetailPageSource,
-    /<aside className="grid content-start gap-4">[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<ResponsibleUseNotice[\s\S]*variant="compact"[\s\S]*heading=\{responsibleUseHeading\}[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<SiteShareActions[\s\S]*?<\/aside>/,
+    /<aside className="grid content-start gap-4">[\s\S]*?<SiteFeedbackSubmissionGuide[\s\S]*?<RelatedBlogReportCard[\s\S]*?<SiteTelegramAlertSubscription[\s\S]*?<SiteShareActions[\s\S]*?<\/aside>/,
   );
+  assert.doesNotMatch(siteDetailPageSource, /ResponsibleUseNotice/);
   assert.doesNotMatch(
     siteDetailPageSource,
     /<aside className="grid content-start gap-4">[\s\S]*?<DomainInfoTabs[\s\S]*?<\/aside>/,

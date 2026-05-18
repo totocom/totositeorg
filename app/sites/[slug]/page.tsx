@@ -6,7 +6,6 @@ import { AdminSiteDetailActions } from "@/app/components/admin-site-detail-actio
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { EmptyStateIllustration } from "@/app/components/empty-state-illustration";
 import { RelatedBlogReportCard } from "@/app/components/related-blog-report-card";
-import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { ReviewHelpfulnessVote } from "@/app/components/review-helpfulness-vote";
 import { ReviewSummary } from "@/app/components/review-summary";
 import { SafeMarkdown } from "@/app/components/safe-markdown";
@@ -370,11 +369,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const overviewBlocks = getSiteOverviewMarkdownBlocks(site.shortDescription);
   const visibleScamReports = splitEnabled ? scamReports.slice(0, 3) : scamReports;
   const visibleReviews = splitEnabled ? reviews.slice(0, 3) : reviews;
-  const responsibleUseHeadingSiteName =
-    site.siteNameKo?.trim() || site.siteName.replace(/\s*\([^)]*\)\s*/g, " ").trim();
-  const responsibleUseHeading = `${
-    responsibleUseHeadingSiteName || site.siteName
-  } 정보 이용 시 참고사항`;
 
   return (
     <>
@@ -881,11 +875,6 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
             siteId={site.id}
             siteName={site.siteName}
             reduced={!indexability.shouldIndex}
-          />
-
-          <ResponsibleUseNotice
-            variant="compact"
-            heading={responsibleUseHeading}
           />
 
           <RelatedBlogReportCard

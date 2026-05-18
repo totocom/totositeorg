@@ -4,7 +4,6 @@ import { permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { DomainInfoTabs } from "@/app/components/domain-info-tabs";
 import { EmptyStateIllustration } from "@/app/components/empty-state-illustration";
-import { ResponsibleUseNotice } from "@/app/components/responsible-use-notice";
 import { SiteDomainFaq } from "@/app/components/site-detail/site-domain-faq";
 import { buildSiteFaqContext } from "@/app/components/site-detail/site-faq-context";
 import { SiteHeaderCommon } from "@/app/components/site-detail/site-header-common";
@@ -409,7 +408,6 @@ export default async function SiteDomainsPage({ params }: SiteDomainsPageProps) 
             </ul>
           </section>
           <SiteDomainFaq context={context} />
-          <ResponsibleUseNotice variant="compact" />
         </div>
       </main>
     </>
