@@ -29,16 +29,11 @@ function getTime(value: string) {
   return Number.isFinite(time) ? time : 0;
 }
 
-function getSiteTrustScore(site: ReviewTarget) {
-  return site.trustScore?.total ?? 0;
-}
-
-function sortPopularSites(first: ReviewTarget, second: ReviewTarget) {
+function sortLatestSites(first: ReviewTarget, second: ReviewTarget) {
   return (
-    getSiteTrustScore(second) - getSiteTrustScore(first) ||
+    getTime(second.createdAt ?? "") - getTime(first.createdAt ?? "") ||
     second.reviewCount - first.reviewCount ||
     (second.scamReportCount ?? 0) - (first.scamReportCount ?? 0) ||
-    second.domains.length - first.domains.length ||
     first.siteName.localeCompare(second.siteName, "ko")
   );
 }
@@ -62,7 +57,7 @@ export async function getHomePageDataUncached(): Promise<PublicHomePageData> {
       scamReportCount: scamReportsResult.items.length,
       reviewCount: reviewsResult.items.length,
     },
-    popularSites: [...sitesResult.sites].sort(sortPopularSites).slice(0, 8),
+    popularSites: [...sitesResult.sites].sort(sortLatestSites).slice(0, 8),
     recentScamReports,
     recentReviews,
     errorMessage: [
@@ -83,7 +78,7 @@ export async function getHomePageDataUncached(): Promise<PublicHomePageData> {
 
 export const getHomePageData = unstable_cache(
   getHomePageDataUncached,
-  ["public-home-v1"],
+  ["public-home-v2"],
   {
     revalidate: 600,
     tags: ["public-sites", "public-home"],

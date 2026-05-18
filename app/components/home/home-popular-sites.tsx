@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { formatDisplayDomain } from "@/app/data/domain-display";
-import { formatTrustScore, type ReviewTarget } from "@/app/data/sites";
+import {
+  formatTrustScore,
+  getTrustScoreTone,
+  type ReviewTarget,
+} from "@/app/data/sites";
 
 type HomePopularSitesProps = {
   sites: ReviewTarget[];
@@ -8,6 +12,20 @@ type HomePopularSitesProps = {
 
 function getTrustScoreLabel(site: ReviewTarget) {
   return formatTrustScore(site.trustScore);
+}
+
+function getTrustScoreTextClass(site: ReviewTarget) {
+  const tone = getTrustScoreTone(site.trustScore?.total ?? 0);
+
+  if (tone === "danger") {
+    return "text-red-600 dark:text-red-400";
+  }
+
+  if (tone === "warning") {
+    return "text-yellow-700 dark:text-yellow-300";
+  }
+
+  return "text-accent";
 }
 
 export function HomePopularSites({ sites }: HomePopularSitesProps) {
@@ -61,7 +79,9 @@ export function HomePopularSites({ sites }: HomePopularSitesProps) {
             <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
               <div className="rounded-md bg-background p-2">
                 <dt className="text-xs text-muted">신뢰점수</dt>
-                <dd className="mt-1 text-sm font-black text-accent">
+                <dd
+                  className={`mt-1 text-sm font-black ${getTrustScoreTextClass(site)}`}
+                >
                   {getTrustScoreLabel(site)}
                 </dd>
               </div>
