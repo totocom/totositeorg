@@ -27,6 +27,7 @@ import {
 import { getSiteReviewsDetail } from "@/app/data/public-site-detail";
 import { buildReviewCardTitle } from "@/app/data/public-seo-selection";
 import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
+import { getSiteBodyName } from "@/app/data/site-name-format";
 import {
   buildSiteReviewsDescription,
   buildSiteReviewsMetadata,
@@ -146,8 +147,9 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
     `/sites/${encodeURIComponent(slug)}/reviews`,
     siteUrl,
   ).toString();
-  const title = buildSiteReviewsTitle(site.siteName);
+  const title = buildSiteReviewsTitle(site);
   const description = buildSiteReviewsDescription(site, reviews);
+  const bodySiteName = getSiteBodyName(site);
   const aggregateRatingJsonLd = buildAggregateRatingJsonLd(site);
   const shortSiteName = getShortSiteName(site);
   const responsibleUseHeading = `${shortSiteName} 후기 확인 시 참고사항`;
@@ -189,7 +191,7 @@ export default async function SiteReviewsPage({ params }: SiteReviewsPageProps) 
                   승인된 이용자 후기와 만족도 평가
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  승인된 이용 경험만 공개하며, 평점은 공개 승인 후기에만 반영됩니다.
+                  {bodySiteName} 관련 승인 후기를 기준으로 이용자 만족도 평가를 정리한 페이지입니다. 승인된 이용 경험만 공개하며, 평점은 공개 승인 후기에만 반영됩니다.
                 </p>
                 <dl className="mt-3 flex flex-wrap gap-2 text-xs">
                   <div className="rounded-md bg-background px-3 py-2">

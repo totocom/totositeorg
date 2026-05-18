@@ -26,19 +26,6 @@ function getDomainAge(value: string): string {
   return `${years}년 ${months}개월`;
 }
 
-function buildNeutralSummary(site: PublicSiteListItem, scamReportCount: number) {
-  const evidenceParts = [
-    `후기 ${site.reviewCount}건`,
-    `먹튀 제보 ${scamReportCount}건`,
-  ];
-
-  if (site.oldestDomainCreationDate) {
-    evidenceParts.push(`운영 이력 ${getDomainAge(site.oldestDomainCreationDate)}`);
-  }
-
-  return `대표 도메인과 ${evidenceParts.join(", ")}을 기준으로 정리한 공개 정보 요약입니다.`;
-}
-
 function getTrustToneClasses(score: number) {
   const tone = getTrustScoreTone(score);
 
@@ -114,9 +101,11 @@ export function SiteCard({ site }: SiteCardProps) {
         </div>
       </div>
 
-      <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted">
-        {buildNeutralSummary(site, scamReportCount)}
-      </p>
+      <div className="mt-3 flex justify-end">
+        <span className="text-xs font-semibold text-accent transition group-hover:underline">
+          상세 정보 보기
+        </span>
+      </div>
     </Link>
   );
 }

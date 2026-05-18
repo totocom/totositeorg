@@ -42,6 +42,7 @@ type SiteRow = SiteCrawlSnapshotSiteColumns & {
   name: string;
   name_ko: string | null;
   name_en: string | null;
+  include_english_alias_in_title: boolean | null;
   url: string;
   domains: string[] | null;
   screenshot_url: string | null;
@@ -146,6 +147,7 @@ type EditingSlug = {
 type AdminSiteFormValues = {
   nameKo: string;
   nameEn: string;
+  includeEnglishAliasInTitle: boolean;
   url: string;
   domainsText: string;
   faviconUrl: string;
@@ -229,6 +231,7 @@ const automaticCaptureFailureFallback = `페이지 캡처 이미지를 생성하
 const initialAdminSiteFormValues: AdminSiteFormValues = {
   nameKo: "",
   nameEn: "",
+  includeEnglishAliasInTitle: false,
   url: "",
   domainsText: "",
   faviconUrl: "",
@@ -338,7 +341,7 @@ async function fetchAdminData(): Promise<AdminDataResult> {
     supabase
       .from("sites")
       .select(
-        "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, category, available_states, license_info, status, description, contact_telegram, created_at",
+        "id, slug, name, name_ko, name_en, include_english_alias_in_title, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, category, available_states, license_info, status, description, contact_telegram, created_at",
       )
       .in("status", ["pending", "approved", "rejected"])
       .order("created_at", { ascending: false }),
@@ -1468,6 +1471,7 @@ export function AdminDashboard({
         name: getDisplayName(siteFormValues.nameKo, siteFormValues.nameEn),
         name_ko: siteFormValues.nameKo.trim() || null,
         name_en: siteFormValues.nameEn.trim() || null,
+        include_english_alias_in_title: siteFormValues.includeEnglishAliasInTitle,
         url: siteFormValues.url.trim(),
         domains: getDomainList(siteFormValues),
         screenshot_url: storedPageCaptureUrl,
@@ -1763,6 +1767,28 @@ export function AdminDashboard({
                 className="h-11 rounded-md border border-line px-3 text-sm"
                 placeholder="예: korea"
               />
+            </label>
+
+            <label className="flex items-start gap-3 rounded-md border border-line bg-background p-3 text-sm">
+              <input
+                type="checkbox"
+                checked={siteFormValues.includeEnglishAliasInTitle}
+                onChange={(event) =>
+                  updateSiteForm(
+                    "includeEnglishAliasInTitle",
+                    event.target.checked,
+                  )
+                }
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <span className="block font-semibold">
+                  title에 영어 이름 포함
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-muted">
+                  기본값은 해제입니다. 영문명이 공식명에 가깝거나 한글명만으로 식별이 어려운 경우에만 사용합니다.
+                </span>
+              </span>
             </label>
 
             <div className="grid gap-1 text-sm font-medium">

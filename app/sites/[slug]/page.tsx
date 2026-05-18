@@ -46,6 +46,7 @@ import {
   buildSiteDetailShareTitle,
 } from "@/app/data/site-detail-metadata";
 import { buildSiteDetailInternalLinks } from "@/app/data/site-detail-internal-links";
+import { getSiteBodyName } from "@/app/data/site-name-format";
 import {
   calculateSiteTrustScore,
   formatRatingScore,
@@ -364,7 +365,8 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
   const additionalDomains = domainTargets.filter(
     (domain) => formatDisplayDomain(domain) !== representativeDisplayDomain,
   );
-  const publicEvidenceNotice = `현재 공개된 ${site.siteName} 관련 먹튀 피해 제보는 ${scamReportCount}건, 이용자 후기는 ${reviews.length}건입니다. 단일 제보나 단일 후기는 사이트 전체의 상태를 확정하는 자료가 아니며, 피해 유형, 작성 시점, 도메인 정보, 추가 후기와 함께 참고해야 합니다.`;
+  const bodySiteName = getSiteBodyName(site);
+  const publicEvidenceNotice = `현재 공개된 ${bodySiteName} 관련 먹튀 피해 제보는 ${scamReportCount}건, 이용자 후기는 ${reviews.length}건입니다. 단일 제보나 단일 후기는 사이트 전체의 상태를 확정하는 자료가 아니며, 피해 유형, 작성 시점, 도메인 정보, 추가 후기와 함께 참고해야 합니다.`;
   const overviewBlocks = getSiteOverviewMarkdownBlocks(site.shortDescription);
   const visibleScamReports = splitEnabled ? scamReports.slice(0, 3) : scamReports;
   const visibleReviews = splitEnabled ? reviews.slice(0, 3) : reviews;
@@ -473,6 +475,9 @@ export default async function SiteDetailPage({ params }: SiteDetailPageProps) {
                 <p className="mt-1 break-all text-sm text-muted">
                   <span className="font-semibold text-foreground">대표 도메인: </span>
                   {representativeDisplayDomain || formatDisplayDomain(site.siteUrl)}
+                </p>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  {bodySiteName} 토토사이트의 먹튀 제보, 후기, 도메인 현황을 공개 승인 데이터 기준으로 정리한 페이지입니다.
                 </p>
               </div>
             </div>

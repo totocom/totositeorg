@@ -27,6 +27,7 @@ import {
 } from "@/app/data/public-display";
 import type { PublicSiteDnsRecord } from "@/app/data/public-sites";
 import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
+import { getSiteBodyName } from "@/app/data/site-name-format";
 import {
   buildSiteDomainsDescription,
   buildSiteDomainsMetadata,
@@ -155,8 +156,9 @@ export default async function SiteDomainsPage({ params }: SiteDomainsPageProps) 
     `/sites/${encodeURIComponent(slug)}/domains`,
     siteUrl,
   ).toString();
-  const title = buildSiteDomainsTitle(site.siteName);
+  const title = buildSiteDomainsTitle(site);
   const description = buildSiteDomainsDescription(site);
+  const bodySiteName = getSiteBodyName(site);
   const displaySiteName = sanitizePublicSiteName(site.siteName);
   const representativeDomain = domains[0] ?? null;
   const representativeDomainAge = representativeDomain?.domainAge ?? "확인 불가";
@@ -219,7 +221,7 @@ export default async function SiteDomainsPage({ params }: SiteDomainsPageProps) 
               {displaySiteName} 등록 도메인 {domains.length}개
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted">
-              대표 도메인과 추가 도메인은 관리자 등록 정보와 공개 가능한
+              {bodySiteName} 주소와 도메인 변경 이력을 관리자 등록 정보와 공개 가능한
               DNS·WHOIS 조회 결과를 기준으로 정리한 참고 자료입니다. 도메인이
               오래 운영되었거나 여러 개 등록되어 있다고 해서 사이트 안전성이나
               이용 가능성이 보장되는 것은 아닙니다. 이용자 후기와 먹튀 제보도

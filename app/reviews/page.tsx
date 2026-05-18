@@ -18,13 +18,14 @@ import { siteName, siteUrl } from "@/lib/config";
 
 export const revalidate = 300;
 
-const reviewsTitle = "토토사이트 후기 및 이용자 만족도 평가";
+const reviewsH1 = "토토사이트 후기 및 이용자 만족도 평가";
+const reviewsMetaTitle = "토토사이트 후기·이용자 만족도 평가";
 const reviewsDescription =
   "토토사이트 후기와 이용자 만족도 평가를 확인하세요. 환전 후기, 고객센터 후기, 이벤트 후기, 모바일 후기, 안전성 후기를 바탕으로 사이트별 리뷰를 비교할 수 있습니다.";
 
 export const metadata: Metadata = {
   title: {
-    absolute: reviewsTitle,
+    absolute: reviewsMetaTitle,
   },
   description: reviewsDescription,
   keywords: null,
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     url: `${siteUrl}/reviews`,
-    title: reviewsTitle,
+    title: reviewsMetaTitle,
     description: reviewsDescription,
     siteName,
     locale: "ko_KR",
@@ -42,7 +43,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: reviewsTitle,
+    title: reviewsMetaTitle,
     description: reviewsDescription,
     images: [getReportTwitterImage("reviews")],
   },
@@ -150,7 +151,7 @@ export default async function ReviewsPage() {
               토토사이트 리뷰 허브
             </p>
             <h1 className="mt-2 text-3xl font-bold text-foreground">
-              {reviewsTitle}
+              {reviewsH1}
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
               토토사이트 후기는 실제 이용자가 남긴 만족도 평가를 바탕으로

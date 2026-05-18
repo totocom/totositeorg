@@ -27,6 +27,7 @@ import { getSiteScamReportsDetail } from "@/app/data/public-site-detail";
 import { buildScamReportCardTitle } from "@/app/data/public-seo-selection";
 import { formatScamReportDepositAmount } from "@/app/data/scam-report-deposit-display";
 import { isSitePageSplitEnabled } from "@/app/data/site-page-split-flags";
+import { getSiteBodyName } from "@/app/data/site-name-format";
 import {
   buildSiteScamReportsDescription,
   buildSiteScamReportsMetadata,
@@ -143,8 +144,9 @@ export default async function SiteScamReportsPage({
     `/sites/${encodeURIComponent(slug)}/scam-reports`,
     siteUrl,
   ).toString();
-  const title = buildSiteScamReportsTitle(site.siteName);
+  const title = buildSiteScamReportsTitle(site);
   const description = buildSiteScamReportsDescription(site, scamReports);
+  const bodySiteName = getSiteBodyName(site);
   const shortSiteName = getShortSiteName(site);
   const responsibleUseHeading = `${shortSiteName} 제보 확인 시 참고사항`;
 
@@ -184,7 +186,7 @@ export default async function SiteScamReportsPage({
                   승인된 먹튀 제보 {scamReports.length}건
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  개인정보와 중복 여부를 검토한 뒤 승인된 공개 제보만 표시합니다.
+                  {bodySiteName} 관련 승인된 먹튀 제보를 기준으로 정리한 페이지입니다. 개인정보와 중복 여부를 검토한 뒤 승인된 공개 제보만 표시합니다.
                 </p>
                 <p
                   className={

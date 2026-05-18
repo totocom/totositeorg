@@ -22,6 +22,7 @@ export type ReviewTarget = {
   siteName: string;
   siteNameKo?: string | null;
   siteNameEn?: string | null;
+  includeEnglishAliasInTitle?: boolean;
   siteUrl: string;
   domains: string[];
   screenshotUrl: string | null;

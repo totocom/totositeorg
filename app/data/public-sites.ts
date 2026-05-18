@@ -26,7 +26,7 @@ import { supabase } from "../../lib/supabase/client";
 import { unstable_cache } from "next/cache";
 
 const PUBLIC_SITE_SELECT =
-  "id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, category, available_states, license_info, resolved_ips, dns_checked_at, created_at, description";
+  "id, slug, name, name_ko, name_en, include_english_alias_in_title, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, category, available_states, license_info, resolved_ips, dns_checked_at, created_at, description";
 
 type PublicSiteRow = SiteCrawlSnapshotSiteColumns & {
   id: string;
@@ -34,6 +34,7 @@ type PublicSiteRow = SiteCrawlSnapshotSiteColumns & {
   name: string;
   name_ko?: string | null;
   name_en?: string | null;
+  include_english_alias_in_title?: boolean | null;
   url: string;
   domains?: string[] | null;
   screenshot_url?: string | null;
@@ -236,6 +237,7 @@ function mapSiteRow(
     siteName: getDisplayName(site),
     siteNameKo: site.name_ko ?? null,
     siteNameEn: site.name_en ?? null,
+    includeEnglishAliasInTitle: Boolean(site.include_english_alias_in_title),
     siteUrl: site.url,
     domains,
     screenshotUrl: getAllowedStoredImageUrl(site.screenshot_url),

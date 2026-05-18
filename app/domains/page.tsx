@@ -22,7 +22,7 @@ export const revalidate = 300;
 
 const domainsH1 = "토토사이트 주소 및 도메인 정보 목록";
 const domainsMetaTitle =
-  "토토사이트 주소와 도메인 변경 정보 확인 | 토토사이트 정보";
+  "토토사이트 주소·도메인 변경 이력 확인";
 const domainsDescription =
   "토토사이트 주소와 도메인 정보를 확인하세요. 대표 주소, 추가 도메인, 도메인 변경 이력, 운영 기간, DNS·WHOIS 확인 정보를 바탕으로 사이트별 주소 정보를 비교할 수 있습니다.";
 const domainsCanonical = `${siteUrl}/domains`;

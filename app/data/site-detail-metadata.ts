@@ -5,6 +5,11 @@ import {
   getReportOpenGraphImage,
   getReportTwitterImage,
 } from "./social-images";
+import {
+  getSiteBodyName,
+  getSiteDisplayName,
+  getSiteTitleName,
+} from "./site-name-format";
 import type { ReviewTarget } from "./sites";
 import { getAllowedStoredImageUrl } from "./storage-image-url";
 import { siteName, siteUrl } from "../../lib/config";
@@ -50,6 +55,7 @@ export function stripMarkdownForMeta(input: string) {
 
 type SiteDetailMetadataOptions = {
   shouldIndex?: boolean;
+  includeEnglishAliasInTitle?: boolean;
   indexability?: SiteDetailIndexabilityResult;
   observationSnapshot?: SiteDetailObservationSnapshot | null;
   relatedBlogReport?: unknown | null;
@@ -79,6 +85,9 @@ type SiteDetailObservationSnapshot = {
 type SiteDetailMetaInput = Pick<
   ReviewTarget,
   | "siteName"
+  | "siteNameKo"
+  | "siteNameEn"
+  | "includeEnglishAliasInTitle"
   | "siteUrl"
   | "domains"
   | "reviewCount"
@@ -94,13 +103,12 @@ export function buildSiteDetailTitle(
   site: SiteDetailMetaInput,
   options: SiteDetailMetadataOptions = {},
 ) {
-  void options;
-
-  const displayName = normalizeTitleSiteName(site.siteName);
-  const titleAxes = getSiteDetailVisibleDataAxes(site);
+  const titleName = getSiteTitleName(site, {
+    includeEnglishAliasInTitle: options.includeEnglishAliasInTitle,
+  });
 
   return removeForbiddenHeadingTerms(
-    `${displayName} ${titleAxes.join("·")} | 토토사이트 정보`,
+    `${titleName} 먹튀 제보·후기·도메인 현황 | 토토사이트 정보`,
   )
     .replace(/\s+/g, " ")
     .trim();
@@ -126,7 +134,7 @@ export function buildSiteDetailHeading(
 ) {
   void options;
 
-  const displayName = normalizeHeadingSiteName(site.siteName);
+  const displayName = getSiteDisplayName(site);
   const headingAxes = getSiteDetailVisibleDataAxes(site);
   const heading = `${displayName} ${headingAxes.join("·")}`;
 
@@ -139,7 +147,7 @@ export function buildSiteDetailMetaDescription(
 ) {
   void options;
 
-  const displayName = normalizeMetaSiteName(site.siteName);
+  const displayName = getSiteBodyName(site);
   const domainCount = getSiteDomainCount(site);
   const scamReportCount = site.scamReportCount ?? 0;
   const representativeDomain = getRepresentativeDomain(site.siteUrl);
@@ -217,7 +225,7 @@ export function buildSiteDetailMetadata(
   const title = buildSiteDetailTitle(site, options);
   const description = buildSiteDetailMetaDescription(site, options);
   const pageUrl = toAbsoluteSiteUrl(`/sites/${encodeURIComponent(slug)}`);
-  const imageAlt = `${normalizeMetaSiteName(site.siteName)} 토토사이트 정보`;
+  const imageAlt = `${getSiteBodyName(site)} 토토사이트 정보`;
   const shouldIndex = options.shouldIndex ?? true;
   const openGraphImage = getSiteDetailOpenGraphImage(site, imageAlt);
   const twitterImage = getSiteDetailTwitterImage(site, imageAlt);
@@ -251,33 +259,6 @@ export function buildMissingSiteMetadata(): Metadata {
     title: { absolute: "사이트를 찾을 수 없습니다" },
     robots: buildSiteDetailRobots(false),
   };
-}
-
-function normalizeBaseSiteName(value: string) {
-  const name = stripMarkdownForMeta(value).replace(/\s+/g, " ").trim();
-  const withoutRepeatedCategory = name
-    .replace(/(?:\s*토토사이트\s*정보)+$/g, "")
-    .replace(/(?:\s*토토사이트)+$/g, "")
-    .trim();
-
-  return withoutRepeatedCategory || name || "사이트";
-}
-
-function normalizeTitleSiteName(value: string) {
-  return normalizeBaseSiteName(value).replace(/\s+\(/g, "(");
-}
-
-function normalizeMetaSiteName(value: string) {
-  return normalizeTitleSiteName(value);
-}
-
-function normalizeHeadingSiteName(value: string) {
-  const normalizedName = normalizeBaseSiteName(value);
-  const safeName = removeForbiddenHeadingTerms(normalizedName)
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return safeName || "사이트";
 }
 
 function removeForbiddenHeadingTerms(value: string) {

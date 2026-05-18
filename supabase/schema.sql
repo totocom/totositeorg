@@ -18,6 +18,7 @@ create table if not exists public.sites (
   name text not null,
   name_ko text null,
   name_en text null,
+  include_english_alias_in_title boolean not null default false,
   url text not null,
   domains text[] not null default '{}',
   screenshot_url text null,
@@ -183,6 +184,9 @@ alter table public.sites
 
 alter table public.sites
   add column if not exists name_en text null;
+
+alter table public.sites
+  add column if not exists include_english_alias_in_title boolean not null default false;
 
 alter table public.sites
   add column if not exists domains text[] not null default '{}';

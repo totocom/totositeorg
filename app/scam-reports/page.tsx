@@ -24,7 +24,7 @@ export const revalidate = 300;
 
 const scamReportsH1 = "먹튀 제보 및 토토사이트 먹튀 피해 사례";
 const scamReportsMetaTitle =
-  "먹튀 제보와 토토사이트 피해 사례 확인 | 토토사이트 정보";
+  "먹튀 제보와 토토사이트 피해 사례 확인";
 const scamReportsDescription =
   "먹튀 제보와 토토사이트 먹튀 피해 사례를 확인하세요. 출금 거부, 출금 지연, 계정 차단, 고객센터 차단, 입금 후 미반영 등 승인된 피해 제보를 유형별로 살펴볼 수 있습니다.";
 const scamReportsCanonical = `${siteUrl}/scam-reports`;

@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
-import {
-  sanitizePublicGeneratedText,
-  sanitizePublicSiteName,
-} from "./public-display";
+import { sanitizePublicGeneratedText } from "./public-display";
 import {
   buildSiteDetailRobots,
   getSiteDetailOpenGraphImage,
@@ -13,6 +10,11 @@ import {
   buildReviewsMetaDescription,
   buildScamReportsMetaDescription,
 } from "./public-seo-selection";
+import {
+  getSiteBodyName,
+  getSiteTitleName,
+  type SiteNameFormatInput,
+} from "./site-name-format";
 import type { ReviewTarget } from "./sites";
 import { siteName, siteUrl } from "../../lib/config";
 
@@ -71,9 +73,6 @@ export function buildSiteMainMetadata(
   slug: string,
 ): Metadata {
   const site = detail.common.site;
-  const reportCount = detail.common.tabCounts.scamReports;
-  const reviewCount = detail.common.tabCounts.reviews;
-  const domainCount = detail.common.tabCounts.domains;
 
   return buildSubpageMetadata({
     site,
@@ -83,14 +82,10 @@ export function buildSiteMainMetadata(
       kind: "main",
     }).shouldIndex,
     title: site
-      ? buildOptimalSiteTitle(
-          site.siteName,
-          `제보 ${reportCount}건·후기 ${reviewCount}건·도메인 ${domainCount}개`,
-          `제보 ${reportCount}건·후기 ${reviewCount}건`,
-        )
+      ? `${getSiteTitleName(site)} 먹튀 제보·후기·도메인 현황 | 토토사이트 정보`
       : "사이트 정보를 찾을 수 없습니다",
     description: site
-      ? `${site.siteName} 토토사이트의 대표 주소, 관측 스냅샷, 후기와 먹튀 제보 요약을 정리했습니다.`
+      ? `${getSiteBodyName(site)} 토토사이트의 대표 주소, 관측 스냅샷, 후기와 먹튀 제보 요약을 정리했습니다.`
       : "",
     imageAlt: site ? `${site.siteName} 토토사이트 메인 화면` : undefined,
   });
@@ -108,7 +103,7 @@ export function buildSiteScamReportsMetadata(
     path: `/sites/${encodeURIComponent(slug)}/scam-reports`,
     shouldIndex: shouldIndexSiteScamReportsPage(site, reportCount),
     title: site
-      ? buildSiteScamReportsTitle(site.siteName)
+      ? buildSiteScamReportsTitle(site)
       : "사이트 정보를 찾을 수 없습니다",
     description: site ? buildSiteScamReportsDescription(site, detail.scamReports) : "",
     imageAlt: site ? `${site.siteName} 토토사이트 먹튀 제보` : undefined,
@@ -127,7 +122,7 @@ export function buildSiteReviewsMetadata(
     path: `/sites/${encodeURIComponent(slug)}/reviews`,
     shouldIndex: shouldIndexSiteReviewsPage(site, reviewCount),
     title: site
-      ? buildSiteReviewsTitle(site.siteName)
+      ? buildSiteReviewsTitle(site)
       : "사이트 정보를 찾을 수 없습니다",
     description: site ? buildSiteReviewsDescription(site, detail.reviews) : "",
     imageAlt: site ? `${site.siteName} 토토사이트 후기` : undefined,
@@ -146,7 +141,7 @@ export function buildSiteDomainsMetadata(
     path: `/sites/${encodeURIComponent(slug)}/domains`,
     shouldIndex: shouldIndexSiteDomainsPage(site, domainCount),
     title: site
-      ? buildSiteDomainsTitle(site.siteName)
+      ? buildSiteDomainsTitle(site)
       : "사이트 정보를 찾을 수 없습니다",
     description: site
       ? buildSiteDomainsDescription(site)
@@ -165,23 +160,23 @@ export function buildReviewsTitleSuffix(
   return "후기와 이용자 만족도 평가";
 }
 
-export function buildSiteReviewsTitle(siteDisplayName: string) {
-  const normalizedSiteName = normalizeReviewTitleSiteName(siteDisplayName);
+export function buildSiteReviewsTitle(siteDisplayName: SiteNameFormatInput) {
+  const normalizedSiteName = getSiteTitleName(siteDisplayName);
 
   return `${normalizedSiteName} 후기와 이용자 만족도 평가 | 토토사이트 정보`;
 }
 
 export function buildSiteReviewsDescription(
-  site: Pick<ReviewTarget, "siteName">,
+  site: Pick<ReviewTarget, "siteName" | "siteNameKo" | "siteNameEn">,
   reviews: Array<{ experience?: string | null }> = [],
 ) {
-  const normalizedSiteName = site.siteName.replace(/\s+/g, " ").trim();
+  const normalizedSiteName = getSiteBodyName(site);
 
   return buildReviewsMetaDescription(normalizedSiteName, reviews);
 }
 
-export function buildSiteScamReportsTitle(siteDisplayName: string) {
-  const normalizedSiteName = normalizeReviewTitleSiteName(siteDisplayName);
+export function buildSiteScamReportsTitle(siteDisplayName: SiteNameFormatInput) {
+  const normalizedSiteName = getSiteTitleName(siteDisplayName);
 
   return sanitizePublicGeneratedText(
     `${normalizedSiteName} 먹튀 제보와 피해 사례 확인 | 토토사이트 정보`,
@@ -189,14 +184,14 @@ export function buildSiteScamReportsTitle(siteDisplayName: string) {
 }
 
 export function buildSiteScamReportsDescription(
-  site: Pick<ReviewTarget, "siteName">,
+  site: Pick<ReviewTarget, "siteName" | "siteNameKo" | "siteNameEn">,
   scamReports: Array<{
     damageTypes?: string[];
     mainCategory?: string | null;
     categoryItems?: string[] | null;
   }> = [],
 ) {
-  const normalizedSiteName = site.siteName.replace(/\s+/g, " ").trim();
+  const normalizedSiteName = getSiteBodyName(site);
 
   return buildScamReportsMetaDescription(normalizedSiteName, scamReports);
 }
@@ -214,8 +209,8 @@ export function buildDomainsTitleSuffix(
   return `주소·도메인 ${domainCount}개`;
 }
 
-export function buildSiteDomainsTitle(siteDisplayName: string) {
-  const normalizedSiteName = normalizeReviewTitleSiteName(siteDisplayName);
+export function buildSiteDomainsTitle(siteDisplayName: SiteNameFormatInput) {
+  const normalizedSiteName = getSiteTitleName(siteDisplayName);
 
   return sanitizePublicGeneratedText(
     `${normalizedSiteName} 주소와 도메인 변경 이력 확인 | 토토사이트 정보`,
@@ -223,9 +218,9 @@ export function buildSiteDomainsTitle(siteDisplayName: string) {
 }
 
 export function buildSiteDomainsDescription(
-  site: Pick<ReviewTarget, "siteName">,
+  site: Pick<ReviewTarget, "siteName" | "siteNameKo" | "siteNameEn">,
 ) {
-  const displayName = sanitizePublicSiteName(site.siteName);
+  const displayName = getSiteBodyName(site);
 
   return sanitizePublicGeneratedText(
     `${displayName}의 대표 도메인, 추가 도메인, 최초 등록일, 운영 이력, DNS·WHOIS 참고 정보를 확인하세요. 도메인 정보는 참고 자료이며 사이트 안전성이나 이용 가능성을 보장하지 않습니다.`,
@@ -307,15 +302,6 @@ function stripParenthesizedEnglish(siteDisplayName: string) {
     .replace(/\s*\([A-Za-z0-9._ -]+\)\s*/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function normalizeReviewTitleSiteName(siteDisplayName: string) {
-  const normalizedSiteName = sanitizePublicSiteName(siteDisplayName)
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\s+\(/g, "(");
-
-  return normalizedSiteName || "해당 사이트";
 }
 
 function toAbsoluteSiteUrl(path: string) {

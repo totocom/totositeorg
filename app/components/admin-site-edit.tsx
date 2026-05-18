@@ -25,6 +25,7 @@ type SiteRow = SiteCrawlSnapshotSiteColumns & {
   name: string;
   name_ko: string | null;
   name_en: string | null;
+  include_english_alias_in_title: boolean | null;
   url: string;
   domains: string[] | null;
   screenshot_url: string | null;
@@ -38,6 +39,7 @@ type SiteRow = SiteCrawlSnapshotSiteColumns & {
 type EditValues = {
   nameKo: string;
   nameEn: string;
+  includeEnglishAliasInTitle: boolean;
   url: string;
   domainsText: string;
   screenshotUrl: string;
@@ -63,6 +65,7 @@ type SiteCrawlSnapshotImageCandidates = Partial<{
 const initialValues: EditValues = {
   nameKo: "",
   nameEn: "",
+  includeEnglishAliasInTitle: false,
   url: "",
   domainsText: "",
   screenshotUrl: "",
@@ -244,6 +247,7 @@ function valuesFromSite(site: SiteRow): EditValues {
   return {
     nameKo: site.name_ko ?? site.name,
     nameEn: site.name_en ?? "",
+    includeEnglishAliasInTitle: Boolean(site.include_english_alias_in_title),
     url: site.url,
     domainsText: extraDomains.join("\n"),
     screenshotUrl: site.screenshot_url ?? "",
@@ -845,7 +849,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
 
       const { data, error } = await supabase
         .from("sites")
-        .select("id, slug, name, name_ko, name_en, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, status, description, latest_crawl_snapshot_id, content_crawled_at, description_source_snapshot_id, description_generated_at")
+        .select("id, slug, name, name_ko, name_en, include_english_alias_in_title, url, domains, screenshot_url, screenshot_thumb_url, favicon_url, logo_url, status, description, latest_crawl_snapshot_id, content_crawled_at, description_source_snapshot_id, description_generated_at")
         .eq("id", siteId)
         .single();
 
@@ -1472,6 +1476,7 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
         name: getDisplayName(values),
         name_ko: values.nameKo.trim() || null,
         name_en: values.nameEn.trim() || null,
+        include_english_alias_in_title: values.includeEnglishAliasInTitle,
         url: values.url.trim(),
         domains: getDomainList(values),
         screenshot_url: storedScreenshotUrl,
@@ -1637,6 +1642,23 @@ export function AdminSiteEdit({ siteId }: AdminSiteEditProps) {
               className="h-11 rounded-md border border-line px-3 text-sm"
               placeholder="예: korea"
             />
+          </label>
+
+          <label className="flex items-start gap-3 rounded-md border border-line bg-background p-3 text-sm">
+            <input
+              type="checkbox"
+              checked={values.includeEnglishAliasInTitle}
+              onChange={(event) =>
+                updateField("includeEnglishAliasInTitle", event.target.checked)
+              }
+              className="mt-1 h-4 w-4"
+            />
+            <span>
+              <span className="block font-semibold">title에 영어 이름 포함</span>
+              <span className="mt-1 block text-xs leading-5 text-muted">
+                기본값은 해제입니다. 영문명이 공식명에 가깝거나 한글명만으로 식별이 어려운 경우에만 사용합니다.
+              </span>
+            </span>
           </label>
 
           <div className="grid gap-1 text-sm font-medium">

@@ -1,6 +1,6 @@
 import { formatDisplayDomain } from "@/app/data/domain-display";
-import { sanitizePublicSiteName } from "@/app/data/public-display";
 import type { SiteCommonHeaderResult } from "@/app/data/public-site-detail";
+import { getSiteDisplayName } from "@/app/data/site-name-format";
 import { formatTrustScore } from "@/app/data/sites";
 import {
   SiteDetailTabs,
@@ -22,23 +22,27 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getHeading(activeTab: SiteDetailTab, siteName: string) {
-  const keywordName = getSiteKeywordName(siteName);
+function getHeading(
+  activeTab: SiteDetailTab,
+  site: NonNullable<SiteCommonHeaderResult["site"]>,
+) {
+  const displayName = getSiteDisplayName(site);
+  const keywordName = getSiteKeywordName(displayName);
 
   if (activeTab === "scam-reports") {
-    return `${sanitizePublicSiteName(siteName)} 먹튀 제보 및 피해 사례`;
+    return `${displayName} 먹튀 제보 및 피해 사례`;
   }
   if (activeTab === "reviews") {
     return `${keywordName} 후기 및 이용자 만족도 평가`;
   }
   if (activeTab === "domains") {
-    return `${sanitizePublicSiteName(siteName)} 주소·도메인 정보 및 변경 이력`;
+    return `${displayName} 주소·도메인 정보 및 변경 이력`;
   }
   return keywordName;
 }
 
 function getSiteKeywordName(siteName: string) {
-  const normalizedSiteName = sanitizePublicSiteName(siteName);
+  const normalizedSiteName = siteName.replace(/\s+/g, " ").trim();
 
   if (!normalizedSiteName) return "토토사이트";
   if (normalizedSiteName.includes("토토사이트")) return normalizedSiteName;
@@ -66,7 +70,7 @@ export function SiteHeaderCommon({
     <section className="rounded-lg border border-line bg-surface p-5 shadow-sm">
       <p className="text-sm font-semibold uppercase text-accent">사이트 상세</p>
       <h1 className="mt-2 break-keep text-2xl font-bold text-foreground sm:text-3xl">
-        {getHeading(activeTab, site.siteName)}
+        {getHeading(activeTab, site)}
       </h1>
       <p className="mt-2 break-all text-sm text-muted">
         <span className="font-semibold text-foreground">대표 도메인: </span>
