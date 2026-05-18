@@ -150,6 +150,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.65,
     },
     {
+      url: `${siteUrl}/tools`,
+      lastModified: new Date("2026-05-18"),
+      changeFrequency: "monthly",
+      priority: 0.55,
+    },
+    {
+      url: `${siteUrl}/tools/payout-calculator`,
+      lastModified: new Date("2026-05-18"),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${siteUrl}/tools/parlay-calculator`,
+      lastModified: new Date("2026-05-18"),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${siteUrl}/tools/implied-probability-calculator`,
+      lastModified: new Date("2026-05-18"),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${siteUrl}/tools/expected-value-calculator`,
+      lastModified: new Date("2026-05-18"),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
       url: `${siteUrl}/site-registration`,
       lastModified: new Date(),
       changeFrequency: "monthly",
