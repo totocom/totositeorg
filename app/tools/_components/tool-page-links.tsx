@@ -21,6 +21,21 @@ const calculatorLinks = [
     title: "기대값 계산기",
     description: "예상 적중 확률을 기준으로 이론상 기대값을 계산합니다.",
   },
+  {
+    href: "/tools/hedge-calculator",
+    title: "헤지 계산기",
+    description: "기존 베팅과 반대 결과 배당으로 결과별 예상 손익을 비교합니다.",
+  },
+  {
+    href: "/tools/no-vig-calculator",
+    title: "북메이커 마진 계산기",
+    description: "2개 또는 3개 결과의 배당으로 암시 확률과 이론상 마진을 계산합니다.",
+  },
+  {
+    href: "/tools/odds-difference-calculator",
+    title: "배당 차이 계산기",
+    description: "서로 다른 결과의 배당과 총 계산 금액으로 결과별 배분 금액과 이론상 손익을 비교합니다.",
+  },
 ];
 
 export const toolNoticeText =

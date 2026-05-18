@@ -16,7 +16,7 @@ import { siteName, siteUrl } from "@/lib/config";
 
 const title = "토토 배당 계산기 모음";
 const description =
-  "한국식 소수 배당 기준으로 예상 당첨금, 조합 배당, 배당 확률, 기대값을 계산할 수 있는 정보 제공용 도구 모음입니다.";
+  "한국식 소수 배당 기준으로 예상 당첨금, 조합 배당, 배당 확률, 기대값, 결과별 손익, 이론상 마진과 배당 차이를 계산할 수 있는 정보 제공용 도구 모음입니다.";
 const canonical = new URL("/tools", siteUrl).toString();
 const calculatorLinks = getCalculatorLinks();
 

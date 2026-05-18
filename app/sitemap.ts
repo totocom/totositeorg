@@ -180,6 +180,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     },
     {
+      url: `${siteUrl}/tools/hedge-calculator`,
+      lastModified: new Date("2026-05-18"),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${siteUrl}/tools/no-vig-calculator`,
+      lastModified: new Date("2026-05-18"),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${siteUrl}/tools/odds-difference-calculator`,
+      lastModified: new Date("2026-05-18"),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
       url: `${siteUrl}/site-registration`,
       lastModified: new Date(),
       changeFrequency: "monthly",
