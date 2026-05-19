@@ -81,14 +81,16 @@ export function CalculatorLinkGrid({
             key={item.href}
             className="rounded-lg border border-line bg-background p-4 transition hover:border-accent/40"
           >
-            <h3 className="text-base font-bold text-foreground">
-              <Link href={item.href} className="transition hover:text-accent">
-                {item.title}
-              </Link>
-            </h3>
+            <h3 className="text-base font-bold text-foreground">{item.title}</h3>
             <p className="mt-2 text-sm leading-6 text-muted">
               {item.description}
             </p>
+            <Link
+              href={item.href}
+              className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-sm font-semibold text-foreground transition hover:bg-surface"
+            >
+              {item.ctaText}
+            </Link>
           </article>
         ))}
       </div>

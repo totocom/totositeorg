@@ -90,7 +90,7 @@ export function PayoutCalculatorClient() {
       </div>
 
       <FormulaDetails>
-        <p>예상 지급액 = 베팅 금액 x 배당</p>
+        <p>예상 지급액 = 베팅 금액 × 배당</p>
         <p>예상 수익 = 예상 지급액 - 베팅 금액</p>
       </FormulaDetails>
     </CalculatorClientShell>
