@@ -4,37 +4,51 @@ const calculatorLinks = [
   {
     href: "/tools/payout-calculator",
     title: "예상 당첨금 계산기",
-    description: "베팅 금액과 소수 배당으로 예상 지급액을 계산합니다.",
+    description:
+      "베팅 금액과 소수 배당을 입력해 예상 지급액과 예상 수익을 계산합니다. 단일 배당 결과를 빠르게 확인할 때 사용할 수 있습니다.",
+    ctaText: "예상 당첨금 계산하기",
   },
   {
     href: "/tools/parlay-calculator",
     title: "조합 배당 계산기",
-    description: "여러 소수 배당을 곱해 조합 배당을 계산합니다.",
+    description:
+      "여러 개의 소수 배당을 곱해 조합 배당, 예상 지급액, 예상 수익을 계산합니다. 2개 이상 선택한 조합 결과를 비교할 때 사용할 수 있습니다.",
+    ctaText: "조합 배당 계산하기",
   },
   {
     href: "/tools/implied-probability-calculator",
     title: "배당 확률 계산기",
-    description: "소수 배당을 암시 확률로 환산합니다.",
+    description:
+      "소수 배당을 암시 확률로 변환합니다. 배당 2.00은 50%, 배당 1.50은 약 66.7%처럼 이론상 확률을 확인할 수 있습니다.",
+    ctaText: "배당 확률 계산하기",
   },
   {
     href: "/tools/expected-value-calculator",
     title: "기대값 계산기",
-    description: "예상 적중 확률을 기준으로 이론상 기대값을 계산합니다.",
+    description:
+      "베팅 금액, 소수 배당, 예상 적중 확률을 입력해 이론상 기대값을 계산합니다. 계산 결과는 사용자가 입력한 확률에 따른 참고값입니다.",
+    ctaText: "기대값 계산하기",
   },
   {
     href: "/tools/hedge-calculator",
     title: "헤지 계산기",
-    description: "기존 베팅과 반대 결과 배당으로 결과별 예상 손익을 비교합니다.",
+    description:
+      "기존 베팅과 반대 결과 배당을 입력해 결과별 예상 손익을 비교합니다. 실제 결과를 확정하는 기능이 아니라 손익 구조를 확인하는 참고 계산기입니다.",
+    ctaText: "헤지 금액 계산하기",
   },
   {
     href: "/tools/no-vig-calculator",
     title: "북메이커 마진 계산기",
-    description: "2개 또는 3개 결과의 배당으로 암시 확률과 이론상 마진을 계산합니다.",
+    description:
+      "2개 또는 3개 결과의 소수 배당을 입력해 암시 확률 합산값과 이론상 마진을 계산합니다.",
+    ctaText: "북메이커 마진 계산하기",
   },
   {
     href: "/tools/odds-difference-calculator",
     title: "배당 차이 계산기",
-    description: "서로 다른 결과의 배당과 총 계산 금액으로 결과별 배분 금액과 이론상 손익을 비교합니다.",
+    description:
+      "서로 다른 결과의 배당과 총 계산 금액을 입력해 결과별 배분 금액과 이론상 손익을 비교합니다.",
+    ctaText: "배당 차이 계산하기",
   },
 ];
 
